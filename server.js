@@ -13,6 +13,18 @@ const V = require('./views');
 
 const PORT = process.env.PORT || 3000;
 const SECRET = process.env.RIVET_SECRET || 'dev-secret-change-me';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
+const googleEnabled = !!(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET);
+
+function baseUrl(req){
+  const proto = (req.headers['x-forwarded-proto'] || '').split(',')[0].trim() || 'http';
+  return `${proto}://${req.headers.host}`;
+}
+function getCookie(req, name){
+  const c = (req.headers.cookie||'').split(';').map(s=>s.trim()).find(s=>s.startsWith(name+'='));
+  return c ? c.slice(name.length+1) : null;
+}
 
 // ---------- session: signed cookie holding the user id (stateless) ----------
 function sign(val){ return crypto.createHmac('sha256', SECRET).update(val).digest('hex').slice(0,32); }
@@ -76,32 +88,89 @@ const server = http.createServer(async (req,res)=>{
       return send(res, V.layout({title:'Hire & get hired in the trades', user:null, body:V.landing()}));
     }
     if(p==='/signup' && method==='GET')
-      return send(res, V.layout({title:'Sign up', user:null, body:V.authForm('signup',{role:url.searchParams.get('role')||'worker'})}));
+      return send(res, V.layout({title:'Sign up', user:null, body:V.authForm('signup',{role:url.searchParams.get('role')||'worker', google:googleEnabled})}));
     if(p==='/login' && method==='GET')
-      return send(res, V.layout({title:'Log in', user:null, body:V.authForm('login')}));
+      return send(res, V.layout({title:'Log in', user:null, body:V.authForm('login',{google:googleEnabled})}));
 
     if(p==='/signup' && method==='POST'){
       const b = await readBody(req);
       const role = b.role==='employer'?'employer':'worker';
-      if(!b.email||!b.pass||!b.name) return send(res, V.layout({title:'Sign up',user:null,body:V.authForm('signup',{role,error:'All fields are required.'})}));
+      if(!b.email||!b.pass||!b.name) return send(res, V.layout({title:'Sign up',user:null,body:V.authForm('signup',{role,google:googleEnabled,error:'All fields are required.'})}));
       try{
         const info = db.prepare('INSERT INTO users(email,pass,role,name,company) VALUES(?,?,?,?,?)')
           .run(b.email.toLowerCase().trim(), hashPassword(b.pass), role, b.name.trim(), role==='employer'?(b.company||'').trim():null);
         setSession(res, info.lastInsertRowid);
         return redirect(res, role==='employer'?'/console':'/app/onboard');
       }catch(e){
-        return send(res, V.layout({title:'Sign up',user:null,body:V.authForm('signup',{role,error:'That email is already registered.'})}));
+        return send(res, V.layout({title:'Sign up',user:null,body:V.authForm('signup',{role,google:googleEnabled,error:'That email is already registered.'})}));
       }
     }
     if(p==='/login' && method==='POST'){
       const b = await readBody(req);
       const u = db.prepare('SELECT * FROM users WHERE email=?').get((b.email||'').toLowerCase().trim());
       if(!u || !verifyPassword(b.pass||'', u.pass))
-        return send(res, V.layout({title:'Log in',user:null,body:V.authForm('login',{error:'Invalid email or password.'})}));
+        return send(res, V.layout({title:'Log in',user:null,body:V.authForm('login',{google:googleEnabled,error:'Invalid email or password.'})}));
       setSession(res, u.id);
       return redirect(res, u.role==='employer'?'/console':'/app');
     }
     if(p==='/logout'){ clearSession(res); return redirect(res,'/'); }
+
+    // ---- Google OAuth (only active when GOOGLE_CLIENT_ID/SECRET are set) ----
+    if(p==='/auth/google' && method==='GET'){
+      if(!googleEnabled) return redirect(res,'/login');
+      const role = url.searchParams.get('role')==='employer' ? 'employer' : 'worker';
+      const state = `${crypto.randomBytes(16).toString('hex')}:${role}`;
+      res.setHeader('Set-Cookie', `gstate=${state}.${sign(state)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=600`);
+      const params = new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        redirect_uri: `${baseUrl(req)}/auth/google/callback`,
+        response_type: 'code',
+        scope: 'openid email profile',
+        state,
+        prompt: 'select_account',
+      });
+      return redirect(res, `https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+    }
+    if(p==='/auth/google/callback' && method==='GET'){
+      if(!googleEnabled) return redirect(res,'/login');
+      const code = url.searchParams.get('code');
+      const state = url.searchParams.get('state') || '';
+      const cookie = getCookie(req,'gstate') || '';
+      const dot = cookie.lastIndexOf('.');
+      const cState = dot>0 ? cookie.slice(0,dot) : '';
+      const cSig = dot>0 ? cookie.slice(dot+1) : '';
+      if(!code || !state || state!==cState || sign(state)!==cSig) return redirect(res,'/login');
+      const role = state.split(':')[1]==='employer' ? 'employer' : 'worker';
+      try {
+        const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+          method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+          body: new URLSearchParams({
+            code, client_id:GOOGLE_CLIENT_ID, client_secret:GOOGLE_CLIENT_SECRET,
+            redirect_uri:`${baseUrl(req)}/auth/google/callback`, grant_type:'authorization_code',
+          }),
+        });
+        const tok = await tokenRes.json();
+        if(!tok.access_token) throw new Error('token exchange failed');
+        const uiRes = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+          headers:{ Authorization:`Bearer ${tok.access_token}` },
+        });
+        const gu = await uiRes.json();
+        if(!gu.email) throw new Error('no email from Google');
+        const email = String(gu.email).toLowerCase().trim();
+        let u = db.prepare('SELECT * FROM users WHERE email=?').get(email);
+        if(!u){
+          const placeholder = hashPassword(crypto.randomBytes(24).toString('hex'));
+          const r = db.prepare('INSERT INTO users(email,pass,role,name,company) VALUES(?,?,?,?,?)')
+            .run(email, placeholder, role, gu.name || email.split('@')[0], null);
+          u = { id:r.lastInsertRowid, role };
+        }
+        setSession(res, u.id);
+        return redirect(res, u.role==='employer' ? '/console' : '/app');
+      } catch(e){
+        console.error('google oauth', e);
+        return redirect(res,'/login');
+      }
+    }
 
     // ---- worker (Rivet) ----
     if(p.startsWith('/app')){

@@ -15,6 +15,12 @@ services:
       # lives inside the project dir (ephemeral — reseeds on restart).
       - key: RIVET_DATA_DIR
         value: /opt/render/project/src/data
+      # Google Sign-In. Set both in the Render dashboard (Environment tab).
+      # Until set, the "Continue with Google" button is hidden automatically.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
     # ---- Persistent data (PAID plan only) ----
     # To keep data permanently: upgrade `plan` above to `starter`, uncomment
     # the disk block below, and change RIVET_DATA_DIR above to /var/data.
