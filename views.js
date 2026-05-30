@@ -41,7 +41,16 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <header class="topbar"><div class="bar wrap">${brand}<nav>${nav}</nav></div></header>
   ${flash?`<div class="flash wrap">${esc(flash)}</div>`:''}
   <main>${body}</main>
-  <footer class="site-foot">Rivet × Crewline — blue-collar hiring MVP · built for the founders' demo</footer>
+  ${user ? `<footer class="site-foot">Rivet × Crewline — blue-collar hiring platform</footer>`
+    : `<footer class="site-foot rich">
+    <div class="wrap foot-grid">
+      <div class="foot-brand"><a class="brand" href="/"><span class="logo">R</span> Rivet <small>× Crewline</small></a>
+        <p>The blue-collar hiring platform — built for the trades.</p></div>
+      <div class="foot-col"><h5>For workers</h5><a href="/signup?role=worker">Get started</a><a href="/login">Log in</a></div>
+      <div class="foot-col"><h5>For employers</h5><a href="/signup?role=employer">Post a job</a><a href="/login">Log in</a></div>
+    </div>
+    <div class="wrap foot-base">© 2026 Rivet × Crewline · Phoenix, AZ</div>
+  </footer>`}
   </body></html>`;
 }
 
@@ -68,6 +77,31 @@ function landing() {
     <div class="prodcard emp">
       <h3>🖥️ Crewline — for employers</h3>
       <ul><li>Search verified, ready, local talent</li><li>Post jobs, auto-matched instantly</li><li>Trades-stage hiring pipeline</li><li>Credential compliance built in</li></ul>
+    </div>
+  </section>
+  <section class="how wrap">
+    <h2 class="how-h">How it works</h2>
+    <div class="how-grid">
+      <div class="how-col">
+        <div class="how-tag worker">For workers · Rivet</div>
+        <ol class="steps">
+          <li><b>Build your Work Card</b><span>Add your trade, experience and credentials — your readiness score updates live.</span></li>
+          <li><b>Get matched</b><span>See local jobs ranked by how well you fit, at the pay you want.</span></li>
+          <li><b>Apply in one tap</b><span>Employers see your verified card instantly — no resume, no re-listing.</span></li>
+        </ol>
+      </div>
+      <div class="how-col">
+        <div class="how-tag emp">For employers · Crewline</div>
+        <ol class="steps">
+          <li><b>Post a job</b><span>It's matched against the verified talent pool the moment you publish.</span></li>
+          <li><b>Review ranked crews</b><span>Candidates scored on trade fit, pay, location and credential coverage.</span></li>
+          <li><b>Move them through</b><span>A trades-stage pipeline from Sourced to Hired — compliance built in.</span></li>
+        </ol>
+      </div>
+    </div>
+    <div class="how-cta">
+      <a class="btn" href="/signup?role=worker">Get hired → Rivet</a>
+      <a class="btn ghost" href="/signup?role=employer">Hire a crew → Crewline</a>
     </div>
   </section>`;
 }
