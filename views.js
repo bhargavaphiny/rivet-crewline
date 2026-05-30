@@ -54,9 +54,10 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:image" content="${site}/og.svg">
   <link rel="stylesheet" href="/styles.css">
   </head><body>
-  <header class="topbar"><div class="bar wrap">${brand}<nav>${nav}</nav></div></header>
+  <a class="skip" href="#main">Skip to main content</a>
+  <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
   ${flash?`<div class="flash wrap">${esc(flash)}</div>`:''}
-  <main>${body}</main>
+  <main id="main">${body}</main>
   ${user ? `<footer class="site-foot">Rivet × Crewline — blue-collar hiring platform</footer>`
     : `<footer class="site-foot rich">
     <div class="wrap foot-grid">
