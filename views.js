@@ -33,9 +33,25 @@ function layout({ title, user, body, active = '', flash = '' }) {
     ? `<a class="brand" href="/console"><span class="logo c">C</span> Crewline</a>`
     : `<a class="brand" href="${user?'/app':'/'}"><span class="logo">R</span> Rivet${user?'':' <small>× Crewline</small>'}</a>`;
 
+  const desc = 'Rivet × Crewline — the blue-collar hiring platform. Rivet preps skilled-trade workers to get hired and certified; Crewline gives employers verified, job-ready crews, fast.';
+  const fullTitle = `${esc(title)} · Rivet × Crewline`;
+  const site = 'https://rivet-crewline.onrender.com';
   return `<!DOCTYPE html><html lang="en"><head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${esc(title)} · Rivet × Crewline</title>
+  <title>${fullTitle}</title>
+  <meta name="description" content="${esc(desc)}">
+  <meta name="theme-color" content="#16242F">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23FF6A1A'/%3E%3Ctext x='16' y='23' font-size='20' font-weight='900' fill='white' text-anchor='middle' font-family='Arial,sans-serif'%3ER%3C/text%3E%3C/svg%3E">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Rivet × Crewline">
+  <meta property="og:title" content="${fullTitle}">
+  <meta property="og:description" content="${esc(desc)}">
+  <meta property="og:url" content="${site}">
+  <meta property="og:image" content="${site}/og.svg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${fullTitle}">
+  <meta name="twitter:description" content="${esc(desc)}">
+  <meta name="twitter:image" content="${site}/og.svg">
   <link rel="stylesheet" href="/styles.css">
   </head><body>
   <header class="topbar"><div class="bar wrap">${brand}<nav>${nav}</nav></div></header>
@@ -429,5 +445,22 @@ function empSearch({ rows, filters }) {
   </section>`;
 }
 
+// Branded 1200x630 social-share image (served at /og.svg).
+function ogImage() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#16242F"/>
+  <rect width="1200" height="8" y="622" fill="#FF6A1A"/>
+  <g transform="translate(90,90)">
+    <rect width="92" height="92" rx="20" fill="#FF6A1A"/>
+    <text x="46" y="66" font-family="Arial,Helvetica,sans-serif" font-size="58" font-weight="900" fill="#fff" text-anchor="middle">R</text>
+    <text x="118" y="40" font-family="Arial,Helvetica,sans-serif" font-size="34" font-weight="800" fill="#fff">Rivet</text>
+    <text x="118" y="76" font-family="Arial,Helvetica,sans-serif" font-size="26" font-weight="600" fill="#9fb0bb">× Crewline</text>
+  </g>
+  <text x="90" y="320" font-family="Arial,Helvetica,sans-serif" font-size="76" font-weight="800" fill="#fff">America can't <tspan fill="#FFC042">build</tspan></text>
+  <text x="90" y="408" font-family="Arial,Helvetica,sans-serif" font-size="76" font-weight="800" fill="#fff">what it can't <tspan fill="#FFC042">staff.</tspan></text>
+  <text x="90" y="500" font-family="Arial,Helvetica,sans-serif" font-size="32" font-weight="500" fill="#c3cfd6">The blue-collar hiring platform — built for the trades.</text>
+</svg>`;
+}
+
 module.exports = { layout, landing, authForm, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, empOverview, empJobs, empJobForm, empPipeline, empSearch, STAGES };
+  jobDetail, workerProfile, empOverview, empJobs, empJobForm, empPipeline, empSearch, ogImage, STAGES };

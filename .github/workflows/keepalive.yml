@@ -10,4 +10,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping site
-        run: curl -sSfL --max-time 60 https://rivet-crewline.onrender.com/ -o /dev/null
+        run: curl -sSfL --max-time 60 https://rivet-crewline.onrender.com/healthz -o /dev/null

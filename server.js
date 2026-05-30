@@ -82,8 +82,10 @@ const server = http.createServer(async (req,res)=>{
   const user = await getUser(req);
 
   try {
-    // static
-    if(p==='/styles.css'){ res.writeHead(200,{'Content-Type':'text/css'}); return res.end(fs.readFileSync(path.join(__dirname,'styles.css'))); }
+    // static & utility
+    if(p==='/styles.css'){ res.writeHead(200,{'Content-Type':'text/css','Cache-Control':'public, max-age=3600'}); return res.end(fs.readFileSync(path.join(__dirname,'styles.css'))); }
+    if(p==='/og.svg'){ res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'public, max-age=86400'}); return res.end(V.ogImage()); }
+    if(p==='/healthz'){ res.writeHead(200,{'Content-Type':'text/plain'}); return res.end('ok'); }
 
     // ---- public ----
     if(p==='/' && method==='GET'){
