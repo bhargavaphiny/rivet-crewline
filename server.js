@@ -1,13 +1,13 @@
 'use strict';
 /*
- * Rivet x Crewline - HTTP server (Node built-ins only).
- * Run:  node --experimental-sqlite server.js   (or: npm start)
+ * Rivet x Crewline - HTTP server.
+ * Run:  node server.js   (or: npm start)
  */
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { db, hashPassword, verifyPassword, recomputeReadiness } = require('./db');
+const { db, init, hashPassword, verifyPassword, recomputeReadiness } = require('./db');
 const M = require('./matching');
 const V = require('./views');
 
@@ -33,13 +33,13 @@ function setSession(res, uid){
   res.setHeader('Set-Cookie', `sess=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=604800`);
 }
 function clearSession(res){ res.setHeader('Set-Cookie', 'sess=; HttpOnly; Path=/; Max-Age=0'); }
-function getUser(req){
+async function getUser(req){
   const cookie = (req.headers.cookie||'').split(';').map(s=>s.trim()).find(s=>s.startsWith('sess='));
   if(!cookie) return null;
   const token = cookie.slice(5);
   const [uid, sig] = token.split('.');
   if(!uid || sig !== sign(uid)) return null;
-  return db.prepare('SELECT id,email,role,name,company FROM users WHERE id=?').get(Number(uid)) || null;
+  return (await db.prepare('SELECT id,email,role,name,company FROM users WHERE id=?').get(Number(uid))) || null;
 }
 
 // ---------- helpers ----------
@@ -61,22 +61,25 @@ const getProfile = uid => db.prepare('SELECT * FROM worker_profiles WHERE user_i
 const getCreds   = uid => db.prepare('SELECT * FROM credentials WHERE user_id=? ORDER BY id').all(uid);
 const openJobs   = () => db.prepare(`SELECT j.*, u.company FROM jobs j JOIN users u ON u.id=j.employer_id WHERE j.status='open' ORDER BY j.created_at DESC`).all();
 
-function rankJobsForWorker(uid){
-  const prof = getProfile(uid); const creds = getCreds(uid);
-  return openJobs().map(j=>{ const r=M.scoreMatch(prof,creds,j); return {job:j, score:r.score, missing:r.missing}; })
+async function rankJobsForWorker(uid){
+  const prof = await getProfile(uid); const creds = await getCreds(uid);
+  const jobs = await openJobs();
+  return jobs.map(j=>{ const r=M.scoreMatch(prof,creds,j); return {job:j, score:r.score, missing:r.missing}; })
     .sort((a,b)=>b.score-a.score);
 }
-function rankWorkersForJob(job){
-  const workers = db.prepare(`SELECT u.id user_id,u.name,p.* FROM users u JOIN worker_profiles p ON p.user_id=u.id WHERE u.role='worker'`).all();
-  return workers.map(w=>{ const creds=getCreds(w.user_id); const r=M.scoreMatch(w,creds,job);
-    return {...w, score:r.score, readiness:w.readiness}; }).sort((a,b)=>b.score-a.score);
+async function rankWorkersForJob(job){
+  const workers = await db.prepare(`SELECT u.id user_id,u.name,p.* FROM users u JOIN worker_profiles p ON p.user_id=u.id WHERE u.role='worker'`).all();
+  const out = [];
+  for(const w of workers){ const creds=await getCreds(w.user_id); const r=M.scoreMatch(w,creds,job);
+    out.push({...w, score:r.score, readiness:w.readiness}); }
+  return out.sort((a,b)=>b.score-a.score);
 }
 
 // ---------- router ----------
 const server = http.createServer(async (req,res)=>{
   const url = new URL(req.url, `http://${req.headers.host}`);
   const p = url.pathname, method = req.method;
-  const user = getUser(req);
+  const user = await getUser(req);
 
   try {
     // static
@@ -97,7 +100,7 @@ const server = http.createServer(async (req,res)=>{
       const role = b.role==='employer'?'employer':'worker';
       if(!b.email||!b.pass||!b.name) return send(res, V.layout({title:'Sign up',user:null,body:V.authForm('signup',{role,google:googleEnabled,error:'All fields are required.'})}));
       try{
-        const info = db.prepare('INSERT INTO users(email,pass,role,name,company) VALUES(?,?,?,?,?)')
+        const info = await db.prepare('INSERT INTO users(email,pass,role,name,company) VALUES(?,?,?,?,?)')
           .run(b.email.toLowerCase().trim(), hashPassword(b.pass), role, b.name.trim(), role==='employer'?(b.company||'').trim():null);
         setSession(res, info.lastInsertRowid);
         return redirect(res, role==='employer'?'/console':'/app/onboard');
@@ -107,7 +110,7 @@ const server = http.createServer(async (req,res)=>{
     }
     if(p==='/login' && method==='POST'){
       const b = await readBody(req);
-      const u = db.prepare('SELECT * FROM users WHERE email=?').get((b.email||'').toLowerCase().trim());
+      const u = await db.prepare('SELECT * FROM users WHERE email=?').get((b.email||'').toLowerCase().trim());
       if(!u || !verifyPassword(b.pass||'', u.pass))
         return send(res, V.layout({title:'Log in',user:null,body:V.authForm('login',{google:googleEnabled,error:'Invalid email or password.'})}));
       setSession(res, u.id);
@@ -157,10 +160,10 @@ const server = http.createServer(async (req,res)=>{
         const gu = await uiRes.json();
         if(!gu.email) throw new Error('no email from Google');
         const email = String(gu.email).toLowerCase().trim();
-        let u = db.prepare('SELECT * FROM users WHERE email=?').get(email);
+        let u = await db.prepare('SELECT * FROM users WHERE email=?').get(email);
         if(!u){
           const placeholder = hashPassword(crypto.randomBytes(24).toString('hex'));
-          const r = db.prepare('INSERT INTO users(email,pass,role,name,company) VALUES(?,?,?,?,?)')
+          const r = await db.prepare('INSERT INTO users(email,pass,role,name,company) VALUES(?,?,?,?,?)')
             .run(email, placeholder, role, gu.name || email.split('@')[0], null);
           u = { id:r.lastInsertRowid, role };
         }
@@ -176,34 +179,34 @@ const server = http.createServer(async (req,res)=>{
     if(p.startsWith('/app')){
       if(!user) return redirect(res,'/login');
       if(user.role!=='worker') return redirect(res,'/console');
-      const prof = getProfile(user.id);
+      const prof = await getProfile(user.id);
 
       if(p==='/app/onboard' && method==='GET') return send(res, V.layout({title:'Set up',user,active:'',body:V.workerOnboard()}));
       if(p==='/app/onboard' && method==='POST'){
         const b = await readBody(req);
         const vals = [b.trade, Number(b.years_exp)||0, b.city||'', b.zip||'', Number(b.pay_floor)||0, b.shift||'Any'];
-        if(prof) db.prepare('UPDATE worker_profiles SET trade=?,years_exp=?,city=?,zip=?,pay_floor=?,shift=? WHERE user_id=?').run(...vals,user.id);
-        else db.prepare('INSERT INTO worker_profiles(user_id,trade,years_exp,city,zip,pay_floor,shift) VALUES(?,?,?,?,?,?,?)').run(user.id,...vals);
-        recomputeReadiness(user.id);
+        if(prof) await db.prepare('UPDATE worker_profiles SET trade=?,years_exp=?,city=?,zip=?,pay_floor=?,shift=? WHERE user_id=?').run(...vals,user.id);
+        else await db.prepare('INSERT INTO worker_profiles(user_id,trade,years_exp,city,zip,pay_floor,shift) VALUES(?,?,?,?,?,?,?)').run(user.id,...vals);
+        await recomputeReadiness(user.id);
         return redirect(res,'/app');
       }
       if(!prof) return redirect(res,'/app/onboard');
 
       if(p==='/app' && method==='GET')
-        return send(res, V.layout({title:'Home',user,active:'home',body:V.workerHome({user,profile:prof,creds:getCreds(user.id),matches:rankJobsForWorker(user.id)})}));
+        return send(res, V.layout({title:'Home',user,active:'home',body:V.workerHome({user,profile:prof,creds:await getCreds(user.id),matches:await rankJobsForWorker(user.id)})}));
       if(p==='/app/jobs' && method==='GET')
-        return send(res, V.layout({title:'Matches',user,active:'jobs',body:V.workerJobs({matches:rankJobsForWorker(user.id)})}));
+        return send(res, V.layout({title:'Matches',user,active:'jobs',body:V.workerJobs({matches:await rankJobsForWorker(user.id)})}));
       if(p==='/app/profile' && method==='GET')
-        return send(res, V.layout({title:'Work Card',user,active:'profile',body:V.workerProfile({user,profile:prof,creds:getCreds(user.id)})}));
+        return send(res, V.layout({title:'Work Card',user,active:'profile',body:V.workerProfile({user,profile:prof,creds:await getCreds(user.id)})}));
       if(p==='/app/credentials' && method==='POST'){
         const b = await readBody(req);
-        if(b.kind) db.prepare('INSERT INTO credentials(user_id,kind,name,verified,expires) VALUES(?,?,?,1,?)')
+        if(b.kind) await db.prepare('INSERT INTO credentials(user_id,kind,name,verified,expires) VALUES(?,?,?,1,?)')
           .run(user.id, b.kind, M.CRED_KINDS[b.kind]||b.kind, b.expires||null);
-        recomputeReadiness(user.id);
+        await recomputeReadiness(user.id);
         return redirect(res,'/app/profile');
       }
       if(p==='/app/applications' && method==='GET'){
-        const apps = db.prepare(`SELECT a.*, j.title,j.trade,j.pay_min,j.pay_max,j.city,u.company
+        const apps = await db.prepare(`SELECT a.*, j.title,j.trade,j.pay_min,j.pay_max,j.city,u.company
           FROM applications a JOIN jobs j ON j.id=a.job_id JOIN users u ON u.id=j.employer_id
           WHERE a.worker_id=? ORDER BY a.created_at DESC`).all(user.id);
         const body = `<section class="wrap"><div class="sec-h big">Your applications</div>
@@ -216,16 +219,16 @@ const server = http.createServer(async (req,res)=>{
       }
       const jid = qid(p);
       if(jid && p===`/app/jobs/${jid}` && method==='GET'){
-        const job = db.prepare(`SELECT j.*,u.company FROM jobs j JOIN users u ON u.id=j.employer_id WHERE j.id=?`).get(jid);
+        const job = await db.prepare(`SELECT j.*,u.company FROM jobs j JOIN users u ON u.id=j.employer_id WHERE j.id=?`).get(jid);
         if(!job) return send(res, V.layout({title:'Not found',user,body:'<section class="wrap"><div class="card">Job not found.</div></section>'}),404);
-        const match = M.scoreMatch(prof, getCreds(user.id), job);
-        const applied = !!db.prepare('SELECT 1 FROM applications WHERE job_id=? AND worker_id=?').get(jid,user.id);
+        const match = M.scoreMatch(prof, await getCreds(user.id), job);
+        const applied = !!(await db.prepare('SELECT 1 FROM applications WHERE job_id=? AND worker_id=?').get(jid,user.id));
         return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied})}));
       }
       if(jid && p===`/app/jobs/${jid}/apply` && method==='POST'){
-        const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(jid);
-        if(job){ const m=M.scoreMatch(prof,getCreds(user.id),job);
-          try{ db.prepare('INSERT INTO applications(job_id,worker_id,stage,score) VALUES(?,?,?,?)').run(jid,user.id,'Sourced',m.score); }catch(e){}
+        const job = await db.prepare('SELECT * FROM jobs WHERE id=?').get(jid);
+        if(job){ const m=M.scoreMatch(prof,await getCreds(user.id),job);
+          try{ await db.prepare('INSERT INTO applications(job_id,worker_id,stage,score) VALUES(?,?,?,?)').run(jid,user.id,'Sourced',m.score); }catch(e){}
         }
         return redirect(res, `/app/jobs/${jid}`);
       }
@@ -237,15 +240,15 @@ const server = http.createServer(async (req,res)=>{
       if(user.role!=='employer') return redirect(res,'/app');
 
       if(p==='/console' && method==='GET'){
-        const jobs = db.prepare(`SELECT * FROM jobs WHERE employer_id=?`).all(user.id);
+        const jobs = await db.prepare(`SELECT * FROM jobs WHERE employer_id=?`).all(user.id);
         const jobIds = jobs.map(j=>j.id);
-        const applicants = jobIds.length? db.prepare(`SELECT COUNT(*) c FROM applications WHERE job_id IN (${jobIds.map(()=>'?').join(',')})`).get(...jobIds).c : 0;
-        const pipeline = jobIds.length? db.prepare(`SELECT COUNT(*) c FROM applications WHERE stage!='Sourced' AND job_id IN (${jobIds.map(()=>'?').join(',')})`).get(...jobIds).c : 0;
-        const pool = db.prepare(`SELECT COUNT(*) c FROM worker_profiles`).get().c;
-        const hot = db.prepare(`SELECT u.name,p.trade,p.readiness,(SELECT COUNT(*) FROM credentials c WHERE c.user_id=u.id AND c.verified=1) vcount
+        const applicants = jobIds.length? (await db.prepare(`SELECT COUNT(*) c FROM applications WHERE job_id IN (${jobIds.map(()=>'?').join(',')})`).get(...jobIds)).c : 0;
+        const pipeline = jobIds.length? (await db.prepare(`SELECT COUNT(*) c FROM applications WHERE stage!='Sourced' AND job_id IN (${jobIds.map(()=>'?').join(',')})`).get(...jobIds)).c : 0;
+        const pool = (await db.prepare(`SELECT COUNT(*) c FROM worker_profiles`).get()).c;
+        const hot = await db.prepare(`SELECT u.name,p.trade,p.readiness,(SELECT COUNT(*) FROM credentials c WHERE c.user_id=u.id AND c.verified=1) vcount
           FROM users u JOIN worker_profiles p ON p.user_id=u.id WHERE u.role='worker' ORDER BY p.readiness DESC LIMIT 5`).all();
         const alerts = [];
-        const expiring = db.prepare(`SELECT COUNT(*) c FROM credentials WHERE verified=1 AND expires IS NOT NULL AND expires < '2026-08'`).get().c;
+        const expiring = (await db.prepare(`SELECT COUNT(*) c FROM credentials WHERE verified=1 AND expires IS NOT NULL AND expires < '2026-08'`).get()).c;
         if(expiring) alerts.push({lvl:'warn',text:`⚠️ ${expiring} credential(s) in the pool expiring within 60 days.`});
         if(pipeline) alerts.push({lvl:'info',text:`⏳ ${pipeline} candidate(s) advancing in your pipeline.`});
         alerts.push({lvl:'ok',text:`✅ ${pool} verified workers available to match right now.`});
@@ -254,11 +257,13 @@ const server = http.createServer(async (req,res)=>{
       }
 
       if(p==='/console/jobs' && method==='GET'){
-        const jobs = db.prepare(`SELECT * FROM jobs WHERE employer_id=? ORDER BY created_at DESC`).all(user.id).map(j=>{
-          const applicants = db.prepare('SELECT COUNT(*) c FROM applications WHERE job_id=?').get(j.id).c;
-          const matched = rankWorkersForJob(j).filter(w=>w.score>=70).length;
-          return {...j, applicants, matched};
-        });
+        const jobsRaw = await db.prepare(`SELECT * FROM jobs WHERE employer_id=? ORDER BY created_at DESC`).all(user.id);
+        const jobs = [];
+        for(const j of jobsRaw){
+          const applicants = (await db.prepare('SELECT COUNT(*) c FROM applications WHERE job_id=?').get(j.id)).c;
+          const matched = (await rankWorkersForJob(j)).filter(w=>w.score>=70).length;
+          jobs.push({...j, applicants, matched});
+        }
         return send(res, V.layout({title:'Jobs',user,active:'jobs',body:V.empJobs({jobs})}));
       }
       if(p==='/console/jobs/new' && method==='GET')
@@ -267,7 +272,7 @@ const server = http.createServer(async (req,res)=>{
         const b = await readBody(req);
         if(!b.title) return send(res, V.layout({title:'Post a job',user,active:'jobs',body:V.empJobForm('Title is required.')}));
         const reqCreds = [].concat(b.req_creds||[]).filter(Boolean).join(',');
-        const info = db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr)
+        const info = await db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr)
           VALUES(?,?,?,?,?,?,?,?,?,?)`).run(user.id,b.title,b.trade,Number(b.pay_min)||0,Number(b.pay_max)||0,b.city||'',b.zip||'',b.shift||'Day',reqCreds,b.descr||'');
         return redirect(res, `/console/jobs/${info.lastInsertRowid}`);
       }
@@ -276,36 +281,37 @@ const server = http.createServer(async (req,res)=>{
       const aMatch = p.match(/^\/console\/applications\/(\d+)\/stage$/);
       if(aMatch && method==='POST'){
         const b = await readBody(req);
-        if(V.STAGES.includes(b.stage)) db.prepare('UPDATE applications SET stage=? WHERE id=?').run(b.stage, Number(aMatch[1]));
-        const app = db.prepare('SELECT job_id FROM applications WHERE id=?').get(Number(aMatch[1]));
+        if(V.STAGES.includes(b.stage)) await db.prepare('UPDATE applications SET stage=? WHERE id=?').run(b.stage, Number(aMatch[1]));
+        const app = await db.prepare('SELECT job_id FROM applications WHERE id=?').get(Number(aMatch[1]));
         return redirect(res, `/console/jobs/${app?app.job_id:''}`);
       }
       const addMatch = p.match(/^\/console\/jobs\/(\d+)\/add$/);
       if(addMatch && method==='POST'){
         const b = await readBody(req); const jobId=Number(addMatch[1]);
-        const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(jobId);
+        const job = await db.prepare('SELECT * FROM jobs WHERE id=?').get(jobId);
         const wid = Number(b.worker_id);
-        if(job && wid){ const prof=getProfile(wid); const m=M.scoreMatch(prof,getCreds(wid),job);
-          try{ db.prepare('INSERT INTO applications(job_id,worker_id,stage,score) VALUES(?,?,?,?)').run(jobId,wid,'Sourced',m.score);}catch(e){} }
+        if(job && wid){ const prof=await getProfile(wid); const m=M.scoreMatch(prof,await getCreds(wid),job);
+          try{ await db.prepare('INSERT INTO applications(job_id,worker_id,stage,score) VALUES(?,?,?,?)').run(jobId,wid,'Sourced',m.score);}catch(e){} }
         return redirect(res, `/console/jobs/${jobId}`);
       }
 
       const jid = qid(p);
       if(jid && p===`/console/jobs/${jid}` && method==='GET'){
-        const job = db.prepare('SELECT * FROM jobs WHERE id=? AND employer_id=?').get(jid,user.id);
+        const job = await db.prepare('SELECT * FROM jobs WHERE id=? AND employer_id=?').get(jid,user.id);
         if(!job) return send(res, V.layout({title:'Not found',user,body:'<section class="wrap"><div class="card">Job not found.</div></section>'}),404);
-        const apps = db.prepare(`SELECT a.id app_id,a.stage,a.score,u.name,p.trade FROM applications a
+        const apps = await db.prepare(`SELECT a.id app_id,a.stage,a.score,u.name,p.trade FROM applications a
           JOIN users u ON u.id=a.worker_id JOIN worker_profiles p ON p.user_id=a.worker_id WHERE a.job_id=?`).all(jid);
         const columns = {}; for(const st of V.STAGES) columns[st]=[];
         const inPipe = new Set(); for(const a of apps){ (columns[a.stage]=columns[a.stage]||[]).push(a); inPipe.add(a.name); }
-        const candidates = rankWorkersForJob(job).filter(w=>!inPipe.has(w.name)).slice(0,5);
+        const candidates = (await rankWorkersForJob(job)).filter(w=>!inPipe.has(w.name)).slice(0,5);
         return send(res, V.layout({title:job.title,user,active:'jobs',body:V.empPipeline({job,columns,candidates})}));
       }
 
       if(p==='/console/search' && method==='GET'){
         const filters = {trade:url.searchParams.get('trade')||'', verified:!!url.searchParams.get('verified'), ready:!!url.searchParams.get('ready')};
-        let rows = db.prepare(`SELECT u.id,u.name,p.* FROM users u JOIN worker_profiles p ON p.user_id=u.id WHERE u.role='worker'`).all()
-          .map(w=>({...w, creds:getCreds(w.id).filter(c=>!filters.verified||c.verified)}));
+        const rowsRaw = await db.prepare(`SELECT u.id,u.name,p.* FROM users u JOIN worker_profiles p ON p.user_id=u.id WHERE u.role='worker'`).all();
+        let rows = [];
+        for(const w of rowsRaw){ const creds=(await getCreds(w.id)).filter(c=>!filters.verified||c.verified); rows.push({...w, creds}); }
         if(filters.trade) rows = rows.filter(w=>w.trade===filters.trade);
         if(filters.ready) rows = rows.filter(w=>w.readiness>=85);
         rows.sort((a,b)=>b.readiness-a.readiness);
@@ -321,4 +327,6 @@ const server = http.createServer(async (req,res)=>{
   }
 });
 
-server.listen(PORT, ()=>console.log(`Rivet × Crewline running → http://localhost:${PORT}`));
+init()
+  .then(()=> server.listen(PORT, ()=>console.log(`Rivet × Crewline running → http://localhost:${PORT}`)))
+  .catch(err=>{ console.error('init failed', err); process.exit(1); });

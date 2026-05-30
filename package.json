@@ -2,11 +2,14 @@
   "name": "rivet-crewline",
   "version": "0.1.0",
   "private": true,
-  "description": "Rivet x Crewline — blue-collar hiring MVP (worker app + employer console). Zero npm dependencies; uses Node 22 built-in SQLite + crypto.",
-  "engines": { "node": ">=22.5.0" },
+  "description": "Rivet x Crewline — blue-collar hiring MVP (worker app + employer console). libSQL/Turso for persistence.",
+  "engines": { "node": ">=18" },
   "scripts": {
-    "start": "node --experimental-sqlite server.js",
-    "dev": "node --watch --experimental-sqlite server.js",
+    "start": "node server.js",
+    "dev": "node --watch server.js",
     "reset": "rm -rf data && echo 'database reset — will reseed on next start'"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.15.0"
   }
 }

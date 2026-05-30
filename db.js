@@ -1,63 +1,63 @@
 'use strict';
 /*
- * Rivet x Crewline - database layer (Node built-in SQLite, zero deps).
- * Creates the schema on first run and seeds demo data so the demo is populated.
+ * Rivet x Crewline - database layer (libSQL / Turso).
+ * - Local dev: uses a local SQLite file (file:data/rivet.db) — no account needed.
+ * - Production: set TURSO_DATABASE_URL (+ TURSO_AUTH_TOKEN) to a Turso DB so data persists.
+ * Same SQLite SQL dialect either way. All calls are async.
  */
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { DatabaseSync } = require('node:sqlite');
+const { createClient } = require('@libsql/client');
 const { readiness } = require('./matching');
 
 const DATA_DIR = process.env.RIVET_DATA_DIR || path.join(__dirname, 'data');
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-const db = new DatabaseSync(path.join(DATA_DIR, 'rivet.db'));
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT UNIQUE NOT NULL,
-    pass TEXT NOT NULL,
-    role TEXT NOT NULL,                 -- 'worker' | 'employer'
-    name TEXT NOT NULL,
-    company TEXT,
-    created_at TEXT DEFAULT (datetime('now'))
-  );
-  CREATE TABLE IF NOT EXISTS worker_profiles (
-    user_id INTEGER PRIMARY KEY REFERENCES users(id),
-    trade TEXT, years_exp INTEGER DEFAULT 0,
-    city TEXT, zip TEXT,
-    pay_floor INTEGER DEFAULT 0, shift TEXT DEFAULT 'Any',
-    readiness INTEGER DEFAULT 0, bio TEXT DEFAULT ''
-  );
-  CREATE TABLE IF NOT EXISTS credentials (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER REFERENCES users(id),
-    kind TEXT, name TEXT,
-    verified INTEGER DEFAULT 0, expires TEXT
-  );
-  CREATE TABLE IF NOT EXISTS jobs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    employer_id INTEGER REFERENCES users(id),
-    title TEXT, trade TEXT,
-    pay_min INTEGER, pay_max INTEGER,
-    city TEXT, zip TEXT, shift TEXT DEFAULT 'Day',
-    req_creds TEXT DEFAULT '', descr TEXT DEFAULT '',
-    status TEXT DEFAULT 'open',
-    created_at TEXT DEFAULT (datetime('now'))
-  );
-  CREATE TABLE IF NOT EXISTS applications (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    job_id INTEGER REFERENCES jobs(id),
-    worker_id INTEGER REFERENCES users(id),
-    stage TEXT DEFAULT 'Sourced',       -- Sourced|Screened|Interview|Offer|Hired
-    score INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT (datetime('now')),
-    UNIQUE(job_id, worker_id)
-  );
-`);
+let url, authToken;
+if (process.env.TURSO_DATABASE_URL) {
+  url = process.env.TURSO_DATABASE_URL;
+  authToken = process.env.TURSO_AUTH_TOKEN || undefined;
+} else {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  url = 'file:' + path.join(DATA_DIR, 'rivet.db');
+}
+const client = createClient(authToken ? { url, authToken } : { url });
 
-// ---- password helpers (scrypt, no external deps) ----
+// Normalize a libSQL Row into a plain object keyed by column name (safe to spread).
+function toObj(row, columns) {
+  if (!row) return undefined;
+  const o = {};
+  for (const c of columns) o[c] = row[c];
+  return o;
+}
+
+// Thin wrapper preserving the prepare(sql).get/all/run(...args) shape, but async.
+const db = {
+  prepare(sql) {
+    return {
+      async get(...args) {
+        const r = await client.execute({ sql, args });
+        return toObj(r.rows[0], r.columns);
+      },
+      async all(...args) {
+        const r = await client.execute({ sql, args });
+        return r.rows.map((row) => toObj(row, r.columns));
+      },
+      async run(...args) {
+        const r = await client.execute({ sql, args });
+        return {
+          lastInsertRowid: r.lastInsertRowid != null ? Number(r.lastInsertRowid) : undefined,
+          changes: r.rowsAffected,
+        };
+      },
+    };
+  },
+  async exec(sql) {
+    await client.executeMultiple(sql);
+  },
+};
+
+// ---- password helpers (scrypt) ----
 function hashPassword(pw) {
   const salt = crypto.randomBytes(16).toString('hex');
   const h = crypto.scryptSync(pw, salt, 32).toString('hex');
@@ -70,17 +70,63 @@ function verifyPassword(pw, stored) {
   return crypto.timingSafeEqual(Buffer.from(test, 'hex'), Buffer.from(h, 'hex'));
 }
 
-function recomputeReadiness(userId) {
-  const p = db.prepare('SELECT * FROM worker_profiles WHERE user_id=?').get(userId);
+async function recomputeReadiness(userId) {
+  const p = await db.prepare('SELECT * FROM worker_profiles WHERE user_id=?').get(userId);
   if (!p) return;
-  const creds = db.prepare('SELECT * FROM credentials WHERE user_id=?').all(userId);
+  const creds = await db.prepare('SELECT * FROM credentials WHERE user_id=?').all(userId);
   const r = readiness(p, creds);
-  db.prepare('UPDATE worker_profiles SET readiness=? WHERE user_id=?').run(r, userId);
+  await db.prepare('UPDATE worker_profiles SET readiness=? WHERE user_id=?').run(r, userId);
+}
+
+async function createSchema() {
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT UNIQUE NOT NULL,
+      pass TEXT NOT NULL,
+      role TEXT NOT NULL,
+      name TEXT NOT NULL,
+      company TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS worker_profiles (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id),
+      trade TEXT, years_exp INTEGER DEFAULT 0,
+      city TEXT, zip TEXT,
+      pay_floor INTEGER DEFAULT 0, shift TEXT DEFAULT 'Any',
+      readiness INTEGER DEFAULT 0, bio TEXT DEFAULT ''
+    );
+    CREATE TABLE IF NOT EXISTS credentials (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER REFERENCES users(id),
+      kind TEXT, name TEXT,
+      verified INTEGER DEFAULT 0, expires TEXT
+    );
+    CREATE TABLE IF NOT EXISTS jobs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      employer_id INTEGER REFERENCES users(id),
+      title TEXT, trade TEXT,
+      pay_min INTEGER, pay_max INTEGER,
+      city TEXT, zip TEXT, shift TEXT DEFAULT 'Day',
+      req_creds TEXT DEFAULT '', descr TEXT DEFAULT '',
+      status TEXT DEFAULT 'open',
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS applications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id INTEGER REFERENCES jobs(id),
+      worker_id INTEGER REFERENCES users(id),
+      stage TEXT DEFAULT 'Sourced',
+      score INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(job_id, worker_id)
+    );
+  `);
 }
 
 // ---- seed (only when empty) ----
-function seed() {
-  const count = db.prepare('SELECT COUNT(*) c FROM users').get().c;
+async function seed() {
+  const count = (await db.prepare('SELECT COUNT(*) c FROM users').get()).c;
   if (count > 0) return;
 
   const pw = hashPassword('demo1234');
@@ -91,18 +137,21 @@ function seed() {
   const insJob  = db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr)
                               VALUES(?,?,?,?,?,?,?,?,?,?)`);
   const insApp  = db.prepare('INSERT INTO applications(job_id,worker_id,stage,score) VALUES(?,?,?,?)');
+  const { scoreMatch, CRED_KINDS } = require('./matching');
 
   // --- Employer (Crewline) ---
-  const empId = insUser.run('ops@sunvalley.test', pw, 'employer', 'Dana Ortiz', 'Sun Valley Mechanical').lastInsertRowid;
+  const empId = (await insUser.run('ops@sunvalley.test', pw, 'employer', 'Dana Ortiz', 'Sun Valley Mechanical')).lastInsertRowid;
 
-  const jobs = [
+  const jobDefs = [
     ['Commercial Electrician','electrician',44,48,'Phoenix','85004','Day','license,osha30','Commercial fit-outs and service. Journeyman card required.'],
     ['HVAC Service Technician','hvac',36,44,'Phoenix','85004','Day','epa608,osha10','Light commercial HVAC service & install.'],
     ['Controls Technician','controls',44,50,'Phoenix','85004','Day','license','PLC / BAS controls for commercial sites.'],
     ['Maintenance Technician','hvac',34,40,'Phoenix','85008','4x10','osha10','Plant maintenance, mechanical + light electrical.'],
-  ].map(j => insJob.run(empId, ...j).lastInsertRowid);
+  ];
+  const jobs = [];
+  for (const j of jobDefs) jobs.push((await insJob.run(empId, ...j)).lastInsertRowid);
 
-  // --- Workers (Rivet) --- [email, name, trade, yrs, zip, floor, shift, creds[[kind,verified,exp]]]
+  // --- Workers (Rivet) ---
   const workers = [
     ['marcus@rivet.test','Marcus Reyes','electrician',8,'85004',42,'Day',
       [['license',1,'2027-06'],['osha30',1,'2026-12'],['cpr',1,'2026-07']]],
@@ -120,29 +169,32 @@ function seed() {
 
   const workerIds = {};
   for (const [email,name,trade,yrs,zip,floor,shift,creds] of workers) {
-    const uid = insUser.run(email, pw, 'worker', name, null).lastInsertRowid;
-    insProf.run(uid, trade, yrs, 'Phoenix', zip, floor, shift, `${yrs}-year ${trade} based in Phoenix.`);
+    const uid = (await insUser.run(email, pw, 'worker', name, null)).lastInsertRowid;
+    await insProf.run(uid, trade, yrs, 'Phoenix', zip, floor, shift, `${yrs}-year ${trade} based in Phoenix.`);
     for (const [kind, ver, exp] of creds) {
-      insCred.run(uid, kind, require('./matching').CRED_KINDS[kind] || kind, ver, exp);
+      await insCred.run(uid, kind, CRED_KINDS[kind] || kind, ver, exp);
     }
-    recomputeReadiness(uid);
+    await recomputeReadiness(uid);
     workerIds[email] = uid;
   }
 
   // Pre-populate one job's pipeline so the employer demo isn't empty.
-  const { scoreMatch } = require('./matching');
-  const elecJob = db.prepare('SELECT * FROM jobs WHERE id=?').get(jobs[0]);
+  const elecJob = await db.prepare('SELECT * FROM jobs WHERE id=?').get(jobs[0]);
   const pre = [['marcus@rivet.test','Interview'],['kim@rivet.test','Screened'],['ray@rivet.test','Sourced']];
   for (const [email, stage] of pre) {
     const uid = workerIds[email];
-    const prof = db.prepare('SELECT * FROM worker_profiles WHERE user_id=?').get(uid);
-    const creds = db.prepare('SELECT * FROM credentials WHERE user_id=?').all(uid);
+    const prof = await db.prepare('SELECT * FROM worker_profiles WHERE user_id=?').get(uid);
+    const creds = await db.prepare('SELECT * FROM credentials WHERE user_id=?').all(uid);
     const { score } = scoreMatch(prof, creds, elecJob);
-    insApp.run(elecJob.id, uid, stage, score);
+    await insApp.run(elecJob.id, uid, stage, score);
   }
 
   console.log('[db] seeded demo data — employer: ops@sunvalley.test / worker: marcus@rivet.test (pw: demo1234)');
 }
-seed();
 
-module.exports = { db, hashPassword, verifyPassword, recomputeReadiness };
+async function init() {
+  await createSchema();
+  await seed();
+}
+
+module.exports = { db, init, hashPassword, verifyPassword, recomputeReadiness };

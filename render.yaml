@@ -4,17 +4,22 @@ services:
     runtime: node
     plan: free
     region: oregon
-    buildCommand: ""
-    startCommand: node --experimental-sqlite server.js
+    buildCommand: npm install
+    startCommand: node server.js
     envVars:
       - key: NODE_VERSION
         value: "22.22.3"
       - key: RIVET_SECRET
         generateValue: true
-      # Free plan has no mounted disk and /var isn't writable, so the DB
-      # lives inside the project dir (ephemeral — reseeds on restart).
+      # Fallback local-file DB path (used only when TURSO_DATABASE_URL is unset).
       - key: RIVET_DATA_DIR
         value: /opt/render/project/src/data
+      # Persistent data via Turso (free, open-source libSQL). Set both in the
+      # Render dashboard. Until set, the app falls back to an ephemeral local file.
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
       # Google Sign-In. Set both in the Render dashboard (Environment tab).
       # Until set, the "Continue with Google" button is hidden automatically.
       - key: GOOGLE_CLIENT_ID
