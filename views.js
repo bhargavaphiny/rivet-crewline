@@ -66,7 +66,6 @@ function landing() {
         <a class="btn" href="/signup?role=worker">I'm a worker → Rivet</a>
         <a class="btn ghost" href="/signup?role=employer">I'm hiring → Crewline</a>
       </div>
-      <p class="demo-note">Demo logins · worker <code>marcus@rivet.test</code> · employer <code>ops@sunvalley.test</code> · password <code>demo1234</code></p>
     </div>
   </section>
   <section class="wrap split2">
@@ -311,7 +310,7 @@ function workerProfile({ user, profile, creds, error }) {
       <form method="post" action="/app/credentials" class="inline-form">
         <select name="kind">${kinds}</select>
         <input name="expires" placeholder="Expires e.g. 2027-06">
-        <button class="btn">Add (auto-verifies in demo)</button>
+        <button class="btn">Add credential</button>
       </form>
     </div>
   </section>`;
