@@ -25,14 +25,26 @@ function getCookie(req, name){
   const c = (req.headers.cookie||'').split(';').map(s=>s.trim()).find(s=>s.startsWith(name+'='));
   return c ? c.slice(name.length+1) : null;
 }
+function isHttps(req){
+  return (req.headers['x-forwarded-proto']||'').split(',')[0].trim()==='https' || !!(req.socket && req.socket.encrypted);
+}
+function secAttr(req){ return isHttps(req) ? '; Secure' : ''; }
+function setSecurityHeaders(res){
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Content-Security-Policy',
+    "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; " +
+    "script-src 'self' 'unsafe-inline'; form-action 'self'; base-uri 'self'; frame-ancestors 'none'");
+}
 
 // ---------- session: signed cookie holding the user id (stateless) ----------
 function sign(val){ return crypto.createHmac('sha256', SECRET).update(val).digest('hex').slice(0,32); }
-function setSession(res, uid){
+function setSession(req, res, uid){
   const v = String(uid), token = `${v}.${sign(v)}`;
-  res.setHeader('Set-Cookie', `sess=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=604800`);
+  res.setHeader('Set-Cookie', `sess=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=604800${secAttr(req)}`);
 }
-function clearSession(res){ res.setHeader('Set-Cookie', 'sess=; HttpOnly; Path=/; Max-Age=0'); }
+function clearSession(req, res){ res.setHeader('Set-Cookie', `sess=; HttpOnly; Path=/; Max-Age=0${secAttr(req)}`); }
 async function getUser(req){
   const cookie = (req.headers.cookie||'').split(';').map(s=>s.trim()).find(s=>s.startsWith('sess='));
   if(!cookie) return null;
@@ -82,6 +94,7 @@ const server = http.createServer(async (req,res)=>{
   const user = await getUser(req);
 
   try {
+    setSecurityHeaders(res);
     // static & utility
     if(p==='/styles.css'){ res.writeHead(200,{'Content-Type':'text/css','Cache-Control':'public, max-age=3600'}); return res.end(fs.readFileSync(path.join(__dirname,'styles.css'))); }
     if(p==='/og.svg'){ res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'public, max-age=86400'}); return res.end(V.ogImage()); }
@@ -104,7 +117,7 @@ const server = http.createServer(async (req,res)=>{
       try{
         const info = await db.prepare('INSERT INTO users(email,pass,role,name,company) VALUES(?,?,?,?,?)')
           .run(b.email.toLowerCase().trim(), hashPassword(b.pass), role, b.name.trim(), role==='employer'?(b.company||'').trim():null);
-        setSession(res, info.lastInsertRowid);
+        setSession(req, res, info.lastInsertRowid);
         return redirect(res, role==='employer'?'/console':'/app/onboard');
       }catch(e){
         return send(res, V.layout({title:'Sign up',user:null,body:V.authForm('signup',{role,google:googleEnabled,error:'That email is already registered.'})}));
@@ -115,17 +128,17 @@ const server = http.createServer(async (req,res)=>{
       const u = await db.prepare('SELECT * FROM users WHERE email=?').get((b.email||'').toLowerCase().trim());
       if(!u || !verifyPassword(b.pass||'', u.pass))
         return send(res, V.layout({title:'Log in',user:null,body:V.authForm('login',{google:googleEnabled,error:'Invalid email or password.'})}));
-      setSession(res, u.id);
+      setSession(req, res, u.id);
       return redirect(res, u.role==='employer'?'/console':'/app');
     }
-    if(p==='/logout'){ clearSession(res); return redirect(res,'/'); }
+    if(p==='/logout'){ clearSession(req, res); return redirect(res,'/'); }
 
     // ---- Google OAuth (only active when GOOGLE_CLIENT_ID/SECRET are set) ----
     if(p==='/auth/google' && method==='GET'){
       if(!googleEnabled) return redirect(res,'/login');
       const role = url.searchParams.get('role')==='employer' ? 'employer' : 'worker';
       const state = `${crypto.randomBytes(16).toString('hex')}:${role}`;
-      res.setHeader('Set-Cookie', `gstate=${state}.${sign(state)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=600`);
+      res.setHeader('Set-Cookie', `gstate=${state}.${sign(state)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=600${secAttr(req)}`);
       const params = new URLSearchParams({
         client_id: GOOGLE_CLIENT_ID,
         redirect_uri: `${baseUrl(req)}/auth/google/callback`,
@@ -169,7 +182,7 @@ const server = http.createServer(async (req,res)=>{
             .run(email, placeholder, role, gu.name || email.split('@')[0], null);
           u = { id:r.lastInsertRowid, role };
         }
-        setSession(res, u.id);
+        setSession(req, res, u.id);
         return redirect(res, u.role==='employer' ? '/console' : '/app');
       } catch(e){
         console.error('google oauth', e);
