@@ -99,6 +99,7 @@ const server = http.createServer(async (req,res)=>{
     if(p==='/styles.css'){ res.writeHead(200,{'Content-Type':'text/css','Cache-Control':'public, max-age=3600'}); return res.end(fs.readFileSync(path.join(__dirname,'styles.css'))); }
     if(p==='/og.svg'){ res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'public, max-age=86400'}); return res.end(V.ogImage()); }
     if(p==='/healthz'){ res.writeHead(200,{'Content-Type':'text/plain'}); return res.end('ok'); }
+    if(p==='/robots.txt'){ res.writeHead(200,{'Content-Type':'text/plain'}); return res.end('User-agent: *\nAllow: /\nDisallow: /app\nDisallow: /console\nDisallow: /auth\n'); }
 
     // ---- public ----
     if(p==='/' && method==='GET'){
