@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: rivet-crewline
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: ""
+    startCommand: node --experimental-sqlite server.js
+    envVars:
+      - key: NODE_VERSION
+        value: "22.22.3"
+      - key: RIVET_SECRET
+        generateValue: true
+      - key: RIVET_DATA_DIR
+        value: /var/data
+    # ---- Persistent data (PAID plan only) ----
+    # Render's free plan has no persistent disk, so the SQLite DB resets
+    # (and reseeds demo data) on every restart. To keep data permanently,
+    # upgrade `plan` above to `starter` and uncomment the disk block below.
+    # disk:
+    #   name: rivet-data
+    #   mountPath: /var/data
+    #   sizeGB: 1
