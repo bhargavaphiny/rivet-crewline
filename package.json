@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
+    "test": "node --test",
     "reset": "rm -rf data && echo 'database reset — will reseed on next start'"
   },
   "dependencies": {
