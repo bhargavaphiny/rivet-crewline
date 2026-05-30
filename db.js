@@ -192,9 +192,59 @@ async function seed() {
   console.log('[db] seeded demo data — employer: ops@sunvalley.test / worker: marcus@rivet.test (pw: demo1234)');
 }
 
+// ---- enrichment: extra employer/jobs/workers for a fuller demo (idempotent, additive) ----
+async function enrichDemo() {
+  const sentinel = await db.prepare('SELECT 1 FROM users WHERE email=?').get('tasha@rivet.test');
+  if (sentinel) return; // already enriched
+
+  const { CRED_KINDS } = require('./matching');
+  const pw = hashPassword('demo1234');
+  const insUser = db.prepare('INSERT INTO users(email,pass,role,name,company) VALUES(?,?,?,?,?)');
+  const insProf = db.prepare(`INSERT INTO worker_profiles(user_id,trade,years_exp,city,zip,pay_floor,shift,bio)
+                              VALUES(?,?,?,?,?,?,?,?)`);
+  const insCred = db.prepare('INSERT INTO credentials(user_id,kind,name,verified,expires) VALUES(?,?,?,?,?)');
+  const insJob  = db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr)
+                              VALUES(?,?,?,?,?,?,?,?,?,?)`);
+
+  const empId = (await insUser.run('hr@coppermountain.test', pw, 'employer', 'Marco Diaz', 'Copper Mountain Builders')).lastInsertRowid;
+  const jobDefs = [
+    ['Commercial Plumber','plumber',40,46,'Phoenix','85008','Day','license','Commercial service & repipes. Journeyman card required.'],
+    ['Structural Welder','welder',38,46,'Phoenix','85008','4x10','osha10','Structural steel for commercial builds. FCAW/SMAW.'],
+    ['Solar Installer','solar',30,38,'Tempe','85281','Day','osha10','Rooftop PV installs across the East Valley.'],
+    ['Equipment Driver (CDL)','cdl_driver',28,34,'Phoenix','85004','Day','cdl','Material delivery between yard and job sites.'],
+    ['Pipefitter','pipefitter',40,48,'Phoenix','85008','Day','osha30','Industrial process piping; some welding a plus.'],
+  ];
+  for (const j of jobDefs) await insJob.run(empId, ...j);
+
+  // [email, name, trade, yrs, city, zip, floor, shift, creds[[kind,verified,exp]]]
+  const workers = [
+    ['tasha@rivet.test','Tasha Brooks','plumber',7,'Phoenix','85008',38,'Day',
+      [['license',1,'2027-09'],['osha10',1,'2026-12']]],
+    ['omar@rivet.test','Omar Haddad','welder',9,'Phoenix','85008',40,'4x10',
+      [['osha30',1,'2027-04'],['forklift',1,'2028-02']]],
+    ['nina@rivet.test','Nina Castillo','solar',4,'Tempe','85281',30,'Day',
+      [['osha10',1,'2027-07']]],
+    ['will@rivet.test','Will Torres','cdl_driver',5,'Phoenix','85004',27,'Day',
+      [['cdl',1,'2028-06']]],
+    ['sam@rivet.test','Sam Okafor','pipefitter',6,'Phoenix','85008',39,'Day',
+      [['osha30',1,'2027-02'],['osha10',1,'2027-02']]],
+  ];
+  for (const [email,name,trade,yrs,city,zip,floor,shift,creds] of workers) {
+    const uid = (await insUser.run(email, pw, 'worker', name, null)).lastInsertRowid;
+    await insProf.run(uid, trade, yrs, city, zip, floor, shift, `${yrs}-year ${trade} based in ${city}.`);
+    for (const [kind, ver, exp] of creds) {
+      await insCred.run(uid, kind, CRED_KINDS[kind] || kind, ver, exp);
+    }
+    await recomputeReadiness(uid);
+  }
+
+  console.log('[db] enriched demo data — +1 employer, +5 jobs, +5 workers across more trades');
+}
+
 async function init() {
   await createSchema();
   await seed();
+  try { await enrichDemo(); } catch (e) { console.error('[db] enrich skipped (non-fatal):', e.message); }
 }
 
 module.exports = { db, init, hashPassword, verifyPassword, recomputeReadiness };
