@@ -592,6 +592,68 @@ async function seedBig(){
   console.log('[db] BIG seed applied — +4 employers, +12 jobs, +24 workers across US metros');
 }
 
+// ---- broaden beyond construction: healthcare, ag, food, logistics, cleaning, security (idempotent) ----
+async function seedCategories(){
+  if (await metaGet('categories_v1')) return;
+  const pw = hashPassword('demo1234');
+  const insEmp = db.prepare('INSERT INTO users(email,pass,role,name,company,company_city,company_size,company_about) VALUES(?,?,?,?,?,?,?,?)');
+  const employers = [
+    ['staffing@valleycare.test','Renee Park','Valley Care Staffing','Phoenix, AZ','201–500','Healthcare staffing for clinics, hospitals and home care across Arizona. Weekly pay, flexible shifts, real advancement into nursing.'],
+    ['jobs@sunorchards.test','Hector Ramos','Sun Orchards','Fresno, CA','500+','Family-run citrus and stone-fruit grower. Seasonal and year-round crews, housing assistance, safe transport to fields.'],
+    ['hr@mesarestaurants.test','Dana Cho','Mesa Restaurant Group','Las Vegas, NV','201–500','12 restaurants across the valley. Cooks, servers and bar staff — paid training, shift meals, fast promotion.'],
+    ['ops@swiftlogistics.test','Marcus Lin','Swift Logistics','Dallas, TX','500+','Regional warehousing and last-mile delivery. Climate-controlled DCs, predictable schedules, sign-on bonus.'],
+    ['careers@shieldsafe.test','Tasha Owens','ShieldSafe Security','Atlanta, GA','201–500','Licensed guard services for commercial and event sites. Paid guard-card training and uniforms provided.'],
+  ];
+  const eid = {};
+  for (const [email,name,co,city,size,about] of employers){
+    try { eid[email] = (await insEmp.run(email,pw,'employer',name,co,city,size,about)).lastInsertRowid; } catch(e){}
+  }
+  const insJob = db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type) VALUES(?,?,?,?,?,?,?,?,?,?,?)`);
+  const jobs = [
+    ['staffing@valleycare.test','Certified Nursing Assistant (CNA)','cna',20,27,'Phoenix','85004','Day','cna_cert','Long-term care facility, day and noc shifts. CNA cert + BLS required.','Full-time'],
+    ['staffing@valleycare.test','Home Health Aide','caregiver',18,23,'Phoenix','85008','Day','hha','In-home care for seniors; mileage reimbursed. HHA cert a plus.','Part-time'],
+    ['staffing@valleycare.test','Medical Assistant','medical_assistant',19,25,'Phoenix','85021','Day','bls','Front + back office MA for a busy clinic.','Full-time'],
+    ['staffing@valleycare.test','Phlebotomist','phlebotomist',19,24,'Phoenix','85004','Day','bls','Outpatient draws; high volume. Certification required.','Full-time'],
+    ['jobs@sunorchards.test','Fruit Picker — Citrus','fruit_picker',16,21,'Phoenix','85008','Day','','Seasonal harvest crews; piece-rate bonuses. Transport provided.','Temp'],
+    ['jobs@sunorchards.test','Farm Laborer','farmworker',16,20,'Phoenix','85021','Day','','Irrigation, pruning and harvest support. Year-round.','Full-time'],
+    ['hr@mesarestaurants.test','Line Cook','cook',18,24,'Las Vegas','89101','Night','food_handler','High-volume kitchen; grill and saute stations.','Full-time'],
+    ['hr@mesarestaurants.test','Server / Waiter','server',12,12,'Las Vegas','89101','Night','food_handler','Tipped position (avg $28+/hr with tips). Food handler card required.','Part-time'],
+    ['hr@mesarestaurants.test','Dishwasher','dishwasher',15,18,'Las Vegas','89101','Night','','Back of house; reliable hours, shift meals.','Part-time'],
+    ['hr@mesarestaurants.test','Bartender','bartender',14,16,'Las Vegas','89101','Night','servsafe','Craft cocktail bar; tips on top. ServSafe alcohol a plus.','Full-time'],
+    ['ops@swiftlogistics.test','Warehouse Associate','warehouse',18,23,'Dallas','75201','Day','forklift','Pick/pack/ship; forklift cert a plus. Sign-on bonus.','Full-time'],
+    ['ops@swiftlogistics.test','Delivery Driver (non-CDL)','delivery_driver',20,26,'Dallas','75201','Day','','Last-mile box truck routes; home daily.','Full-time'],
+    ['ops@swiftlogistics.test','Mover / Furniture','mover',18,24,'Dallas','75201','Day','','Residential + commercial moves. Lift 50+ lbs.','Full-time'],
+    ['careers@shieldsafe.test','Security Guard','security_guard',17,22,'Atlanta','30303','Any','guard_card','Commercial site patrol; guard card training provided.','Full-time'],
+    ['careers@shieldsafe.test','Janitor / Custodian','janitor',16,20,'Atlanta','30303','Night','','Nightly commercial cleaning routes.','Full-time'],
+  ];
+  for (const [email,title,trade,lo,hi,city,zip,shift,creds,descr,etype] of jobs){
+    const id = eid[email]; if(!id) continue;
+    try { await insJob.run(id,title,trade,lo,hi,city,zip,shift,creds,descr,etype); } catch(e){}
+  }
+  // a few workers in the new categories so talent search/maps look real
+  const insUser = db.prepare('INSERT INTO users(email,pass,role,name) VALUES(?,?,?,?)');
+  const insProf = db.prepare(`INSERT INTO worker_profiles(user_id,trade,trades,headline,about,years_exp,city,zip,pay_floor,shift,available,work_today,relocate,alerts) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+  const insCred = db.prepare('INSERT INTO credentials(user_id,kind,name,verified,expires) VALUES(?,?,?,?,?)');
+  const { CRED_KINDS } = require('./matching');
+  const W = [
+    ['Gloria Mendez','cna,caregiver',6,'Phoenix','85004',22,'Day',[['cna_cert','2027-09'],['bls','2027-01']],'CNA + caregiver — long-term care'],
+    ['Luis Fuentes','fruit_picker,farmworker',9,'Phoenix','85008',17,'Day',[],'Harvest crew lead — citrus & stone fruit'],
+    ['Mina Patel','cook,server',5,'Las Vegas','89101',18,'Night',[['food_handler','2027-05']],'Line cook — high volume'],
+    ['Trey Jackson','warehouse,mover',4,'Dallas','75201',19,'Day',[['forklift','2028-02']],'Warehouse + forklift'],
+    ['Sandra Webb','security_guard',7,'Atlanta','30303',18,'Any',[['guard_card','2027-11']],'Licensed security officer'],
+  ];
+  for (const [name,trades,yrs,city,zip,floor,shift,creds,headline] of W){
+    const email = name.toLowerCase().replace(/[^a-z]+/g,'.')+'@rivet.test';
+    let uid; try { uid = (await insUser.run(email,pw,'worker',name)).lastInsertRowid; } catch(e){ continue; }
+    const first = trades.split(',')[0];
+    try { await insProf.run(uid,first,trades,headline,`${yrs}-year ${first.replace(/_/g,' ')} in ${city}. Reliable and ready to start.`,yrs,city,zip,floor,shift,1,0,0,1); } catch(e){ continue; }
+    for (const [k,exp] of creds){ try { await insCred.run(uid,k,CRED_KINDS[k]||k,1,exp); } catch(e){} }
+    try { await recomputeReadiness(uid); } catch(e){}
+  }
+  await metaSet('categories_v1','1');
+  console.log('[db] category expansion seeded — +5 employers, +15 jobs, +5 workers (healthcare/ag/food/logistics/security)');
+}
+
 async function migrate() {
   // additive column migrations (idempotent — errors swallowed when already applied)
   try { await db.exec('ALTER TABLE users ADD COLUMN phone TEXT'); } catch (e) { /* column exists */ }
@@ -659,6 +721,7 @@ async function init() {
   try { await seedJobTypes(); } catch (e) { console.error('[db] job-types seed skipped (non-fatal):', e.message); }
   try { await seedCompanies(); } catch (e) { console.error('[db] company seed skipped (non-fatal):', e.message); }
   try { await seedBig(); } catch (e) { console.error('[db] big seed skipped (non-fatal):', e.message); }
+  try { await seedCategories(); } catch (e) { console.error('[db] category seed skipped (non-fatal):', e.message); }
   try {
     if(!(await metaGet('relocate_v1'))){
       for(const email of ['omar@rivet.test','will@rivet.test','sam@rivet.test']){

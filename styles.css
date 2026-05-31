@@ -123,8 +123,8 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--brand)}
 .mtag{font-size:10.5px;padding:3px 8px;border-radius:14px;font-weight:700;background:var(--paper);border:1px solid var(--line);color:var(--slate)}
 .mtag.fit{background:rgba(31,169,113,.13);border-color:transparent;color:#157a52}
 .mtag.warn{background:rgba(226,69,59,.1);border-color:transparent;color:#b7322a}
-.matchbar{height:5px;border-radius:6px;background:var(--line);margin-top:11px;overflow:hidden}
-.matchbar i{display:block;height:100%;background:linear-gradient(90deg,var(--amber),var(--brand))}
+.matchbar{height:6px;border-radius:6px;background:#EAE0CD;margin-top:11px;overflow:hidden}
+.matchbar i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--brand),#3E8FCC)}
 .descr{font-size:14px;color:var(--slate);margin:14px 0}
 .breakdown{background:var(--paper);border-radius:11px;padding:14px;margin:8px 0}
 .breakdown h4{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px}
@@ -367,10 +367,28 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .jtype{display:inline-block;margin:2px 0 4px;padding:2px 9px;border-radius:6px;background:var(--steel);color:#fff;font-size:11px;font-weight:700;letter-spacing:.02em;text-transform:uppercase}
 
 /* ---- US candidate map ---- */
-.mapwrap{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
-.usmap{flex:1;min-width:280px;max-width:660px;background:linear-gradient(180deg,#EAF1F7,#E3EBF2);border-radius:14px;border:1px solid var(--line);padding:6px}
-.us-states .us-state{fill:#D7E2EC;stroke:#fff;stroke-width:.8;stroke-linejoin:round;transition:fill .12s}
+.mapwrap{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
+.mapbox{position:relative;flex:1;min-width:300px;max-width:680px}
+.usmap{width:100%;background:linear-gradient(180deg,#EAF1F7,#DFE9F1);border-radius:14px;border:1px solid var(--line);padding:6px;display:block}
+.us-states .us-state{fill:#D3DFEA;stroke:#F4EEE2;stroke-width:.8;stroke-linejoin:round;transition:fill .12s}
 .us-states .us-state:hover{fill:#C4D4E2}
+.mapzoom{position:absolute;top:12px;right:12px;display:flex;flex-direction:column;gap:6px}
+.mapzoom button{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:rgba(255,255,255,.92);color:var(--steel);cursor:pointer;display:grid;place-items:center;box-shadow:var(--shadow-sm)}
+.mapzoom button:hover{background:#fff;border-color:var(--brand)}
+.mapzoom .ic{width:18px;height:18px}
+.mapside{flex:none;width:230px;display:flex;flex-direction:column;gap:12px}
+.mappanel{border-top:1px solid var(--line);padding-top:10px;max-height:230px;overflow:auto}
+.mp-h{font-weight:800;font-size:13px;margin-bottom:8px}
+.mp-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
+.mp-row:last-child{border-bottom:none}
+.mp-info{flex:1;min-width:0}
+.mp-info b{display:block;font-size:12.5px;font-weight:700;line-height:1.25}
+.mp-info span{font-size:11px;color:var(--muted)}
+.mp-cta{flex:none;background:var(--brand);color:#fff;font-weight:700;font-size:11.5px;padding:6px 12px;border-radius:8px}
+.mp-cta:hover{background:var(--brand-d)}
+.maplist li{cursor:pointer}
+.maplist li:hover{color:var(--brand-d)}
+@media(max-width:680px){.mapside{width:100%}}
 .mdot circle{fill:var(--amber);fill-opacity:.82;stroke:#fff;stroke-width:1.5}
 .mdot text{fill:var(--steel);font-size:11px;font-weight:800}
 .maplist{list-style:none;margin:0;padding:0;min-width:150px;flex:none}

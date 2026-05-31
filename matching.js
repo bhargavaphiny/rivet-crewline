@@ -40,6 +40,30 @@ const TRADES = {
   landscaper:      'Landscaper / Groundskeeper',
   locksmith:       'Locksmith',
   facilities:      'Facilities Maintenance',
+  // healthcare & care
+  cna:             'CNA / Nursing Assistant',
+  caregiver:       'Caregiver / Home Health Aide',
+  medical_assistant:'Medical Assistant',
+  phlebotomist:    'Phlebotomist',
+  emt:             'EMT / Paramedic',
+  // agriculture
+  farmworker:      'Farmworker / Ag Laborer',
+  fruit_picker:    'Fruit / Crop Picker',
+  // food service
+  cook:            'Cook / Line Cook',
+  server:          'Server / Waiter',
+  dishwasher:      'Dishwasher',
+  bartender:       'Bartender',
+  // logistics & warehouse
+  warehouse:       'Warehouse Associate',
+  delivery_driver: 'Delivery Driver',
+  mover:           'Mover / Furniture',
+  // facilities, cleaning & safety
+  janitor:         'Janitor / Custodian',
+  housekeeper:     'Housekeeper',
+  security_guard:  'Security Guard',
+  pest_control:    'Pest Control Technician',
+  appliance_repair:'Appliance Repair Tech',
 };
 
 // Adjacent trades score partial credit (skills transfer).
@@ -75,9 +99,28 @@ const ADJACENT = {
   diesel_mechanic: ['automotive_tech', 'machinist'],
   automotive_tech: ['diesel_mechanic'],
   machinist:       ['millwright', 'diesel_mechanic'],
-  landscaper:      [],
+  landscaper:      ['farmworker'],
   locksmith:       [],
-  facilities:      ['hvac', 'electrician', 'millwright'],
+  facilities:      ['hvac', 'electrician', 'millwright', 'janitor'],
+  cna:             ['caregiver', 'medical_assistant', 'emt'],
+  caregiver:       ['cna', 'housekeeper'],
+  medical_assistant:['cna', 'phlebotomist'],
+  phlebotomist:    ['medical_assistant'],
+  emt:             ['cna'],
+  farmworker:      ['fruit_picker', 'landscaper'],
+  fruit_picker:    ['farmworker'],
+  cook:            ['dishwasher', 'server'],
+  server:          ['bartender', 'cook'],
+  dishwasher:      ['cook'],
+  bartender:       ['server'],
+  warehouse:       ['mover', 'delivery_driver'],
+  delivery_driver: ['cdl_driver', 'mover'],
+  mover:           ['warehouse', 'delivery_driver'],
+  janitor:         ['housekeeper', 'facilities'],
+  housekeeper:     ['janitor', 'caregiver'],
+  security_guard:  [],
+  pest_control:    ['landscaper'],
+  appliance_repair:['facilities', 'hvac'],
 };
 
 // Credential kinds and labels (real trade certs).
@@ -103,6 +146,12 @@ const CRED_KINDS = {
   med_gas:        'Medical Gas Brazing',
   cpr:            'First Aid / CPR',
   twic:           'TWIC Card',
+  cna_cert:       'CNA Certification',
+  bls:            'BLS (Healthcare CPR)',
+  hha:            'Home Health Aide Cert',
+  food_handler:   'Food Handler Card',
+  servsafe:       'ServSafe',
+  guard_card:     'Security Guard Card',
 };
 
 // How to earn each credential — issuer + short path + an official resource link.
@@ -128,6 +177,12 @@ const TRAINING = {
   med_gas:        { how: 'Medical gas brazing / installer certification (ASSE 6010 series).', url: 'https://www.careeronestop.org/Toolkit/Training/find-certifications.aspx' },
   cpr:            { how: 'First Aid / CPR certification from the American Red Cross or American Heart Association.', url: 'https://www.redcross.org/take-a-class/cpr' },
   twic:           { how: 'Transportation Worker Identification Credential from the TSA — needed for many ports and secure sites.', url: 'https://www.tsa.gov/for-industry/twic' },
+  cna_cert:       { how: 'State-approved CNA course + competency exam; lists you on the state nurse-aide registry.', url: 'https://www.careeronestop.org/Toolkit/Training/find-certifications.aspx' },
+  bls:            { how: 'Basic Life Support (healthcare CPR) from the American Heart Association or Red Cross.', url: 'https://www.redcross.org/take-a-class/cpr/cpr-certification' },
+  hha:            { how: 'Home Health Aide certification — short training program, often employer-provided.', url: 'https://www.careeronestop.org/Toolkit/Training/find-certifications.aspx' },
+  food_handler:   { how: 'Food Handler card — short online course + test, required by most counties for food service.', url: 'https://www.statefoodsafety.com' },
+  servsafe:       { how: 'ServSafe Food Handler / Manager certification from the National Restaurant Association.', url: 'https://www.servsafe.com' },
+  guard_card:     { how: 'State security guard license (e.g., a "guard card") — training hours + background check.', url: 'https://www.careeronestop.org/Toolkit/Training/find-certifications.aspx' },
 };
 
 const clamp = (n, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, n));

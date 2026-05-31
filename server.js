@@ -162,11 +162,18 @@ async function workerDistance(prof, zip){
   const dest = await geocodeZip(zip); if(!dest) return null;
   return haversineMi(home, dest);
 }
-// aggregated candidate locations for the recruiter US map
-function candidateGeo(){
-  return db.prepare(`SELECT p.city, z.lat, z.lon, COUNT(*) n
-    FROM worker_profiles p JOIN zip_geo z ON z.zip=p.zip
-    GROUP BY p.zip ORDER BY n DESC`).all();
+// aggregated candidate locations for the recruiter US map (with per-location candidate list)
+async function candidateGeo(){
+  const rows = await db.prepare(`SELECT u.id, u.name, p.city, p.zip, z.lat, z.lon, p.trade, p.readiness
+    FROM worker_profiles p JOIN users u ON u.id=p.user_id JOIN zip_geo z ON z.zip=p.zip
+    ORDER BY p.readiness DESC`).all();
+  const byZip = {};
+  for(const r of rows){
+    const b = byZip[r.zip] || (byZip[r.zip] = {city:r.city, lat:r.lat, lon:r.lon, n:0, items:[]});
+    b.n++;
+    if(b.items.length<12) b.items.push({ label:r.name, sub:`${M.TRADES[r.trade]||r.trade} · readiness ${r.readiness}`, href:`/console/candidates/${r.id}` });
+  }
+  return Object.values(byZip).sort((a,b)=>b.n-a.n);
 }
 // open-job locations relevant to a worker: their trades (direct) + adjacent trades (related)
 async function jobGeoForWorker(prof){
@@ -175,19 +182,18 @@ async function jobGeoForWorker(prof){
   const direct = new Set(trades);
   const related = new Set();
   for(const t of trades) (M.ADJACENT[t]||[]).forEach(a=>{ if(!direct.has(a)) related.add(a); });
-  const rows = await db.prepare(`SELECT j.zip, z.lat, z.lon, z.city, j.trade
-    FROM jobs j JOIN zip_geo z ON z.zip=j.zip WHERE j.status='open'`).all();
+  const rows = await db.prepare(`SELECT j.id, j.title, j.trade, j.pay_min, j.pay_max, j.zip, z.lat, z.lon, z.city, u.company
+    FROM jobs j JOIN zip_geo z ON z.zip=j.zip JOIN users u ON u.id=j.employer_id WHERE j.status='open'`).all();
   const byZip = {};
   for(const r of rows){
     const isDirect = direct.has(r.trade), isRelated = related.has(r.trade);
     if(!isDirect && !isRelated) continue;
-    const b = byZip[r.zip] || (byZip[r.zip] = {city:r.city, lat:r.lat, lon:r.lon, n:0, anyDirect:false, trades:{}});
+    const b = byZip[r.zip] || (byZip[r.zip] = {city:r.city, lat:r.lat, lon:r.lon, n:0, anyDirect:false, items:[]});
     b.n++; if(isDirect) b.anyDirect = true;
-    b.trades[r.trade] = (b.trades[r.trade]||0)+1;
+    b.items.push({ label:`${r.title} · $${r.pay_min}–${r.pay_max}/hr`, sub:`${r.company||''} · ${M.TRADES[r.trade]||r.trade}`, href:`/app/jobs/${r.id}` });
   }
   const points = Object.values(byZip).map(b=>({
-    city:b.city, lat:b.lat, lon:b.lon, n:b.n, kind:b.anyDirect?'direct':'related',
-    label:`${b.city}: ${b.n} open job${b.n===1?'':'s'} — ${Object.entries(b.trades).map(([t,c])=>`${(M.TRADES[t]||t)} ${c}`).join(', ')}`
+    city:b.city, lat:b.lat, lon:b.lon, n:b.n, kind:b.anyDirect?'direct':'related', items:b.items
   })).sort((a,b)=>b.n-a.n);
   return { points };
 }

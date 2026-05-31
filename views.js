@@ -23,6 +23,14 @@ const ICONS = {
   check:   { f:0, p:'<path d="M20 6 9 17l-5-5"/>' },
   star:    { f:1, p:'<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 17l-5.2 2.6 1-5.8L3.5 9.7l5.9-.9z"/>' },
   warn:    { f:0, p:'<path d="M12 3 2 20h20z"/><path d="M12 10v4"/><path d="M12 17h.01"/>' },
+  cross:   { f:0, p:'<path d="M10 3h4v5h5v4h-5v5h-4v-5H5V8h5z"/>' },
+  heart:   { f:0, p:'<path d="M12 20s-7-4.5-9-9a4.5 4.5 0 0 1 9-2 4.5 4.5 0 0 1 9 2c-2 4.5-9 9-9 9z"/>' },
+  utensils:{ f:0, p:'<path d="M5 3v8M8 3v8M6.5 11v10M17 3c-1.5 0-2.5 1.8-2.5 4.5S15.5 12 17 12v9"/>' },
+  box:     { f:0, p:'<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/>' },
+  spray:   { f:0, p:'<path d="M9 21h6V9H9z"/><path d="M9 9V5h4V3M13 5h3l1 2.5M19 6l1.5 1.5M20 10l1 1"/>' },
+  shield:  { f:0, p:'<path d="M12 3 5 6v5c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6z"/>' },
+  zoomin:  { f:0, p:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4M11 8v6M8 11h6"/>' },
+  zoomout: { f:0, p:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4M8 11h6"/>' },
 };
 function icon(name, cls=''){
   const ic = ICONS[name] || ICONS.wrench;
@@ -37,6 +45,11 @@ const TRADE_ICON = {
   carpenter:'hammer',framer:'hammer',drywall:'hammer',roofer:'hammer',glazier:'hammer',
   insulation:'hammer',painter:'hammer',flooring:'hammer',tile:'hammer',mason:'layers',concrete:'layers',
   cdl_driver:'truck',heavy_equipment:'truck',landscaper:'leaf',
+  cna:'cross',medical_assistant:'cross',phlebotomist:'cross',emt:'cross',caregiver:'heart',
+  farmworker:'leaf',fruit_picker:'leaf',
+  cook:'utensils',server:'utensils',dishwasher:'utensils',bartender:'utensils',
+  warehouse:'box',delivery_driver:'truck',mover:'box',
+  janitor:'spray',housekeeper:'spray',security_guard:'shield',pest_control:'spray',appliance_repair:'wrench',
 };
 
 const esc = s => String(s == null ? '' : s)
@@ -87,6 +100,7 @@ const I18N = {
     home_credentials:'credentials', home_top:'Top matches near you', home_seeall:'See all', home_nomatch:'No matches yet — check back soon.',
     home_boost:'Boost your card', step_cred:'Add a credential', step_about:'Write your About', step_work:'Add work history', step_port:'Add portfolio photos',
     home_wallet:'Credential Wallet', home_manage:'Manage', home_quick:'Quick stats',
+    cred_expiring_one:'credential expiring soon', cred_expiring_many:'credentials expiring soon',
     st_readiness:'READINESS', st_verified:'VERIFIED', st_years:'YEARS',
     x_avail_on:'Available for work', x_avail_off:'Tap: Available', x_today_on:'Can work today', x_today_off:'Tap: Work today',
     x_relo_on:'Open to relocate', x_relo_off:'Tap: Relocate', x_alert_on:'Job alerts on', x_alert_off:'Tap: Job alerts',
@@ -130,6 +144,7 @@ const I18N = {
     home_credentials:'credenciales', home_top:'Mejores empleos cerca de ti', home_seeall:'Ver todos', home_nomatch:'Aún no hay coincidencias — vuelve pronto.',
     home_boost:'Mejora tu perfil', step_cred:'Agrega una credencial', step_about:'Escribe tu perfil', step_work:'Agrega tu experiencia', step_port:'Agrega fotos de tu trabajo',
     home_wallet:'Cartera de credenciales', home_manage:'Gestionar', home_quick:'Resumen',
+    cred_expiring_one:'credencial por vencer', cred_expiring_many:'credenciales por vencer',
     st_readiness:'PREPARACIÓN', st_verified:'VERIFICADAS', st_years:'AÑOS',
     x_avail_on:'Disponible para trabajar', x_avail_off:'Toca: Disponible', x_today_on:'Puedo trabajar hoy', x_today_off:'Toca: Trabajar hoy',
     x_relo_on:'Dispuesto a mudarme', x_relo_off:'Toca: Mudarme', x_alert_on:'Alertas activadas', x_alert_off:'Toca: Alertas de empleo',
@@ -219,7 +234,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=29">
+  <link rel="stylesheet" href="/styles.css?v=30">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -419,6 +434,9 @@ function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 
       ${xToggle('/app/relocate', profile.relocate, 'send', t('x_relo_on'), t('x_relo_off'), '/app')}
       ${xToggle('/app/alerts', profile.alerts, 'bell', t('x_alert_on'), t('x_alert_off'), '/app')}
     </div>
+    ${jobsGeo && jobsGeo.points.length ? usMap(jobsGeo.points, {title:t('home_top'), noun:T('job'), cta:T('Apply'),
+        legend:`<span class="lg"><i class="d-direct"></i> ${T('Your trades')}</span><span class="lg"><i class="d-related"></i> ${T('Related trades')}</span>`,
+        emptyMsg:T('No mapped openings yet.')}) : ''}
     <div class="dash-grid">
       <div>
         <div class="readiness card">
@@ -441,7 +459,7 @@ function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 
           <div class="sec-h" style="margin-top:0">${t('home_wallet')} <a href="/app/profile">${t('home_manage')}</a></div>
           ${creds.slice(0,4).map(credRow).join('') || `<p class="muted">${t('step_cred')}</p>`}
         </div>
-        ${expiring?`<div class="card warn-card">${icon('warn','xic')} ${expiring} · <a href="/app/profile">${t('home_manage')}</a></div>`:''}
+        ${expiring?`<div class="card warn-card">${icon('warn','xic')} <span>${expiring} ${expiring===1?t('cred_expiring_one'):t('cred_expiring_many')}</span> · <a href="/app/profile">${t('home_manage')}</a></div>`:''}
         <div class="card">
           <div class="sec-h" style="margin-top:0">${t('home_quick')}</div>
           <div class="ministats">
@@ -452,9 +470,6 @@ function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 
         </div>
       </aside>
     </div>
-    ${jobsGeo && jobsGeo.points.length ? usMap(jobsGeo.points, {title:T('Where the work is'), noun:T('job'),
-        legend:`<span class="lg"><i class="d-direct"></i> ${T('Your trades')}</span><span class="lg"><i class="d-related"></i> ${T('Related trades')}</span>`,
-        emptyMsg:T('No mapped openings yet.')}) : ''}
   </section>`;
 }
 
@@ -524,7 +539,7 @@ function workerJobs({ matches, filters = {}, jobsGeo = null }) {
       <button class="btn-sm">${T('Search')}</button>
       ${active?`<a class="nav-link" style="color:var(--brand-d)" href="/app/jobs">${T('Clear')}</a>`:''}
     </form>
-    ${jobsGeo && jobsGeo.points.length ? usMap(jobsGeo.points, {title:T('Where the work is'), noun:T('job'),
+    ${jobsGeo && jobsGeo.points.length ? usMap(jobsGeo.points, {title:T('Where the work is'), noun:T('job'), cta:T('Apply'),
         legend:`<span class="lg"><i class="d-direct"></i> ${T('Your trades')}</span><span class="lg"><i class="d-related"></i> ${T('Related trades')}</span>`,
         emptyMsg:T('No mapped openings yet.')}) : ''}
     <div class="grid3">${matches.map(jobCard).join('') || `<div class="card muted">${T('No jobs match those filters.')} <a href="/app/jobs">${T('Clear filters')}</a></div>`}</div>
@@ -787,26 +802,48 @@ function timeAgo(sqlTs){
   const mo=Math.floor(d/30); return `${mo}mo ago`;
 }
 // ---------- US map (real state outlines from us-geo, same linear projection as dots) ----------
-// generalized: points = [{city,lat,lon,n,kind?}]; opts controls labels/legend
+// Interactive US map: real state outlines + clickable count dots that open a
+// panel of jobs/candidates (with a CTA), plus zoom controls. points = [{city,lat,lon,n,kind?,items:[{label,sub,href}]}]
 function usMap(points = [], opts = {}){
-  const { title='Where your talent is', noun='candidate', emptyMsg='No mapped locations yet.', legend=null } = opts;
+  const { title='Where your talent is', noun='candidate', emptyMsg='No mapped locations yet.', legend=null, cta='Open' } = opts;
   const MINLON=-125, MAXLON=-66, MINLAT=24, MAXLAT=50, VW=620, VH=350;
   const px = lon => ((lon-MINLON)/(MAXLON-MINLON)*VW).toFixed(1);
   const py = lat => ((MAXLAT-lat)/(MAXLAT-MINLAT)*VH).toFixed(1);
   const statePaths = US_STATES.map(s=>`<path class="us-state" d="${s.d}"><title>${esc(s.n)}</title></path>`).join('');
   const total = points.reduce((a,g)=>a+(g.n||0),0);
-  const dots = points.map(g=>{
-    const r = Math.min(18, 5 + (g.n||1)*2.2);
+  const dots = points.map((g,i)=>{
+    const r = Math.min(18, 6 + (g.n||1)*2.2);
     const cls = g.kind==='related' ? 'mdot related' : 'mdot';
-    const lbl = g.label || `${g.city||''}: ${g.n} ${noun}${g.n===1?'':'s'}`;
-    return `<g class="${cls}"><circle cx="${px(g.lon)}" cy="${py(g.lat)}" r="${r}"><title>${esc(lbl)}</title></circle>${g.n>1?`<text x="${px(g.lon)}" y="${(+py(g.lat)+3.6).toFixed(1)}" text-anchor="middle">${g.n}</text>`:''}</g>`;
+    const lbl = `${g.city||''}: ${g.n} ${noun}${g.n===1?'':'s'}`;
+    return `<g class="${cls}" tabindex="0" role="button" onclick="rvMapShow(${i})" onkeydown="if(event.key==='Enter')rvMapShow(${i})">
+      <circle cx="${px(g.lon)}" cy="${py(g.lat)}" r="${r}"><title>${esc(lbl)}</title></circle>
+      <text x="${px(g.lon)}" y="${(+py(g.lat)+3.6).toFixed(1)}" text-anchor="middle">${g.n}</text></g>`;
   }).join('');
-  const top = points.slice(0,6).map(g=>`<li><span>${esc(g.city||'—')}</span><b>${g.n}</b></li>`).join('');
+  const top = points.slice(0,7).map((g,i)=>`<li onclick="rvMapShow(${i})"><span>${esc(g.city||'—')}</span><b>${g.n}</b></li>`).join('');
+  // escaped per-point payload for the click panel (esc() makes it HTML- and </script>-safe)
+  const data = points.map(g=>({ c: esc(g.city||''), items: (g.items||[]).slice(0,12).map(it=>({l:esc(it.label||''),s:esc(it.sub||''),h:esc(it.href||'#')})) }));
   return `<div class="card">
     <div class="sec-h" style="margin-top:0">${esc(title)} <span class="muted">${total} ${noun}${total===1?'':'s'} mapped</span></div>
-    ${points.length ? `<div class="mapwrap"><svg class="usmap" viewBox="0 0 ${VW} ${VH}" role="img" aria-label="US map">
-        <g class="us-states">${statePaths}</g>${dots}</svg>
-      <ul class="maplist">${top}</ul></div>${legend?`<div class="maplegend">${legend}</div>`:''}`
+    ${points.length ? `<div class="mapwrap">
+      <div class="mapbox">
+        <svg class="usmap" id="rvsvg" viewBox="0 0 ${VW} ${VH}" role="img" aria-label="US map">
+          <g class="us-states">${statePaths}</g>${dots}
+        </svg>
+        <div class="mapzoom"><button type="button" onclick="rvZoom(.8)" aria-label="Zoom in">${icon('zoomin')}</button><button type="button" onclick="rvZoom(1.25)" aria-label="Zoom out">${icon('zoomout')}</button></div>
+      </div>
+      <div class="mapside">
+        <ul class="maplist">${top}</ul>
+        <div class="mappanel" id="rvpanel"><p class="muted sm">${T('Tap a dot to see openings there')}</p></div>
+      </div>
+    </div>${legend?`<div class="maplegend">${legend}</div>`:''}
+    <script>(function(){
+      window.__RVD=${JSON.stringify(data)};window.__RVC=${JSON.stringify(esc(cta))};
+      if(window.__rvmapInit)return;window.__rvmapInit=1;
+      window.rvMapShow=function(i){var d=(window.__RVD||[])[i];var p=document.getElementById('rvpanel');if(!d||!p)return;
+        if(!d.items.length){p.innerHTML='<div class="mp-h">'+d.c+'</div><p class="muted sm">'+(window.__RVC==='Apply'?'No matching openings here yet.':'No items here.')+'</p>';return;}
+        p.innerHTML='<div class="mp-h">'+d.c+'</div>'+d.items.map(function(it){return '<div class="mp-row"><div class="mp-info"><b>'+it.l+'</b><span>'+it.s+'</span></div><a class="mp-cta" href="'+it.h+'">'+window.__RVC+'</a></div>';}).join('');};
+      window.rvZoom=function(f){var s=document.getElementById('rvsvg');if(!s)return;var vb=(s.getAttribute('viewBox')||'0 0 620 350').split(' ').map(Number);var cx=vb[0]+vb[2]/2,cy=vb[1]+vb[3]/2,nw=Math.max(150,Math.min(620,vb[2]*f)),nh=Math.max(85,Math.min(350,vb[3]*f));s.setAttribute('viewBox',(cx-nw/2).toFixed(1)+' '+(cy-nh/2).toFixed(1)+' '+nw.toFixed(1)+' '+nh.toFixed(1));};
+    })();</script>`
       : `<p class="muted">${esc(emptyMsg)}</p>`}
   </div>`;
 }
@@ -841,7 +878,7 @@ function empOverview({ user, kpis, funnel, recent, hot, alerts, fillRate, geo = 
         </div>`).join('') : `<p class="muted">${T('No recent activity yet.')}</p>`}
       </div>
     </div>
-    ${usMap(geo, {title:T('Where your talent is'), noun:T('candidate'), emptyMsg:T('No mapped candidate locations yet. Locations appear as workers add a ZIP to their Work Card.')})}
+    ${usMap(geo, {title:T('Where your talent is'), noun:T('candidate'), cta:T('View'), emptyMsg:T('No mapped candidate locations yet. Locations appear as workers add a ZIP to their Work Card.')})}
     <div class="grid2">
       <div class="card">
         <div class="sec-h" style="margin-top:0">${T('Hot candidates — ready now')} <a href="/console/search">${T('Search all')}</a></div>
