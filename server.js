@@ -790,9 +790,13 @@ const server = http.createServer(async (req,res)=>{
         const trades = normTrades(b.trades);
         const trade = trades[0] || prof.trade;
         const tradesCsv = (trades.length?trades:[trade]).join(',');
-        await db.prepare('UPDATE worker_profiles SET trade=?,trades=?,headline=?,about=?,custom_trade=? WHERE user_id=?')
-          .run(trade, tradesCsv, String(b.headline||'').slice(0,80), String(b.about||'').slice(0,600), String(b.custom_trade||'').slice(0,60), user.id);
+        const zip = (String(b.zip||'').match(/\d{5}/)||[''])[0];
+        const shift = ['Any','Day','Night','4x10'].includes(b.shift) ? b.shift : (prof.shift||'Any');
+        await db.prepare('UPDATE worker_profiles SET trade=?,trades=?,headline=?,about=?,custom_trade=?,city=?,zip=?,years_exp=?,pay_floor=?,shift=? WHERE user_id=?')
+          .run(trade, tradesCsv, String(b.headline||'').slice(0,80), String(b.about||'').slice(0,600), String(b.custom_trade||'').slice(0,60),
+               String(b.city||'').slice(0,60), zip, Number(b.years_exp)||0, Number(b.pay_floor)||0, shift, user.id);
         await recomputeReadiness(user.id);
+        try { await geocodeZip(zip); } catch(e){} // pin on the map + enable distance immediately
         return redirect(res,'/app/profile');
       }
       if(p==='/app/experience' && method==='POST'){

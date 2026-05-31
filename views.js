@@ -282,6 +282,10 @@ const BUILTIN_ES = {
   'Your rights at work — no matter your status':'Tus derechos en el trabajo — sin importar tu estatus',
   'You are owed at least the minimum wage and a safe workplace, and it is illegal for most employers to discriminate against you based on citizenship or national origin. These protections apply regardless of immigration status.':'Te corresponde al menos el salario mínimo y un lugar de trabajo seguro, y para la mayoría de los empleadores es ilegal discriminarte por ciudadanía u origen nacional. Estas protecciones aplican sin importar tu estatus migratorio.',
   'Know a worker who needs this? Share it — it’s public and free.':'¿Conoces a un trabajador que necesite esto? Compártelo — es público y gratis.',
+  // editable Work Card location/pay
+  'Trades, location & details':'Oficios, ubicación y detalles','ZIP code':'Código postal','Years of experience':'Años de experiencia',
+  'Lowest pay you’d take ($/hr)':'Pago mínimo que aceptarías ($/hr)',
+  'Your ZIP powers distance to each job and the map — add it to see how far jobs are.':'Tu código postal calcula la distancia a cada empleo y el mapa — agrégalo para ver qué tan lejos están.',
 };
 function T(s){
   if(LANG !== 'es' || !s) return s;
@@ -364,7 +368,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=53">
+  <link rel="stylesheet" href="/styles.css?v=54">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1046,7 +1050,7 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [],
     </div>
     <div class="col2"><div class="colstack">
     <div class="card">
-      <div class="sec-h" style="margin-top:0">${T('Trades, headline & about')}</div>
+      <div class="sec-h" style="margin-top:0">${T('Trades, location & details')}</div>
       ${error?`<div class="err">${esc(error)}</div>`:''}
       <form method="post" action="/app/profile/details">
         <label>${T('Headline')} <input name="headline" maxlength="80" value="${esc(profile.headline||'')}" placeholder="${T('e.g. Journeyman electrician — commercial & solar')}"></label>
@@ -1055,6 +1059,16 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [],
           <div class="tradepick">${tradeCheckboxes(trades)}</div>
         </div>
         <label>${T("Don't see your job? Add it")} <input name="custom_trade" maxlength="60" value="${esc(profile.custom_trade||'')}" placeholder="${T('e.g. Wind turbine technician')}"></label>
+        <div class="row2">
+          <label>${T('City')} <input name="city" maxlength="60" value="${esc(profile.city||'')}" placeholder="${T('e.g. Phoenix')}"></label>
+          <label>${T('ZIP code')} <input name="zip" inputmode="numeric" maxlength="5" pattern="[0-9]*" value="${esc(profile.zip||'')}" placeholder="${T('e.g. 85004')}"></label>
+        </div>
+        <p class="muted sm" style="margin-top:-4px">${T('Your ZIP powers distance to each job and the map — add it to see how far jobs are.')}</p>
+        <div class="row2">
+          <label>${T('Years of experience')} <input name="years_exp" type="number" min="0" max="60" inputmode="numeric" value="${profile.years_exp||0}"></label>
+          <label>${T('Lowest pay you’d take ($/hr)')} <input name="pay_floor" type="number" min="0" inputmode="numeric" value="${profile.pay_floor||0}"></label>
+        </div>
+        <label>${T('Shift')} <select name="shift">${['Any','Day','Night','4x10'].map(s=>`<option value="${s}" ${(profile.shift||'Any')===s?'selected':''}>${T(s)}</option>`).join('')}</select></label>
         <label>${T('About you')} <textarea name="about" rows="3" maxlength="600" placeholder="${T("Where you've worked, what you're great at, what you're looking for.")}">${esc(profile.about||'')}</textarea></label>
         <button class="btn-sm">${T('Save details')}</button>
       </form>
