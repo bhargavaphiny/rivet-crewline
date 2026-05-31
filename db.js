@@ -121,6 +121,38 @@ async function createSchema() {
       created_at TEXT DEFAULT (datetime('now')),
       UNIQUE(job_id, worker_id)
     );
+    CREATE TABLE IF NOT EXISTS messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      from_id INTEGER REFERENCES users(id),
+      to_id INTEGER REFERENCES users(id),
+      body TEXT NOT NULL,
+      read_at TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      author_id INTEGER REFERENCES users(id),
+      worker_id INTEGER REFERENCES users(id),
+      body TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS saved_jobs (
+      worker_id INTEGER REFERENCES users(id),
+      job_id INTEGER REFERENCES jobs(id),
+      created_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY(worker_id, job_id)
+    );
+    CREATE TABLE IF NOT EXISTS saved_candidates (
+      employer_id INTEGER REFERENCES users(id),
+      worker_id INTEGER REFERENCES users(id),
+      created_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY(employer_id, worker_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_messages_to ON messages(to_id, read_at);
+    CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_id, to_id);
+    CREATE INDEX IF NOT EXISTS idx_applications_worker ON applications(worker_id);
+    CREATE INDEX IF NOT EXISTS idx_applications_job ON applications(job_id);
+    CREATE INDEX IF NOT EXISTS idx_credentials_user ON credentials(user_id);
   `);
 }
 

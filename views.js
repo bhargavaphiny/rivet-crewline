@@ -20,12 +20,14 @@ function layout({ title, user, body, active = '', flash = '' }) {
            <a class="btn-sm" href="/signup">Get started</a>`;
   } else if (user.role === 'worker') {
     const L = (h,l,k)=>`<a class="nav-link ${active===k?'on':''}" href="${h}">${l}</a>`;
-    nav = `${L('/app','Home','home')}${L('/app/jobs','Matches','jobs')}${L('/app/profile','Work Card','profile')}${L('/app/applications','Applications','apps')}
+    const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/app/messages">Messages${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
+    nav = `${L('/app','Home','home')}${L('/app/jobs','Matches','jobs')}${L('/app/profile','Work Card','profile')}${L('/app/applications','Applications','apps')}${msg}
            <span class="who">${initials(user.name)}</span>
            <a class="nav-link" href="/logout">Log out</a>`;
   } else {
     const L = (h,l,k)=>`<a class="nav-link ${active===k?'on':''}" href="${h}">${l}</a>`;
-    nav = `${L('/console','Overview','ov')}${L('/console/search','Talent','search')}${L('/console/jobs','Jobs','jobs')}
+    const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/console/messages">Messages${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
+    nav = `${L('/console','Overview','ov')}${L('/console/search','Talent','search')}${L('/console/jobs','Jobs','jobs')}${msg}
            <span class="who">${initials(user.company||user.name)}</span>
            <a class="nav-link" href="/logout">Log out</a>`;
   }
@@ -52,7 +54,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles.css?v=8">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -478,8 +480,27 @@ function empSearch({ rows, filters }) {
   </section>`;
 }
 
+// ---------- shared: message thread + inbox ----------
+function msgThread(messages, meId){
+  if(!messages || !messages.length) return '<p class="muted sm">No messages yet — say hello.</p>';
+  return `<div class="thread">${messages.map(m=>`<div class="bubble ${m.from_id===meId?'mine':'theirs'}"><div class="bub-body">${esc(m.body)}</div><div class="bub-t">${timeAgo(m.created_at)}</div></div>`).join('')}</div>`;
+}
+function inbox({ convos, base, meId }){
+  return `<section class="wrap narrow">
+    <div class="page-h"><h2>Messages</h2></div>
+    ${convos.length ? convos.map(c=>`<div class="card">
+      <div class="sec-h" style="margin-top:0">${esc(c.other.company||c.other.name)}${c.other.company?` <span class="muted sm">${esc(c.other.name)}</span>`:''}</div>
+      ${msgThread(c.msgs, meId)}
+      <form method="post" action="${base}/messages/${c.other.id}" class="msg-form">
+        <input name="body" placeholder="Write a message…" autocomplete="off" required maxlength="2000">
+        <button class="btn-sm">Send</button>
+      </form>
+    </div>`).join('') : `<div class="card muted">No conversations yet.${base==='/console'?' Open a candidate from Talent Search and send a message to start one.':' An employer will reach out when you match.'}</div>`}
+  </section>`;
+}
+
 // ---------- employer: candidate detail ----------
-function empCandidate({ worker, profile, creds, matches, apps }) {
+function empCandidate({ worker, profile, creds, matches, apps, messages, meId }) {
   const stageByJob = {}; for (const a of apps) stageByJob[a.job_id] = a.stage;
   return `<section class="wrap narrow">
     <a class="back" href="/console/search">← Talent Search</a>
@@ -512,6 +533,14 @@ function empCandidate({ worker, profile, creds, matches, apps }) {
           : `<form method="post" action="/console/jobs/${m.job.id}/add"><input type="hidden" name="worker_id" value="${worker.id}"><button class="btn-sm">+ Add to pipeline</button></form>`}</div>
       </div>`).join('') : `<p class="muted">You have no open jobs yet. <a href="/console/jobs/new">Post a job</a> to see how this candidate fits.</p>`}
     </div>
+    <div class="card" id="messages">
+      <div class="sec-h" style="margin-top:0">Message ${esc(worker.name.split(' ')[0])}</div>
+      ${msgThread(messages, meId)}
+      <form method="post" action="/console/candidates/${worker.id}/message" class="msg-form">
+        <input name="body" placeholder="Reach out about a role…" autocomplete="off" required maxlength="2000">
+        <button class="btn-sm">Send</button>
+      </form>
+    </div>
   </section>`;
 }
 
@@ -533,4 +562,4 @@ function ogImage() {
 }
 
 module.exports = { layout, landing, authForm, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, empOverview, empJobs, empJobForm, empPipeline, empSearch, empCandidate, ogImage, STAGES };
+  jobDetail, workerProfile, empOverview, empJobs, empJobForm, empPipeline, empSearch, empCandidate, inbox, ogImage, STAGES };

@@ -51,7 +51,34 @@ async function getUser(req){
   const token = cookie.slice(5);
   const [uid, sig] = token.split('.');
   if(!uid || sig !== sign(uid)) return null;
-  return (await db.prepare('SELECT id,email,role,name,company FROM users WHERE id=?').get(Number(uid))) || null;
+  const u = await db.prepare('SELECT id,email,role,name,company FROM users WHERE id=?').get(Number(uid));
+  if(!u) return null;
+  try { u.unread = (await db.prepare('SELECT COUNT(*) c FROM messages WHERE to_id=? AND read_at IS NULL').get(u.id)).c; }
+  catch(e){ u.unread = 0; }
+  return u;
+}
+
+// ---------- messaging helpers ----------
+async function getConversations(meId){
+  const ids = await db.prepare(`SELECT DISTINCT CASE WHEN from_id=? THEN to_id ELSE from_id END oid
+    FROM messages WHERE from_id=? OR to_id=?`).all(meId, meId, meId);
+  const convos = [];
+  for(const { oid } of ids){
+    const other = await db.prepare('SELECT id,name,company,role FROM users WHERE id=?').get(oid);
+    if(!other) continue;
+    const msgs = await db.prepare(`SELECT * FROM messages WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=?)
+      ORDER BY created_at, id`).all(meId, oid, oid, meId);
+    other.unread = msgs.filter(m=>m.to_id===meId && !m.read_at).length;
+    convos.push({ other, msgs, last: msgs[msgs.length-1] });
+  }
+  convos.sort((a,b)=> String(b.last&&b.last.created_at||'').localeCompare(String(a.last&&a.last.created_at||'')));
+  return convos;
+}
+async function sendMessage(fromId, toId, body){
+  const text = String(body||'').trim().slice(0,2000);
+  if(!text) return false;
+  await db.prepare('INSERT INTO messages(from_id,to_id,body) VALUES(?,?,?)').run(fromId, toId, text);
+  return true;
 }
 
 // ---------- helpers ----------
@@ -96,7 +123,7 @@ const server = http.createServer(async (req,res)=>{
   try {
     setSecurityHeaders(res);
     // static & utility
-    if(p==='/styles.css'){ res.writeHead(200,{'Content-Type':'text/css','Cache-Control':'public, max-age=3600'}); return res.end(fs.readFileSync(path.join(__dirname,'styles.css'))); }
+    if(p==='/styles.css'){ res.writeHead(200,{'Content-Type':'text/css','Cache-Control':'no-cache'}); return res.end(fs.readFileSync(path.join(__dirname,'styles.css'))); }
     if(p==='/og.svg'){ res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'public, max-age=86400'}); return res.end(V.ogImage()); }
     if(p==='/healthz'){ res.writeHead(200,{'Content-Type':'text/plain'}); return res.end('ok'); }
     if(p==='/robots.txt'){ res.writeHead(200,{'Content-Type':'text/plain'}); return res.end('User-agent: *\nAllow: /\nDisallow: /app\nDisallow: /console\nDisallow: /auth\n'); }
@@ -206,6 +233,19 @@ const server = http.createServer(async (req,res)=>{
         await recomputeReadiness(user.id);
         return redirect(res,'/app');
       }
+
+      if(p==='/app/messages' && method==='GET'){
+        await db.prepare("UPDATE messages SET read_at=datetime('now') WHERE to_id=? AND read_at IS NULL").run(user.id);
+        const convos = await getConversations(user.id);
+        return send(res, V.layout({title:'Messages',user:{...user,unread:0},active:'msgs',body:V.inbox({convos, base:'/app', meId:user.id})}));
+      }
+      const wMsg = p.match(/^\/app\/messages\/(\d+)$/);
+      if(wMsg && method==='POST'){
+        const b = await readBody(req);
+        await sendMessage(user.id, Number(wMsg[1]), b.body);
+        return redirect(res, '/app/messages');
+      }
+
       if(!prof) return redirect(res,'/app/onboard');
 
       if(p==='/app' && method==='GET')
@@ -346,6 +386,26 @@ const server = http.createServer(async (req,res)=>{
         return send(res, V.layout({title:'Talent Search',user,active:'search',body:V.empSearch({rows,filters})}));
       }
 
+      if(p==='/console/messages' && method==='GET'){
+        await db.prepare("UPDATE messages SET read_at=datetime('now') WHERE to_id=? AND read_at IS NULL").run(user.id);
+        const convos = await getConversations(user.id);
+        return send(res, V.layout({title:'Messages',user:{...user,unread:0},active:'msgs',body:V.inbox({convos, base:'/console', meId:user.id})}));
+      }
+      const eMsg = p.match(/^\/console\/messages\/(\d+)$/);
+      if(eMsg && method==='POST'){
+        const b = await readBody(req);
+        await sendMessage(user.id, Number(eMsg[1]), b.body);
+        return redirect(res, '/console/messages');
+      }
+      const cMsg = p.match(/^\/console\/candidates\/(\d+)\/message$/);
+      if(cMsg && method==='POST'){
+        const wid = Number(cMsg[1]);
+        const b = await readBody(req);
+        const w = await db.prepare("SELECT id FROM users WHERE id=? AND role='worker'").get(wid);
+        if(w) await sendMessage(user.id, wid, b.body);
+        return redirect(res, `/console/candidates/${wid}`);
+      }
+
       const candMatch = p.match(/^\/console\/candidates\/(\d+)$/);
       if(candMatch && method==='GET'){
         const wid = Number(candMatch[1]);
@@ -356,7 +416,9 @@ const server = http.createServer(async (req,res)=>{
         const jobs = await db.prepare('SELECT * FROM jobs WHERE employer_id=? ORDER BY created_at DESC').all(user.id);
         const matches = jobs.map(j=>{ const r=M.scoreMatch(prof,creds,j); return {job:j, score:r.score, breakdown:r.breakdown, missing:r.missing}; }).sort((a,b)=>b.score-a.score);
         const apps = jobs.length ? await db.prepare(`SELECT job_id,stage FROM applications WHERE worker_id=? AND job_id IN (${jobs.map(()=>'?').join(',')})`).all(wid, ...jobs.map(j=>j.id)) : [];
-        return send(res, V.layout({title:w.name,user,active:'search',body:V.empCandidate({worker:w,profile:prof,creds,matches,apps})}));
+        const messages = await db.prepare(`SELECT * FROM messages WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=?) ORDER BY created_at, id`).all(user.id, wid, wid, user.id);
+        await db.prepare("UPDATE messages SET read_at=datetime('now') WHERE to_id=? AND from_id=? AND read_at IS NULL").run(user.id, wid);
+        return send(res, V.layout({title:w.name,user,active:'search',body:V.empCandidate({worker:w,profile:prof,creds,matches,apps,messages,meId:user.id})}));
       }
     }
 

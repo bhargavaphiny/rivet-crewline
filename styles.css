@@ -209,6 +209,16 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--orange)}
 .foot-col a:hover{color:var(--amber)}
 .foot-base{border-top:1px solid rgba(255,255,255,.1);margin-top:26px;padding-top:18px;font-size:12.5px;color:#8da0ab}
 
+/* messaging */
+.ndot{display:inline-grid;place-items:center;min-width:16px;height:16px;padding:0 4px;margin-left:5px;background:var(--orange);color:#fff;font-size:10px;font-weight:800;border-radius:9px;vertical-align:middle}
+.thread{display:flex;flex-direction:column;gap:8px;margin:6px 0 14px;max-height:340px;overflow-y:auto}
+.bubble{max-width:78%;padding:9px 13px;border-radius:14px;font-size:14px;line-height:1.4}
+.bubble .bub-t{font-size:10.5px;opacity:.7;margin-top:3px}
+.bubble.mine{align-self:flex-end;background:var(--orange);color:#fff;border-bottom-right-radius:4px}
+.bubble.theirs{align-self:flex-start;background:var(--paper);border:1px solid var(--line);border-bottom-left-radius:4px}
+.msg-form{display:flex;gap:8px;align-items:center}
+.msg-form input{flex:1;margin:0}
+
 /* recruiter funnel + activity */
 .funnel{display:flex;flex-direction:column;gap:10px}
 .fn-row{display:grid;grid-template-columns:84px 1fr 28px;align-items:center;gap:10px}
