@@ -491,6 +491,10 @@ const server = http.createServer(async (req,res)=>{
       return send(res, V.layout({title:`${job.title} — ${job.company||'Hiring'} (${job.city})`, user, body:V.publicJob({job, rules, jsonld})}));
     }
 
+    // ---- Work-in-the-U.S. resource hub — open to all (public, crawlable) ----
+    if(p==='/work-authorization' && method==='GET')
+      return send(res, V.layout({title:'Work in the U.S.',user,active:'',body:V.workHub()}));
+
     // ---- Industry Pulse (trends + community board) — open to all ----
     if(p==='/pulse' && method==='GET'){
       const trending = await db.prepare(`SELECT trade, COUNT(*) n FROM jobs WHERE status='open' GROUP BY trade ORDER BY n DESC LIMIT 8`).all();
@@ -816,6 +820,13 @@ const server = http.createServer(async (req,res)=>{
         await recomputeReadiness(user.id);
         return redirect(res,'/app/profile');
       }
+      if(p==='/app/work-auth' && method==='POST'){
+        const b = await readBody(req);
+        const allowed = ['','authorized','need_h2a','need_h2b'];
+        const wa = allowed.includes(b.work_auth) ? b.work_auth : '';
+        await db.prepare('UPDATE worker_profiles SET work_auth=? WHERE user_id=?').run(wa||null, user.id);
+        return redirect(res,'/app/profile');
+      }
       const credVerify = p.match(/^\/app\/credentials\/(\d+)\/verify$/);
       if(credVerify && method==='POST'){
         const cid = Number(credVerify[1]); const b = await readBody(req);
@@ -922,7 +933,7 @@ const server = http.createServer(async (req,res)=>{
         const distance = await workerDistance(prof, job.zip);
         const rules = M.localRules(job.city);
         const empRating = await ratingFor(job.employer_id, 'employer');
-        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied,saved,jobMedia,distance,rules,empRating})}));
+        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied,saved,jobMedia,distance,rules,empRating,workAuth:prof.work_auth||''})}));
       }
       if(jid && p===`/app/jobs/${jid}/apply` && method==='POST'){
         const job = await db.prepare('SELECT * FROM jobs WHERE id=?').get(jid);
@@ -1032,8 +1043,9 @@ const server = http.createServer(async (req,res)=>{
         if(!b.title) return send(res, V.layout({title:'Post a job',user,active:'jobs',body:V.empJobForm('Title is required.')}));
         const reqCreds = [].concat(b.req_creds||[]).filter(Boolean).join(',');
         const empType = V.JOB_TYPES.includes(b.employment_type) ? b.employment_type : 'Full-time';
-        const info = await db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type)
-          VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(user.id,b.title,b.trade,Number(b.pay_min)||0,Number(b.pay_max)||0,b.city||'',b.zip||'',b.shift||'Day',reqCreds,b.descr||'',empType);
+        const spon = ['authorized','h2a','h2b'].includes(b.sponsorship) ? b.sponsorship : 'authorized';
+        const info = await db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type,sponsorship)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).run(user.id,b.title,b.trade,Number(b.pay_min)||0,Number(b.pay_max)||0,b.city||'',b.zip||'',b.shift||'Day',reqCreds,b.descr||'',empType,spon);
         const jobId = info.lastInsertRowid;
         try { await geocodeZip(b.zip); } catch(e){} // pin new job on the demand map immediately
         // SMS job alerts to matching, opted-in, available workers who have a phone
@@ -1110,8 +1122,9 @@ const server = http.createServer(async (req,res)=>{
         if(!b.title) return send(res, V.layout({title:'Edit job',user,active:'jobs',body:V.empJobForm('Title is required.', {...job, ...b, req_creds:[].concat(b.req_creds||[]).join(',')})}));
         const reqCreds = [].concat(b.req_creds||[]).filter(Boolean).join(',');
         const empType = V.JOB_TYPES.includes(b.employment_type) ? b.employment_type : (job.employment_type||'Full-time');
-        await db.prepare(`UPDATE jobs SET title=?,trade=?,pay_min=?,pay_max=?,city=?,zip=?,shift=?,req_creds=?,descr=?,employment_type=? WHERE id=? AND employer_id=?`)
-          .run(String(b.title).slice(0,120), b.trade||job.trade, Number(b.pay_min)||0, Number(b.pay_max)||0, b.city||'', b.zip||'', b.shift||'Day', reqCreds, String(b.descr||'').slice(0,2000), empType, jobId, user.id);
+        const spon = ['authorized','h2a','h2b'].includes(b.sponsorship) ? b.sponsorship : (job.sponsorship||'authorized');
+        await db.prepare(`UPDATE jobs SET title=?,trade=?,pay_min=?,pay_max=?,city=?,zip=?,shift=?,req_creds=?,descr=?,employment_type=?,sponsorship=? WHERE id=? AND employer_id=?`)
+          .run(String(b.title).slice(0,120), b.trade||job.trade, Number(b.pay_min)||0, Number(b.pay_max)||0, b.city||'', b.zip||'', b.shift||'Day', reqCreds, String(b.descr||'').slice(0,2000), empType, spon, jobId, user.id);
         return redirect(res, `/console/jobs/${jobId}`);
       }
 

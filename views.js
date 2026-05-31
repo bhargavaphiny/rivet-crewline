@@ -260,6 +260,28 @@ const BUILTIN_ES = {
   // map legend
   'Tap a circle to see openings there':'Toca un círculo para ver las vacantes ahí','bigger circle = more':'círculo más grande = más',
   'hiring demand':'demanda de contratación','Tap any circle to see them':'Toca cualquier círculo para verlos',
+  // work authorization & sponsorship
+  'Work authorization':'Autorización de trabajo','Sponsors H-2A visa':'Patrocina visa H-2A','Sponsors H-2B visa':'Patrocina visa H-2B',
+  'Informational only — not legal advice':'Solo informativo — no es asesoría legal','matches you':'coincide contigo',
+  'If you sponsor H-2A/H-2B workers, candidates seeking that sponsorship will see it. Informational only — not legal advice.':'Si patrocinas trabajadores H-2A/H-2B, los candidatos que buscan ese patrocinio lo verán. Solo informativo — no es asesoría legal.',
+  'Requires U.S. work authorization':'Requiere autorización de trabajo en EE. UU.','Offers H-2A (agricultural) visa sponsorship':'Ofrece patrocinio de visa H-2A (agrícola)','Offers H-2B (seasonal) visa sponsorship':'Ofrece patrocinio de visa H-2B (temporal)',
+  'Prefer not to say':'Prefiero no decir','Authorized to work in the U.S.':'Autorizado para trabajar en EE. UU.','Seeking H-2A (agricultural) sponsorship':'Busco patrocinio H-2A (agrícola)','Seeking H-2B (seasonal) sponsorship':'Busco patrocinio H-2B (temporal)',
+  'This employer sponsors H-2A (agricultural) visas.':'Este empleador patrocina visas H-2A (agrícolas).','This employer sponsors H-2B (seasonal) visas.':'Este empleador patrocina visas H-2B (temporales).',
+  'Matches what you’re seeking.':'Coincide con lo que buscas.','Requires existing U.S. work authorization (Form I-9).':'Requiere autorización de trabajo vigente en EE. UU. (Formulario I-9).',
+  'Work in the U.S. — your rights & options ↗':'Trabajar en EE. UU. — tus derechos y opciones ↗','Work in the U.S. — full guide':'Trabajar en EE. UU. — guía completa',
+  'optional · private':'opcional · privado','Tells you when an employer sponsors the visa you need. We never use this to screen you out, and it’s not shown publicly.':'Te avisa cuando un empleador patrocina la visa que necesitas. Nunca lo usamos para descartarte y no se muestra públicamente.',
+  'Work in the U.S.':'Trabajar en EE. UU.','Resources':'Recursos',
+  'Plain-language pointers to official government sources — so you can find the real rules yourself.':'Guía sencilla con fuentes oficiales del gobierno — para que encuentres las reglas reales por ti mismo.',
+  'This is general information, not legal advice. Rules change and every situation is different — confirm with the official sources below or a qualified immigration attorney before acting.':'Esto es información general, no asesoría legal. Las reglas cambian y cada caso es distinto — confirma con las fuentes oficiales abajo o con un abogado de inmigración calificado antes de actuar.',
+  'Am I authorized to work?':'¿Estoy autorizado para trabajar?',
+  'Everyone hired in the U.S. completes Form I-9 and shows they’re authorized to work. That can be citizenship, a green card, asylee/refugee status, or an Employment Authorization Document (EAD).':'Todos los contratados en EE. UU. completan el Formulario I-9 y demuestran que están autorizados para trabajar. Eso puede ser ciudadanía, residencia (green card), estatus de asilo/refugiado, o un Documento de Autorización de Empleo (EAD).',
+  'Seasonal & agricultural visa sponsorship (H-2A / H-2B)':'Patrocinio de visa temporal y agrícola (H-2A / H-2B)',
+  'Some employers sponsor temporary workers: H-2A for agricultural/seasonal farm work, and H-2B for seasonal non-farm work like landscaping, hospitality and events. On Rivet, jobs that sponsor show a badge.':'Algunos empleadores patrocinan trabajadores temporales: H-2A para trabajo agrícola/de temporada, y H-2B para trabajo temporal no agrícola como jardinería, hotelería y eventos. En Rivet, los empleos que patrocinan muestran una insignia.',
+  'Students (F-1: CPT / OPT)':'Estudiantes (F-1: CPT / OPT)',
+  'International students on an F-1 visa may be able to work through CPT or OPT. Check the official rules and talk to your school’s international student office.':'Los estudiantes internacionales con visa F-1 pueden trabajar mediante CPT u OPT. Revisa las reglas oficiales y habla con la oficina de estudiantes internacionales de tu escuela.',
+  'Your rights at work — no matter your status':'Tus derechos en el trabajo — sin importar tu estatus',
+  'You are owed at least the minimum wage and a safe workplace, and it is illegal for most employers to discriminate against you based on citizenship or national origin. These protections apply regardless of immigration status.':'Te corresponde al menos el salario mínimo y un lugar de trabajo seguro, y para la mayoría de los empleadores es ilegal discriminarte por ciudadanía u origen nacional. Estas protecciones aplican sin importar tu estatus migratorio.',
+  'Know a worker who needs this? Share it — it’s public and free.':'¿Conoces a un trabajador que necesite esto? Compártelo — es público y gratis.',
 };
 function T(s){
   if(LANG !== 'es' || !s) return s;
@@ -342,7 +364,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=52">
+  <link rel="stylesheet" href="/styles.css?v=53">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -355,6 +377,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
         <p>${t('foot_tagline')}</p></div>
       <div class="foot-col"><h5>${t('foot_for_workers')}</h5><a href="/signup?role=worker">${t('foot_get_started')}</a><a href="/login">${t('nav_login')}</a></div>
       <div class="foot-col"><h5>${t('foot_for_employers')}</h5><a href="/signup?role=employer">${t('foot_post_job')}</a><a href="/login">${t('nav_login')}</a></div>
+      <div class="foot-col"><h5>${T('Resources')}</h5><a href="/work-authorization">${T('Work in the U.S.')}</a><a href="/pulse">${t('nav_pulse')}</a></div>
     </div>
     <div class="wrap foot-base">© 2026 Rivet × Crewline · Phoenix, AZ · <a href="/lang/${LANG==='es'?'en':'es'}" style="color:#9fb0bb">${LANG==='es'?'English':'Español'}</a></div>
   </footer>`}
@@ -704,6 +727,36 @@ function agentsHub({ mode }){
   </section>`;
 }
 
+// ---------- Work-in-the-U.S. resource hub (informational, official sources only) ----------
+function workHub(){
+  const link = (href,label) => `<a class="wa-link" href="${href}" target="_blank" rel="noopener noreferrer">${esc(label)} ↗</a>`;
+  const sections = [
+    { h:T('Am I authorized to work?'),
+      p:T('Everyone hired in the U.S. completes Form I-9 and shows they’re authorized to work. That can be citizenship, a green card, asylee/refugee status, or an Employment Authorization Document (EAD).'),
+      links:[['https://www.uscis.gov/i-9-central', 'USCIS — Form I-9 Central'], ['https://www.uscis.gov/working-in-the-united-states','USCIS — Working in the United States']] },
+    { h:T('Seasonal & agricultural visa sponsorship (H-2A / H-2B)'),
+      p:T('Some employers sponsor temporary workers: H-2A for agricultural/seasonal farm work, and H-2B for seasonal non-farm work like landscaping, hospitality and events. On Rivet, jobs that sponsor show a badge.'),
+      links:[['https://www.dol.gov/agencies/whd/agriculture/h2a','U.S. DOL — H-2A (agricultural)'], ['https://www.dol.gov/agencies/whd/immigration/h2b','U.S. DOL — H-2B (seasonal non-agricultural)']] },
+    { h:T('Students (F-1: CPT / OPT)'),
+      p:T('International students on an F-1 visa may be able to work through CPT or OPT. Check the official rules and talk to your school’s international student office.'),
+      links:[['https://www.uscis.gov/working-in-the-united-states/students-and-exchange-visitors','USCIS — Students & exchange visitors']] },
+    { h:T('Your rights at work — no matter your status'),
+      p:T('You are owed at least the minimum wage and a safe workplace, and it is illegal for most employers to discriminate against you based on citizenship or national origin. These protections apply regardless of immigration status.'),
+      links:[['https://www.justice.gov/crt/immigrant-and-employee-rights-section','U.S. DOJ — Immigrant & Employee Rights'], ['https://www.dol.gov/agencies/whd','U.S. DOL — Wage & Hour Division'], ['https://www.osha.gov/workers','OSHA — Worker safety rights']] },
+  ];
+  return `<section class="wrap narrow">
+    <div class="page-h"><h2>${icon('globe','xic')} ${T('Work in the U.S.')}</h2>
+      <p class="muted">${T('Plain-language pointers to official government sources — so you can find the real rules yourself.')}</p></div>
+    <div class="card disclaimer">${T('This is general information, not legal advice. Rules change and every situation is different — confirm with the official sources below or a qualified immigration attorney before acting.')}</div>
+    ${sections.map(s=>`<div class="card">
+      <div class="sec-h" style="margin-top:0">${esc(s.h)}</div>
+      <p>${esc(s.p)}</p>
+      <div class="wa-links">${s.links.map(([h,l])=>link(h,l)).join('')}</div>
+    </div>`).join('')}
+    <div class="card muted sm">${T('Know a worker who needs this? Share it — it’s public and free.')}</div>
+  </section>`;
+}
+
 function jobCard(m, bare = false){
   const j = m.job;
   const fit = (m.missing && m.missing.length)
@@ -723,6 +776,7 @@ function jobCard(m, bare = false){
       ${j.employment_type?`<span class="jtype">${esc(T(j.employment_type))}</span>`:''}
       <span class="js-shift">${esc(T(j.shift))}</span>
       ${isExternal(j)?`<span class="ext-badge">${esc(j.source)} ↗</span>`:''}
+      ${sponsorBadge(j)}
       ${bare?'':fit}
     </div>
     ${bare?'':`<div class="matchbar"><i style="width:${m.score}%"></i></div>`}
@@ -799,8 +853,10 @@ function workerJobs({ matches, filters = {}, jobsGeo = null, needZip = false }) 
 }
 
 // ---------- worker: job detail ----------
-function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance = null, rules = null, empRating = {avg:0,count:0} }) {
+function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance = null, rules = null, empRating = {avg:0,count:0}, workAuth = '' }) {
   const belowMin = rules && job.pay_min && job.pay_min < rules.minWage;
+  const spon = (job.sponsorship)||'authorized';
+  const sponMatch = (spon==='h2a'&&workAuth==='need_h2a')||(spon==='h2b'&&workAuth==='need_h2b');
   return `<section class="wrap narrow">
     <a class="back" href="/app/jobs">← All matches</a>
     <div class="card">
@@ -824,6 +880,13 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
         </div>
         <p class="rules-note">${rules.cityApplies?`${esc(rules.city)} ${T('sets a higher minimum than the state')} ($${rules.stateWage.toFixed(2)}). `:''}${T('Employers must meet the highest of federal, state, county or city minimum wage. Verify local rules before you start.')}</p>
       </div>`:''}
+      <div class="rules workauth">
+        <div class="rules-h">${T('Work authorization')}</div>
+        ${spon==='h2a'||spon==='h2b'
+          ? `<p class="${sponMatch?'wa-match':''}">${icon('globe','xic')} ${spon==='h2a'?T('This employer sponsors H-2A (agricultural) visas.'):T('This employer sponsors H-2B (seasonal) visas.')}${sponMatch?` <b>${T('Matches what you’re seeking.')}</b>`:''}</p>`
+          : `<p>${T('Requires existing U.S. work authorization (Form I-9).')}</p>`}
+        <p class="rules-note">${T('Informational only — not legal advice.')} <a href="/work-authorization" target="_blank" rel="noopener">${T('Work in the U.S. — your rights & options ↗')}</a></p>
+      </div>
       ${jobMedia.length?`<div class="sec-h" style="margin-top:4px">The work</div>${mediaGallery(jobMedia)}`:''}
       <div class="breakdown">
         <h4>Why you match</h4>
@@ -1000,6 +1063,15 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [],
       </form>
     </div>
     <div class="card">
+      <div class="sec-h" style="margin-top:0">${T('Work authorization')} <span class="muted sm">${T('optional · private')}</span></div>
+      <p class="muted sm">${T('Tells you when an employer sponsors the visa you need. We never use this to screen you out, and it’s not shown publicly.')}</p>
+      <form method="post" action="/app/work-auth" class="msg-form">
+        <select name="work_auth">${Object.entries(WORK_AUTH).map(([k,v])=>`<option value="${k}" ${(profile.work_auth||'')===k?'selected':''}>${T(v)}</option>`).join('')}</select>
+        <button class="btn-sm">${T('Save')}</button>
+      </form>
+      <p class="muted sm" style="margin-top:8px"><a href="/work-authorization" target="_blank" rel="noopener" style="color:var(--brand-d);font-weight:700">${T('Work in the U.S. — your rights & options ↗')}</a></p>
+    </div>
+    <div class="card">
       <div class="sec-h" style="margin-top:0">${T('Work history')}</div>
       ${workHistoryList(work, true)}
       <form method="post" action="/app/experience" class="exp-form">
@@ -1075,6 +1147,7 @@ function workerTraining({ have = [] }) {
         <a class="nav-link" style="color:var(--brand-d);font-weight:700" href="https://www.uscis.gov/i-9-central" target="_blank" rel="noopener noreferrer">USCIS — Work authorization (Form I-9) ↗</a>
         <a class="nav-link" style="color:var(--brand-d);font-weight:700" href="https://www.dol.gov/agencies/whd/youthrules" target="_blank" rel="noopener noreferrer">DOL — Youth & student work rules ↗</a>
       </div>
+      <a class="btn-sm" href="/work-authorization" style="margin-top:12px">${icon('globe')} ${T('Work in the U.S. — full guide')}</a>
     </div>
   </section>`;
 }
@@ -1494,6 +1567,17 @@ function empJobs({ jobs }) {
 }
 
 const JOB_TYPES = ['Full-time','Part-time','Contract','Temp','Apprenticeship','Outcome-based'];
+const SPONSORSHIP = { authorized:'Requires U.S. work authorization', h2a:'Offers H-2A (agricultural) visa sponsorship', h2b:'Offers H-2B (seasonal) visa sponsorship' };
+const WORK_AUTH = { '':'Prefer not to say', authorized:'Authorized to work in the U.S.', need_h2a:'Seeking H-2A (agricultural) sponsorship', need_h2b:'Seeking H-2B (seasonal) sponsorship' };
+// Informational sponsorship badge for a job. profile (optional) lets us note a match
+// with what the worker is seeking. Never gates anyone out — purely informational.
+function sponsorBadge(job, profile){
+  const s = (job && job.sponsorship) || 'authorized';
+  if(s!=='h2a' && s!=='h2b') return '';
+  const label = s==='h2a' ? T('Sponsors H-2A visa') : T('Sponsors H-2B visa');
+  const match = profile && ((s==='h2a'&&profile.work_auth==='need_h2a')||(s==='h2b'&&profile.work_auth==='need_h2b'));
+  return `<span class="sponsor-badge${match?' match':''}" title="${T('Informational only — not legal advice')}">${icon('globe')} ${label}${match?` · ${T('matches you')}`:''}</span>`;
+}
 function empJobForm(error='', job=null) {
   const editing = !!job;
   const opts = tradeOptionsGrouped(editing ? job.trade : '');
@@ -1514,6 +1598,8 @@ function empJobForm(error='', job=null) {
       <div class="row2"><label>${T('City')} <input name="city" value="${v('city','Phoenix')}"></label>
         <label>${T('ZIP')} <input name="zip" value="${v('zip','85004')}"></label></div>
       <label>${T('Shift')} <select name="shift">${shiftOpts}</select></label>
+      <label>${T('Work authorization')} <select name="sponsorship">${Object.entries(SPONSORSHIP).map(([k,vv])=>`<option value="${k}" ${editing&&job.sponsorship===k?'selected':(k==='authorized'&&!(editing&&job.sponsorship)?'selected':'')}>${T(vv)}</option>`).join('')}</select></label>
+      <p class="muted sm" style="margin-top:-4px">${T('If you sponsor H-2A/H-2B workers, candidates seeking that sponsorship will see it. Informational only — not legal advice.')}</p>
       <label>${T('Required credentials')}</label><div class="ckrow">${cred}</div>
       <label>${T('Description')} <textarea name="descr" rows="3">${v('descr')}</textarea></label>
       <button class="btn full">${editing?T('Save changes'):T('Post & match')}</button>
@@ -1735,4 +1821,4 @@ function ogImage() {
 }
 
 module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub };
+  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP };

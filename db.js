@@ -926,6 +926,8 @@ async function migrate() {
   try { await db.exec('ALTER TABLE users ADD COLUMN company_size TEXT'); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE credentials ADD COLUMN proof_url TEXT'); } catch (e) { /* column exists */ }
   try { await db.exec("ALTER TABLE credentials ADD COLUMN verify_status TEXT DEFAULT 'unverified'"); } catch (e) { /* column exists */ }
+  try { await db.exec("ALTER TABLE jobs ADD COLUMN sponsorship TEXT DEFAULT 'authorized'"); } catch (e) { /* column exists */ }
+  try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN work_auth TEXT'); } catch (e) { /* column exists */ }
 }
 
 async function seedZips() {
@@ -984,6 +986,16 @@ async function init() {
   try { await seedUsajobs(); } catch (e) { console.error('[db] usajobs seed skipped (non-fatal):', e.message); }
   try { await seedActivity2(); } catch (e) { console.error('[db] activity2 seed skipped (non-fatal):', e.message); }
   try { await seedReviews(); } catch (e) { console.error('[db] reviews seed skipped (non-fatal):', e.message); }
+  try {
+    if(!(await metaGet('sponsorship_v2'))){
+      // Recompute cleanly by trade (no employment_type sweep, which mis-tagged Temp jobs).
+      // Agricultural roles → H-2A; seasonal non-ag (hospitality/landscaping/events) → H-2B.
+      await db.exec("UPDATE jobs SET sponsorship='authorized'");
+      await db.exec("UPDATE jobs SET sponsorship='h2a' WHERE trade IN ('fruit_picker','farmworker','irrigation_tech','packing_shed','ranch_hand','nursery_worker')");
+      await db.exec("UPDATE jobs SET sponsorship='h2b' WHERE trade IN ('landscaper','event_setup','housekeeper','host','server','busser','dishwasher','bartender')");
+      await metaSet('sponsorship_v2','1');
+    }
+  } catch (e) { console.error('[db] sponsorship seed skipped (non-fatal):', e.message); }
   try {
     if(!(await metaGet('credstatus_v1'))){
       await db.exec("UPDATE credentials SET verify_status='verified' WHERE verified=1");
