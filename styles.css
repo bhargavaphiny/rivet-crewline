@@ -552,6 +552,11 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .r-tip{margin:8px 0 0;font-size:12.5px;color:rgba(255,255,255,.85);display:flex;align-items:center;gap:5px}
 .r-tip .xic{width:13px;height:13px}
 .r-tip a{color:#fff;font-weight:700;text-decoration:underline}
+/* inclusion: fair-chance + veteran */
+.jtype.fair,.incl-badge.fair{background:rgba(31,169,113,.14);color:#157a52}
+.jtype.vet,.incl-badge.vet{background:rgba(43,73,112,.13);color:#2e547e}
+.incl-badge{display:inline-flex;align-items:center;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px}
+.avail-badge.vet{background:rgba(43,73,112,.12);color:#2e547e}
 
 /* ---- training & certifications ---- */
 .info-card{background:rgba(23,99,166,.06);border:1px solid rgba(23,99,166,.18);color:var(--slate);font-size:14px}

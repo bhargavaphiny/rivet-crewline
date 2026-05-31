@@ -1022,6 +1022,9 @@ async function migrate() {
   try { await db.exec("ALTER TABLE jobs ADD COLUMN poster_kind TEXT DEFAULT 'company'"); } catch (e) { /* company|individual */ }
   try { await db.exec('ALTER TABLE jobs ADD COLUMN quotes_ok INTEGER DEFAULT 0'); } catch (e) { /* accepts price quotes */ }
   try { await db.exec('ALTER TABLE jobs ADD COLUMN duration TEXT'); } catch (e) { /* e.g. 2 weeks, 3 months, ongoing */ }
+  try { await db.exec('ALTER TABLE jobs ADD COLUMN fair_chance INTEGER DEFAULT 0'); } catch (e) { /* considers applicants with records */ }
+  try { await db.exec('ALTER TABLE jobs ADD COLUMN veteran_ok INTEGER DEFAULT 0'); } catch (e) { /* veteran-friendly */ }
+  try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN veteran INTEGER DEFAULT 0'); } catch (e) { /* worker is a veteran */ }
 }
 
 async function seedZips() {
@@ -1082,6 +1085,18 @@ async function init() {
   try { await seedReviews(); } catch (e) { console.error('[db] reviews seed skipped (non-fatal):', e.message); }
   try { await seedXfactors(); } catch (e) { console.error('[db] xfactors seed skipped (non-fatal):', e.message); }
   try { await seedHomeowner(); } catch (e) { console.error('[db] homeowner seed skipped (non-fatal):', e.message); }
+  try {
+    if(!(await metaGet('inclusion_v1'))){
+      // fair-chance: trades & roles where second-chance hiring is common and impactful
+      await db.exec("UPDATE jobs SET fair_chance=1 WHERE trade IN ('warehouse','mover','janitor','landscaper','concrete','demolition','dishwasher','prep_cook','delivery_driver','junk_removal','packing_shed','welder','pipefitter')");
+      await db.exec("UPDATE jobs SET veteran_ok=1 WHERE trade IN ('electrician','hvac','welder','diesel_mechanic','heavy_equipment','security_guard','cdl_driver','facilities','controls','low_voltage')");
+      for(const email of ['will@rivet.test','omar@rivet.test','marcus.bell@rivet.test']){
+        const u = await db.prepare('SELECT id FROM users WHERE email=?').get(email);
+        if(u) await db.prepare('UPDATE worker_profiles SET veteran=1 WHERE user_id=?').run(u.id);
+      }
+      await metaSet('inclusion_v1','1');
+    }
+  } catch (e) { console.error('[db] inclusion seed skipped (non-fatal):', e.message); }
   try {
     if(!(await metaGet('duration_v1'))){
       await db.exec("UPDATE jobs SET duration='3 months' WHERE employment_type='Contract' AND duration IS NULL");
