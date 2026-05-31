@@ -294,6 +294,8 @@ const BUILTIN_ES = {
   'Apply with verified Work Card':'Postular con tarjeta verificada','★ Saved — remove':'★ Guardado — quitar','☆ Save this job':'☆ Guardar este empleo',
   'employees':'empleados','Candidate':'Candidato','Trade':'Oficio','Exp':'Exp.','Readiness':'Preparación','Pay floor':'Pago mínimo','yr':'años',
   'No matches for these filters.':'No hay coincidencias para estos filtros.',
+  // map hero
+  'across':'en','metro':'metro','metros':'metros','warmer & bigger = more hiring':'más grande = más contratación',
 };
 function T(s){
   if(LANG !== 'es' || !s) return s;
@@ -376,7 +378,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=55">
+  <link rel="stylesheet" href="/styles.css?v=56">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -547,15 +549,15 @@ function workerOnboard(error='') {
       <label>Headline <input name="headline" maxlength="80" placeholder="e.g. Journeyman electrician — commercial & solar"></label>
       <div class="fieldset">
         <div class="fs-lbl">Your trades <span class="muted">pick all you work</span></div>
-        <div class="tradepick">${tradeCheckboxes(['electrician'])}</div>
+        <div class="tradepick">${tradeCheckboxes([])}</div>
       </div>
       <div class="row2">
-        <label>Years experience <input type="number" name="years_exp" min="0" value="3"></label>
-        <label>Pay floor ($/hr) <input type="number" name="pay_floor" min="0" value="30"></label>
+        <label>Years experience <input type="number" name="years_exp" min="0" placeholder="e.g. 8"></label>
+        <label>Pay floor ($/hr) <input type="number" name="pay_floor" min="0" placeholder="e.g. 32"></label>
       </div>
       <div class="row2">
-        <label>City <input name="city" value="Phoenix"></label>
-        <label>ZIP <input name="zip" value="85004"></label>
+        <label>City <input name="city" placeholder="e.g. Phoenix"></label>
+        <label>ZIP <input name="zip" inputmode="numeric" maxlength="5" placeholder="e.g. 85004"></label>
       </div>
       <label>Preferred shift
         <select name="shift"><option>Day</option><option>Night</option><option>4x10</option><option>Any</option></select>
@@ -1367,21 +1369,22 @@ function usMap(points = [], opts = {}){
   const py = lat => ((MAXLAT-lat)/(MAXLAT-MINLAT)*VH).toFixed(1);
   const statePaths = US_STATES.map(s=>`<path class="us-state" d="${s.d}"><title>${esc(s.n)}</title></path>`).join('');
   const cityLayer = MAP_CITIES.map(([nm,lo,la])=>`<g class="us-city"><circle cx="${px(lo)}" cy="${py(la)}" r="1.6"/><text x="${(+px(lo)+4).toFixed(1)}" y="${(+py(la)+3).toFixed(1)}">${esc(nm)}</text></g>`).join('');
-  // demand heat: soft amber glow blobs sized by how many openings/candidates cluster there
-  const heatDefs = `<defs><radialGradient id="rvheat"><stop offset="0%" stop-color="#E89A2E" stop-opacity=".66"/><stop offset="55%" stop-color="#D9701E" stop-opacity=".2"/><stop offset="100%" stop-color="#B4471F" stop-opacity="0"/></radialGradient></defs>`;
   const nfmt = n => n>=10000 ? Math.round(n/1000)+'k' : (n>=1000 ? (n/1000).toFixed(1).replace(/\.0$/,'')+'k' : String(n));
-  const heat = points.map(g=>{ const hr=Math.max(16, Math.min(60, 14 + Math.sqrt(g.n||1)*0.7)); return `<circle class="heat" cx="${px(g.lon)}" cy="${py(g.lat)}" r="${hr.toFixed(1)}" fill="url(#rvheat)"/>`; }).join('');
   // subtle river lines only — geographic context, clearly not interactive markers.
-  // (Forest blobs + mountain triangles removed: they looked like clickable dots but weren't.)
   const rivers = MAP_RIVERS.map(r=>`<polyline class="geo-river" points="${r.map(([lo,la])=>`${px(lo)},${py(la)}`).join(' ')}"/>`).join('');
   const total = points.reduce((a,g)=>a+(g.n||0),0);
+  // The clickable circles ARE the heatmap: size = volume, soft glow = intensity,
+  // the busiest metros gently pulse so the map feels alive (a "real hero").
+  const maxN = Math.max(1, ...points.map(g=>g.n||0));
   const dots = points.map((g,i)=>{
-    const r = Math.min(21, 8 + Math.sqrt(g.n||1)*0.2);
-    const cls = g.kind==='related' ? 'mdot related' : 'mdot';
-    const lbl = `${g.city||''}: ${(g.n||0).toLocaleString()} ${noun}${g.n===1?'':'s'}`;
-    return `<g class="${cls}" tabindex="0" role="button" onclick="rvMapShow(${i})" onkeydown="if(event.key==='Enter')rvMapShow(${i})">
-      <circle cx="${px(g.lon)}" cy="${py(g.lat)}" r="${r.toFixed(1)}"><title>${esc(lbl)}</title></circle>
-      <text x="${px(g.lon)}" y="${(+py(g.lat)+3.4).toFixed(1)}" text-anchor="middle">${nfmt(g.n||0)}</text></g>`;
+    const r = Math.min(26, 9 + Math.sqrt(g.n||1)*0.24);
+    const hot = (g.n||0) >= maxN*0.6;
+    const cls = `mdot${g.kind==='related'?' related':''}${hot?' hot':''}`;
+    const lbl = `${g.city||''}: ${(g.n||0).toLocaleString()} ${noun}${g.n===1?'':'s'} — tap to open`;
+    return `<g class="${cls}" tabindex="0" role="button" aria-label="${esc(lbl)}" onclick="rvMapShow(${i})" onkeydown="if(event.key==='Enter')rvMapShow(${i})">
+      ${hot?`<circle class="mpulse" cx="${px(g.lon)}" cy="${py(g.lat)}" r="${r.toFixed(1)}"/>`:''}
+      <circle class="mdisc" cx="${px(g.lon)}" cy="${py(g.lat)}" r="${r.toFixed(1)}"><title>${esc(lbl)}</title></circle>
+      <text x="${px(g.lon)}" y="${(+py(g.lat)+3.6).toFixed(1)}" text-anchor="middle">${nfmt(g.n||0)}</text></g>`;
   }).join('');
   const top = points.slice(0,7).map((g,i)=>`<li onclick="rvMapShow(${i})"><span>${esc(g.city||'—')}</span><b>${(g.n||0).toLocaleString()}</b></li>`).join('');
   // escaped per-point payload for the click panel (esc() makes it HTML- and </script>-safe)
@@ -1390,12 +1393,10 @@ function usMap(points = [], opts = {}){
     <div class="sec-h" style="margin-top:0">${esc(title)} <span class="muted">${total.toLocaleString()} ${noun}${total===1?'':'s'}</span></div>
     ${points.length ? `<div class="mapwrap">
       <div class="mapbox">
-        <svg class="usmap" id="rvsvg" viewBox="0 0 ${VW} ${VH}" role="img" aria-label="US map">
-          ${heatDefs}
+        <svg class="usmap" id="rvsvg" viewBox="0 0 ${VW} ${VH}" role="img" aria-label="US opportunity map">
           <g class="us-states">${statePaths}</g>
           <g class="us-geo"><clipPath id="rvclip"><rect x="0" y="0" width="${VW}" height="${VH}"/></clipPath>
             <g clip-path="url(#rvclip)"><g class="geo-rivers">${rivers}</g></g></g>
-          <g class="us-heat">${heat}</g>
           <g class="us-cities">${cityLayer}</g>${dots}
         </svg>
         <div class="mapzoom"><button type="button" onclick="rvZoom(.8)" aria-label="Zoom in">${icon('zoomin')}</button><button type="button" onclick="rvZoom(1.25)" aria-label="Zoom out">${icon('zoomout')}</button></div>
@@ -1406,11 +1407,10 @@ function usMap(points = [], opts = {}){
       </div>
     </div>
     <div class="maplegend">
-      <span class="lg"><i class="lg-dot"></i> ${esc(noun)}s <span class="lg-sub">— ${T('bigger circle = more')}</span></span>
-      <span class="lg"><i class="lg-heat"></i> ${T('hiring demand')}</span>
-      ${legend||''}
-      <span class="lg muted">${T('Tap any circle to see them')}</span>
-    </div>
+      ${legend || `<span class="lg"><i class="lg-dot"></i> ${esc(noun)}s</span>`}
+      <span class="lg lg-scale"><i class="ls ls1"></i><i class="ls ls2"></i><i class="ls ls3"></i> ${T('bigger circle = more')}</span>
+      <span class="lg muted">${icon('pin')} ${T('Tap any circle to see them')}</span>
+    </div>`+`<p class="map-hint sm muted">${total.toLocaleString()} ${noun}${total===1?'':'s'} ${T('across')} ${points.length} ${points.length===1?T('metro'):T('metros')} · ${T('warmer & bigger = more hiring')}</p>`+`
     <script>(function(){
       window.__RVD=${JSON.stringify(data)};window.__RVC=${JSON.stringify(esc(cta))};
       if(window.__rvmapInit)return;window.__rvmapInit=1;

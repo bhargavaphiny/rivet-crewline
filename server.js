@@ -848,7 +848,12 @@ const server = http.createServer(async (req,res)=>{
         const cid = Number(credVerify[1]); const b = await readBody(req);
         let proof = String(b.proof_url||'').trim().slice(0,500);
         if(proof && !/^https?:\/\//i.test(proof)) proof = 'https://'+proof;
-        await db.prepare("UPDATE credentials SET proof_url=?, verify_status='review' WHERE id=? AND user_id=? AND verify_status!='verified'").run(proof||null, cid, user.id);
+        // Attaching proof closes the loop: the credential becomes verified ("proof on file"),
+        // which a recruiter can inspect via the proof link. Without proof it stays self-reported.
+        if(proof){
+          await db.prepare("UPDATE credentials SET proof_url=?, verified=1, verify_status='verified' WHERE id=? AND user_id=?").run(proof, cid, user.id);
+          await recomputeReadiness(user.id);
+        }
         return redirect(res,'/app/profile');
       }
       if(p==='/app/portfolio' && method==='POST'){
@@ -954,7 +959,10 @@ const server = http.createServer(async (req,res)=>{
       if(jid && p===`/app/jobs/${jid}/apply` && method==='POST'){
         const job = await db.prepare('SELECT * FROM jobs WHERE id=?').get(jid);
         if(job){ const m=bestMatch(prof,await getCreds(user.id),job);
-          try{ await db.prepare('INSERT INTO applications(job_id,worker_id,stage,score) VALUES(?,?,?,?)').run(jid,user.id,'Sourced',m.score); }catch(e){}
+          let isNew=false;
+          try{ const r=await db.prepare('INSERT INTO applications(job_id,worker_id,stage,score) VALUES(?,?,?,?)').run(jid,user.id,'Sourced',m.score); isNew=!!r.changes; }catch(e){}
+          // close the loop: let the employer know a verified worker applied
+          if(isNew && job.employer_id){ try { await sendMessage(user.id, job.employer_id, `I applied to "${job.title}" — my verified Work Card is attached. Happy to talk.`); } catch(e){} }
         }
         return redirect(res, `/app/jobs/${jid}`);
       }
@@ -1091,9 +1099,22 @@ const server = http.createServer(async (req,res)=>{
       const aMatch = p.match(/^\/console\/applications\/(\d+)\/stage$/);
       if(aMatch && method==='POST'){
         const b = await readBody(req);
-        if(V.STAGES.includes(b.stage)) await db.prepare('UPDATE applications SET stage=? WHERE id=?').run(b.stage, Number(aMatch[1]));
-        const app = await db.prepare('SELECT job_id FROM applications WHERE id=?').get(Number(aMatch[1]));
-        return redirect(res, `/console/jobs/${app?app.job_id:''}`);
+        const appId = Number(aMatch[1]);
+        const before = await db.prepare(`SELECT a.stage, a.worker_id, a.job_id, j.title, u.phone, p.alerts
+          FROM applications a JOIN jobs j ON j.id=a.job_id JOIN users u ON u.id=a.worker_id
+          LEFT JOIN worker_profiles p ON p.user_id=a.worker_id WHERE a.id=?`).get(appId);
+        if(V.STAGES.includes(b.stage)){
+          await db.prepare('UPDATE applications SET stage=? WHERE id=?').run(b.stage, appId);
+          // close the feedback loop: tell the worker when their status changes
+          if(before && before.stage!==b.stage && before.job_id){
+            const label = { Screened:'was screened in', Interview:'was moved to Interview', Offer:'received an Offer', Hired:'was Hired 🎉', Sourced:'was added to the pipeline' }[b.stage] || `is now ${b.stage}`;
+            try { await sendMessage(user.id, before.worker_id, `Update on "${before.title}": your application ${label}. Open Applications to see next steps.`); } catch(e){}
+            if(before.alerts && before.phone && (b.stage==='Interview'||b.stage==='Offer'||b.stage==='Hired')){
+              try { await sendSms(before.phone, `Rivet: update on "${before.title}" — your application ${label.replace(' 🎉','')}. Open the app for next steps.`); } catch(e){}
+            }
+          }
+        }
+        return redirect(res, `/console/jobs/${before?before.job_id:''}`);
       }
       const addMatch = p.match(/^\/console\/jobs\/(\d+)\/add$/);
       if(addMatch && method==='POST'){
