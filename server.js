@@ -606,7 +606,7 @@ const server = http.createServer(async (req,res)=>{
       const work = await getWorkHistory(wid);
       const rating = await ratingFor(wid, 'worker');
       const reviews = await reviewsFor(wid, 'worker');
-      return send(res, V.layout({title:`${worker.name} — Trades portfolio`, user, body:V.publicPortfolio({worker,profile,creds,portfolio,work,rating,reviews})}));
+      return send(res, V.layout({title:`${worker.name} — Trades portfolio`, user, body:V.publicPortfolio({worker,profile,creds,portfolio,work,rating,reviews,showUp:await showUp(wid)})}));
     }
 
     if(p==='/signup' && method==='POST'){

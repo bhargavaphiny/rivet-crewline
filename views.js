@@ -330,6 +330,9 @@ const BUILTIN_ES = {
   'Farthest you’ll travel (miles, 0 = no limit)':'Distancia máxima que viajarías (millas, 0 = sin límite)','past your commute':'fuera de tu rango',
   // payscale fit
   'Worker sets the price':'El trabajador pone el precio','Asks':'Pide','within your range':'dentro de tu rango','Meets your':'Cumple tu','floor':'mínimo','over budget':'sobre tu presupuesto','below your':'por debajo de tu',
+  // shareable work card
+  'Share my Work Card':'Compartir mi tarjeta','Preview ↗':'Vista previa ↗','Link copied ✓':'Enlace copiado ✓','Copy link':'Copiar enlace','Portfolio':'Portafolio','Public page ↗':'Página pública ↗',
+  'One link with your trades, credentials, reviews & portfolio — text it to any employer.':'Un enlace con tus oficios, credenciales, reseñas y portafolio — envíalo por mensaje a cualquier empleador.',
 };
 function T(s){
   if(LANG !== 'es' || !s) return s;
@@ -412,7 +415,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=63">
+  <link rel="stylesheet" href="/styles.css?v=64">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1107,6 +1110,11 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [],
       <div class="chips">${tradeChips(profile)}</div>
       ${(rating.count||showUp.pct!=null)?`<div class="rating-row">${rating.count?ratingHead(rating):''} ${showUpBadge(showUp)}</div>`:''}
       <p class="muted">${esc(profile.city)} · ${profile.years_exp} yrs · floor $${profile.pay_floor}/hr · ${esc(profile.shift)} shift</p>
+      <div class="share-row">
+        <button class="btn-sm" type="button" onclick="var u=location.origin+'/p/${user.id}';if(navigator.share){navigator.share({title:'My Rivet Work Card',url:u})}else if(navigator.clipboard){navigator.clipboard.writeText(u);this.textContent='${T('Link copied ✓')}'}">${icon('send')} ${T('Share my Work Card')}</button>
+        <a class="btn-sm ghost" href="/p/${user.id}" target="_blank" rel="noopener">${T('Preview ↗')}</a>
+      </div>
+      <p class="muted sm share-hint">${T('One link with your trades, credentials, reviews & portfolio — text it to any employer.')}</p>
       <div class="ministats">
         <div><b>${profile.readiness}</b><span>${T('READINESS')}</span></div>
         <div><b>${creds.filter(c=>c.verified).length}</b><span>${T('VERIFIED')}</span></div>
@@ -1310,13 +1318,13 @@ function pulsePage({ user, trending, posts, totalOpen, companies = [], demandGeo
 }
 
 // ---------- public shareable portfolio ----------
-function publicPortfolio({ worker, profile, creds, portfolio, work = [], rating = {avg:0,count:0}, reviews = [] }) {
+function publicPortfolio({ worker, profile, creds, portfolio, work = [], rating = {avg:0,count:0}, reviews = [], showUp = {} }) {
   return `<section class="hero pub-hero"><div class="wrap">
       <span class="tag">Verified on Rivet</span>
       <h1>${esc(worker.name)}</h1>
       ${profile.headline?`<p class="lead">${esc(profile.headline)}</p>`:''}
       <div class="chips light">${tradeChips(profile)}</div>
-      ${rating.count?`<div class="rating-row light">${ratingHead(rating)}</div>`:''}
+      ${(rating.count||showUp.pct!=null)?`<div class="rating-row light">${rating.count?ratingHead(rating):''} ${showUpBadge(showUp)}</div>`:''}
       <p class="lead">${esc(profile.city)} · ${profile.years_exp} years experience</p>
       <div class="pub-stats">
         <div><b>${profile.readiness}</b><span>Job-readiness</span></div>
@@ -1907,7 +1915,7 @@ function empCandidate({ worker, profile, creds, matches, apps, messages, meId, n
       ${creds.map(c=>credRow(c)).join('') || `<p class="muted">${T('No credentials listed yet.')}</p>`}
     </div>
     <div class="card">
-      <div class="sec-h" style="margin-top:0">Portfolio <a href="/p/${worker.id}" target="_blank" rel="noopener">Public page ↗</a></div>
+      <div class="sec-h" style="margin-top:0">${T('Portfolio')} <a href="/p/${worker.id}" target="_blank" rel="noopener">${T('Public page ↗')}</a> <button class="btn-xs ghost" type="button" onclick="var u=location.origin+'/p/${worker.id}';navigator.clipboard&&navigator.clipboard.writeText(u);this.textContent='${T('Link copied ✓')}'">${T('Copy link')}</button></div>
       ${mediaGallery(portfolio) || '<p class="muted sm">No portfolio pieces yet.</p>'}
     </div>
     <div class="card">

@@ -567,6 +567,10 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .payfit.good{color:#157a52}
 .payfit.low{color:#b7322a}
 .payfit.q{color:var(--muted)}
+/* shareable Work Card */
+.share-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+.share-row .btn-sm svg{width:13px;height:13px;vertical-align:-2px;margin-right:3px}
+.share-hint{text-align:center;margin:6px 0 0}
 
 /* ---- training & certifications ---- */
 .info-card{background:rgba(23,99,166,.06);border:1px solid rgba(23,99,166,.18);color:var(--slate);font-size:14px}
