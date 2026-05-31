@@ -520,3 +520,6 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 
 /* ---- map panel count badge ---- */
 .mp-n{font-size:11px;font-weight:700;color:var(--brand-d);background:rgba(154,75,46,.12);padding:1px 7px;border-radius:10px;margin-left:4px}
+
+/* ---- external/partner job badge ---- */
+.ext-badge{font-size:10.5px;font-weight:700;color:var(--slate);background:var(--paper);border:1px dashed var(--line);padding:3px 8px;border-radius:14px}

@@ -721,6 +721,28 @@ async function seedLocalGig(){
   console.log('[db] local metro + gig/ag/food seed applied — +1 employer, +18 local jobs');
 }
 
+// ---- external/partner jobs: apply on the source site (idempotent) ----
+async function seedExternal(){
+  if (await metaGet('external_v1')) return;
+  const pw = hashPassword('demo1234');
+  let eid;
+  try { eid = (await db.prepare('INSERT INTO users(email,pass,role,name,company,company_city,company_about) VALUES(?,?,?,?,?,?,?)')
+    .run('feed@rivet.test',pw,'employer','Rivet Job Network','Rivet Job Network','U.S.','Aggregated openings from union halls, government and partner job boards. Apply on the source site.')).lastInsertRowid; } catch(e){}
+  if(!eid){ await metaSet('external_v1','1'); return; }
+  const insJob = db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type,source,apply_url) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+  // [title,trade,lo,hi,city,zip,shift,creds,descr,etype,source,apply_url] — apply_url = real search/landing pages
+  const X = [
+    ['Apprentice Electrician (IBEW)','electrician',22,30,'Chicago','60601','Day','','Union apprenticeship via your local IBEW hall. Apply through the union.','Apprenticeship','IBEW','https://www.ibew.org/Tools/Find-Local-Union'],
+    ['Federal Maintenance Mechanic','facilities',24,34,'Denver','80202','Day','','Federal facilities role. Apply on the official USAJOBS portal.','Full-time','USAJOBS','https://www.usajobs.gov/Search/Results?k=maintenance%20mechanic'],
+    ['Union Carpenter','carpenter',28,40,'Seattle','98101','Day','osha10','Commercial carpentry through the regional carpenters union.','Full-time','Carpenters Union','https://www.carpenters.org/'],
+    ['CDL-A Driver (regional)','cdl_driver',26,34,'Dallas','75201','Day','cdl','Regional routes; multiple carriers hiring now.','Full-time','Indeed','https://www.indeed.com/jobs?q=cdl-a+driver&l=Dallas%2C+TX'],
+    ['HVAC Service Technician','hvac',25,36,'Atlanta','30303','Day','epa608','Light-commercial service openings from partner employers.','Full-time','ZipRecruiter','https://www.ziprecruiter.com/Jobs/Hvac-Service-Technician'],
+  ];
+  for (const r of X){ try { await insJob.run(eid, ...r); } catch(e){} }
+  await metaSet('external_v1','1');
+  console.log('[db] external/partner jobs seeded — +5 jobs with source apply links');
+}
+
 async function migrate() {
   // additive column migrations (idempotent — errors swallowed when already applied)
   try { await db.exec('ALTER TABLE users ADD COLUMN phone TEXT'); } catch (e) { /* column exists */ }
@@ -737,6 +759,8 @@ async function migrate() {
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN has_transport INTEGER DEFAULT 0'); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN bilingual INTEGER DEFAULT 0'); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN custom_trade TEXT'); } catch (e) { /* column exists */ }
+  try { await db.exec("ALTER TABLE jobs ADD COLUMN source TEXT DEFAULT 'Rivet'"); } catch (e) { /* column exists */ }
+  try { await db.exec('ALTER TABLE jobs ADD COLUMN apply_url TEXT'); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE users ADD COLUMN company_about TEXT'); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE users ADD COLUMN company_website TEXT'); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE users ADD COLUMN company_city TEXT'); } catch (e) { /* column exists */ }
@@ -795,6 +819,7 @@ async function init() {
   try { await seedCategories(); } catch (e) { console.error('[db] category seed skipped (non-fatal):', e.message); }
   try { await seedPosts(); } catch (e) { console.error('[db] posts seed skipped (non-fatal):', e.message); }
   try { await seedLocalGig(); } catch (e) { console.error('[db] localgig seed skipped (non-fatal):', e.message); }
+  try { await seedExternal(); } catch (e) { console.error('[db] external seed skipped (non-fatal):', e.message); }
   try {
     if(!(await metaGet('xfactor_v1'))){
       // own tools (most trades), reliable transport, bilingual — high-signal flags for recruiters

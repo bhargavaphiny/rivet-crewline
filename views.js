@@ -271,7 +271,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=42">
+  <link rel="stylesheet" href="/styles.css?v=43">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -557,6 +557,7 @@ function jobCard(m, bare = false){
       <span class="pay">$${j.pay_min}–${j.pay_max}<small>/hr</small></span>
       ${j.employment_type?`<span class="jtype">${esc(T(j.employment_type))}</span>`:''}
       <span class="js-shift">${esc(T(j.shift))}</span>
+      ${isExternal(j)?`<span class="ext-badge">${esc(j.source)} ↗</span>`:''}
       ${bare?'':fit}
     </div>
     ${bare?'':`<div class="matchbar"><i style="width:${m.score}%"></i></div>`}
@@ -564,6 +565,7 @@ function jobCard(m, bare = false){
 }
 
 function tradeEmoji(t){ return icon(TRADE_ICON[t] || 'wrench', 'tic'); }
+function isExternal(job){ return !!(job && job.apply_url && /^https?:\/\//i.test(job.apply_url)); }
 
 function credRow(c){
   const verified = c.verified;
@@ -638,9 +640,12 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
         ${bd('Credentials',match.breakdown.cred,15)}
       </div>
       ${match.missing.length?`<div class="warn-card">Missing: ${match.missing.map(k=>CRED_KINDS[k]||k).join(', ')} — <a href="/app/training" style="font-weight:700;color:inherit;text-decoration:underline">see how to earn it</a> to boost this match.</div>`:''}
-      ${applied
-        ? `<div class="ok-card">✓ Applied — the employer can see your verified Work Card.</div>`
-        : `<form method="post" action="/app/jobs/${job.id}/apply"><button class="btn full">Apply with verified Work Card</button></form>`}
+      ${isExternal(job)
+        ? `<a class="btn full" href="${esc(job.apply_url)}" target="_blank" rel="noopener noreferrer">${T('Apply on')} ${esc(job.source)} ↗</a>
+           <p class="muted sm" style="text-align:center;margin-top:8px">${T('This opening is listed on')} ${esc(job.source)}. ${T('You’ll finish applying on their site.')}</p>`
+        : (applied
+          ? `<div class="ok-card">✓ Applied — the employer can see your verified Work Card.</div>`
+          : `<form method="post" action="/app/jobs/${job.id}/apply"><button class="btn full">Apply with verified Work Card</button></form>`)}
       <form method="post" action="/app/jobs/${job.id}/save"><button class="btn full ghost">${saved?'★ Saved — remove':'☆ Save this job'}</button></form>
     </div>
     ${(job.company_about||job.company_website||job.company_size)?`<div class="card">
@@ -679,7 +684,10 @@ function publicJob({ job, rules, jsonld }) {
           <div><span>Overtime</span><b>1.5× after 40 hrs/wk</b></div>
         </div>
       </div>`:''}
-      <a class="btn full" href="/app/jobs/${job.id}">Apply on Rivet — it's free</a>
+      ${isExternal(job)
+        ? `<a class="btn full" href="${esc(job.apply_url)}" target="_blank" rel="noopener noreferrer">Apply on ${esc(job.source)} ↗</a>
+           <p class="muted sm" style="text-align:center;margin-top:8px">Listed on ${esc(job.source)} — you'll finish applying on their site.</p>`
+        : `<a class="btn full" href="/app/jobs/${job.id}">Apply on Rivet — it's free</a>`}
     </div>
     ${(job.company_about)?`<div class="card">
       <div class="sec-h" style="margin-top:0">About ${esc(job.company||'the employer')}</div>
