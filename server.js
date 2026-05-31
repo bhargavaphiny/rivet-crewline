@@ -108,7 +108,7 @@ async function rankJobsForWorker(uid){
     .sort((a,b)=>b.score-a.score);
 }
 async function rankWorkersForJob(job){
-  const workers = await db.prepare(`SELECT u.id user_id,u.name,p.* FROM users u JOIN worker_profiles p ON p.user_id=u.id WHERE u.role='worker'`).all();
+  const workers = await db.prepare(`SELECT u.id user_id,u.name,p.* FROM users u JOIN worker_profiles p ON p.user_id=u.id`).all();
   const out = [];
   for(const w of workers){ const creds=await getCreds(w.user_id); const r=M.scoreMatch(w,creds,job);
     out.push({...w, score:r.score, readiness:w.readiness}); }
@@ -349,7 +349,7 @@ const server = http.createServer(async (req,res)=>{
         const fillRate = applicants ? Math.round((hired/applicants)*100) : 0;
         const pool = (await db.prepare(`SELECT COUNT(*) c FROM worker_profiles`).get()).c;
         const hot = await db.prepare(`SELECT u.id,u.name,p.trade,p.readiness,(SELECT COUNT(*) FROM credentials c WHERE c.user_id=u.id AND c.verified=1) vcount
-          FROM users u JOIN worker_profiles p ON p.user_id=u.id WHERE u.role='worker' ORDER BY p.readiness DESC LIMIT 5`).all();
+          FROM users u JOIN worker_profiles p ON p.user_id=u.id ORDER BY p.readiness DESC LIMIT 5`).all();
         const alerts = [];
         const expiring = (await db.prepare(`SELECT COUNT(*) c FROM credentials WHERE verified=1 AND expires IS NOT NULL AND expires < '2026-08'`).get()).c;
         if(expiring) alerts.push({lvl:'warn',text:`⚠️ ${expiring} credential(s) in the pool expiring within 60 days.`});
@@ -437,7 +437,7 @@ const server = http.createServer(async (req,res)=>{
 
       if(p==='/console/search' && method==='GET'){
         const filters = {trade:url.searchParams.get('trade')||'', verified:!!url.searchParams.get('verified'), ready:!!url.searchParams.get('ready')};
-        const rowsRaw = await db.prepare(`SELECT u.id,u.name,p.* FROM users u JOIN worker_profiles p ON p.user_id=u.id WHERE u.role='worker'`).all();
+        const rowsRaw = await db.prepare(`SELECT u.id,u.name,p.* FROM users u JOIN worker_profiles p ON p.user_id=u.id`).all();
         let rows = [];
         for(const w of rowsRaw){ const creds=(await getCreds(w.id)).filter(c=>!filters.verified||c.verified); rows.push({...w, creds}); }
         if(filters.trade) rows = rows.filter(w=>w.trade===filters.trade);
@@ -461,7 +461,7 @@ const server = http.createServer(async (req,res)=>{
       if(cMsg && method==='POST'){
         const wid = Number(cMsg[1]);
         const b = await readBody(req);
-        const w = await db.prepare("SELECT id FROM users WHERE id=? AND role='worker'").get(wid);
+        const w = await db.prepare("SELECT id FROM users WHERE id=?").get(wid);
         if(w) await sendMessage(user.id, wid, b.body);
         return redirect(res, `/console/candidates/${wid}`);
       }
@@ -491,7 +491,7 @@ const server = http.createServer(async (req,res)=>{
       const candMatch = p.match(/^\/console\/candidates\/(\d+)$/);
       if(candMatch && method==='GET'){
         const wid = Number(candMatch[1]);
-        const w = await db.prepare("SELECT id,name,role FROM users WHERE id=? AND role='worker'").get(wid);
+        const w = await db.prepare("SELECT id,name FROM users WHERE id=?").get(wid);
         const prof = w ? await getProfile(wid) : null;
         if(!w || !prof) return send(res, V.layout({title:'Candidate',user,active:'search',body:'<section class="wrap narrow"><a class="back" href="/console/search">← Talent Search</a><div class="card">Candidate not found.</div></section>'}),404);
         const creds = await getCreds(wid);
