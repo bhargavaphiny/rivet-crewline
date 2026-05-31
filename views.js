@@ -66,7 +66,7 @@ const I18N = {
   en: {
     nav_login:'Log in', nav_get_started:'Get started', nav_home:'Home', nav_find_work:'Jobs',
     nav_work_card:'Work Card', nav_applications:'Applications', nav_training:'Learn', nav_pulse:'Pulse', nav_messages:'Messages',
-    nav_hiring:'Hiring →', nav_working:'Working →', nav_logout:'Log out',
+    nav_hiring:'Hiring →', nav_working:'Working →', nav_logout:'Log out', mode_work:'Work', mode_hire:'Hire',
     nav_overview:'Overview', nav_talent:'Talent', nav_jobs:'Jobs',
     hero_tag:'The blue-collar hiring platform · U.S.',
     hero_h1a:"America can't ", hero_build:'build', hero_h1b:' what it can\'t ', hero_staff:'staff.',
@@ -112,7 +112,7 @@ const I18N = {
   es: {
     nav_login:'Entrar', nav_get_started:'Empezar', nav_home:'Inicio', nav_find_work:'Empleos',
     nav_work_card:'Mi perfil', nav_applications:'Solicitudes', nav_training:'Aprender', nav_pulse:'Pulso', nav_messages:'Mensajes',
-    nav_hiring:'Contratar →', nav_working:'Trabajar →', nav_logout:'Salir',
+    nav_hiring:'Contratar →', nav_working:'Trabajar →', nav_logout:'Salir', mode_work:'Trabajo', mode_hire:'Contratar',
     nav_overview:'Resumen', nav_talent:'Talento', nav_jobs:'Empleos',
     hero_tag:'La plataforma de empleo para oficios · EE. UU.',
     hero_h1a:'Estados Unidos no puede ', hero_build:'construir', hero_h1b:' lo que no puede ', hero_staff:'dotar de personal.',
@@ -197,7 +197,10 @@ function mediaGallery(items, { deletable = false, base = '' } = {}){
 
 // ---------- layout ----------
 function layout({ title, user, body, active = '', flash = '' }) {
-  const langTg = `<a class="nav-link lang-tg" href="/lang/${LANG==='es'?'en':'es'}" title="${LANG==='es'?'English':'Español'}">${LANG==='es'?'EN':'ES'}</a>`;
+  const langTg = `<div class="seg" role="group" aria-label="Language">
+      <a class="seg-opt ${LANG!=='es'?'on':''}" href="/lang/en">EN</a><a class="seg-opt ${LANG==='es'?'on':''}" href="/lang/es">ES</a></div>`;
+  const modeTg = (cur)=>`<div class="seg mode" role="group" aria-label="Mode">
+      <a class="seg-opt ${cur==='work'?'on':''}" href="/app">${t('mode_work')}</a><a class="seg-opt ${cur==='hire'?'on':''}" href="/console">${t('mode_hire')}</a></div>`;
   let nav = '';
   if (!user) {
     nav = `<a class="nav-link" href="/login">${t('nav_login')}</a>
@@ -206,14 +209,14 @@ function layout({ title, user, body, active = '', flash = '' }) {
     const L = (h,l,k)=>`<a class="nav-link ${active===k?'on':''}" href="${h}">${l}</a>`;
     const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/app/messages">${t('nav_messages')}${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
     nav = `${L('/app',t('nav_home'),'home')}${L('/app/jobs',t('nav_find_work'),'jobs')}${L('/app/profile',t('nav_work_card'),'profile')}${L('/app/applications',t('nav_applications'),'apps')}${L('/app/training',t('nav_training'),'training')}${L('/pulse',t('nav_pulse'),'pulse')}${msg}
-           <a class="nav-link switch" href="/console" title="Switch to hiring">${t('nav_hiring')}</a>
+           ${modeTg('work')}
            <span class="who">${initials(user.name)}</span>
            <a class="nav-link" href="/logout">${t('nav_logout')}</a>${langTg}`;
   } else {
     const L = (h,l,k)=>`<a class="nav-link ${active===k?'on':''}" href="${h}">${l}</a>`;
     const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/console/messages">${t('nav_messages')}${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
     nav = `${L('/console',t('nav_overview'),'ov')}${L('/console/search',t('nav_talent'),'search')}${L('/console/jobs',t('nav_jobs'),'jobs')}${L('/pulse',t('nav_pulse'),'pulse')}${msg}
-           <a class="nav-link switch" href="/app" title="Switch to working">${t('nav_working')}</a>
+           ${modeTg('hire')}
            <a class="who" href="/console/company" title="Company profile">${initials(user.company||user.name)}</a>
            <a class="nav-link" href="/logout">${t('nav_logout')}</a>${langTg}`;
   }
@@ -240,7 +243,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=32">
+  <link rel="stylesheet" href="/styles.css?v=33">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -865,12 +868,19 @@ function timeAgo(sqlTs){
 // ---------- US map (real state outlines from us-geo, same linear projection as dots) ----------
 // Interactive US map: real state outlines + clickable count dots that open a
 // panel of jobs/candidates (with a CTA), plus zoom controls. points = [{city,lat,lon,n,kind?,items:[{label,sub,href}]}]
+const MAP_CITIES = [
+  ['Seattle',-122.33,47.61],['Portland',-122.68,45.52],['San Francisco',-122.42,37.77],['Los Angeles',-118.24,34.05],
+  ['Las Vegas',-115.14,36.17],['Phoenix',-112.07,33.45],['Denver',-104.99,39.74],['Dallas',-96.80,32.78],
+  ['Houston',-95.37,29.76],['Minneapolis',-93.27,44.98],['Chicago',-87.63,41.88],['Detroit',-83.05,42.33],
+  ['Nashville',-86.78,36.17],['Atlanta',-84.39,33.75],['Miami',-80.19,25.76],['New York',-74.0,40.71],
+];
 function usMap(points = [], opts = {}){
   const { title='Where your talent is', noun='candidate', emptyMsg='No mapped locations yet.', legend=null, cta='Open' } = opts;
   const MINLON=-125, MAXLON=-66, MINLAT=24, MAXLAT=50, VW=620, VH=350;
   const px = lon => ((lon-MINLON)/(MAXLON-MINLON)*VW).toFixed(1);
   const py = lat => ((MAXLAT-lat)/(MAXLAT-MINLAT)*VH).toFixed(1);
   const statePaths = US_STATES.map(s=>`<path class="us-state" d="${s.d}"><title>${esc(s.n)}</title></path>`).join('');
+  const cityLayer = MAP_CITIES.map(([nm,lo,la])=>`<g class="us-city"><circle cx="${px(lo)}" cy="${py(la)}" r="1.6"/><text x="${(+px(lo)+4).toFixed(1)}" y="${(+py(la)+3).toFixed(1)}">${esc(nm)}</text></g>`).join('');
   const total = points.reduce((a,g)=>a+(g.n||0),0);
   const dots = points.map((g,i)=>{
     const r = Math.min(18, 6 + (g.n||1)*2.2);
@@ -888,7 +898,8 @@ function usMap(points = [], opts = {}){
     ${points.length ? `<div class="mapwrap">
       <div class="mapbox">
         <svg class="usmap" id="rvsvg" viewBox="0 0 ${VW} ${VH}" role="img" aria-label="US map">
-          <g class="us-states">${statePaths}</g>${dots}
+          <g class="us-states">${statePaths}</g>
+          <g class="us-cities">${cityLayer}</g>${dots}
         </svg>
         <div class="mapzoom"><button type="button" onclick="rvZoom(.8)" aria-label="Zoom in">${icon('zoomin')}</button><button type="button" onclick="rvZoom(1.25)" aria-label="Zoom out">${icon('zoomout')}</button></div>
       </div>

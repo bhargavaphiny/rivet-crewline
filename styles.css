@@ -369,9 +369,11 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 /* ---- US candidate map ---- */
 .mapwrap{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
 .mapbox{position:relative;flex:1;min-width:300px;max-width:680px}
-.usmap{width:100%;background:linear-gradient(180deg,#EAF1F7,#DFE9F1);border-radius:14px;border:1px solid var(--line);padding:6px;display:block}
-.us-states .us-state{fill:#D3DFEA;stroke:#F4EEE2;stroke-width:.8;stroke-linejoin:round;transition:fill .12s}
-.us-states .us-state:hover{fill:#C4D4E2}
+.usmap{width:100%;background:radial-gradient(120% 120% at 50% 0,#1E3346,#13212E 70%);border-radius:16px;border:1px solid #0C1822;padding:8px;display:block;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+.us-states .us-state{fill:#27435A;stroke:rgba(125,178,224,.28);stroke-width:.7;stroke-linejoin:round;transition:fill .12s}
+.us-states .us-state:hover{fill:#33566F}
+.us-cities circle{fill:rgba(255,255,255,.5)}
+.us-cities text{fill:rgba(214,228,240,.62);font-size:7.5px;font-weight:600;letter-spacing:.02em}
 .mapzoom{position:absolute;top:12px;right:12px;display:flex;flex-direction:column;gap:6px}
 .mapzoom button{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:rgba(255,255,255,.92);color:var(--steel);cursor:pointer;display:grid;place-items:center;box-shadow:var(--shadow-sm)}
 .mapzoom button:hover{background:#fff;border-color:var(--brand)}
@@ -389,8 +391,12 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .maplist li{cursor:pointer}
 .maplist li:hover{color:var(--brand-d)}
 @media(max-width:680px){.mapside{width:100%}}
-.mdot circle{fill:var(--amber);fill-opacity:.82;stroke:#fff;stroke-width:1.5}
-.mdot text{fill:var(--steel);font-size:11px;font-weight:800}
+.mdot{cursor:pointer}
+.mdot circle{fill:var(--amber);stroke:#fff;stroke-width:1.5;filter:drop-shadow(0 0 5px rgba(246,166,35,.55));transition:transform .1s}
+.mdot:hover circle,.mdot:focus circle{transform:scale(1.12);transform-box:fill-box;transform-origin:center}
+.mdot text{fill:var(--steel);font-size:11px;font-weight:800;pointer-events:none}
+.mdot.related circle{fill:#7FB2E0;filter:none;stroke:rgba(255,255,255,.85)}
+.mdot.related text{fill:#10212E}
 .maplist{list-style:none;margin:0;padding:0;min-width:150px;flex:none}
 .maplist li{display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
 .maplist li:last-child{border-bottom:none}
@@ -403,7 +409,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .maplegend .lg{display:inline-flex;align-items:center;gap:6px}
 .maplegend i{width:13px;height:13px;border-radius:50%;display:inline-block}
 .maplegend i.d-direct{background:var(--amber)}
-.maplegend i.d-related{background:var(--brand);opacity:.55}
+.maplegend i.d-related{background:#7FB2E0}
 
 /* ---- training & certifications ---- */
 .info-card{background:rgba(23,99,166,.06);border:1px solid rgba(23,99,166,.18);color:var(--slate);font-size:14px}
@@ -475,3 +481,10 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .post-h b{font-size:13.5px}
 .post-t{font-size:11px;color:var(--muted);margin-left:auto}
 .post-b{font-size:13.5px;color:var(--slate);line-height:1.5;margin-top:4px}
+
+/* ---- segmented toggles (language + work/hire) in the top bar ---- */
+.seg{display:inline-flex;border:1px solid rgba(255,255,255,.22);border-radius:10px;overflow:hidden;background:rgba(255,255,255,.05)}
+.seg-opt{padding:6px 12px;font-size:12px;font-weight:800;color:#aebcc6;line-height:1.3;letter-spacing:.02em}
+.seg-opt+.seg-opt{border-left:1px solid rgba(255,255,255,.16)}
+.seg-opt.on{background:var(--brand);color:#fff}
+.seg-opt:hover:not(.on){background:rgba(255,255,255,.1);color:#fff}
