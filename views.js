@@ -277,7 +277,7 @@ function jobCard(m){
   </div>`;
 }
 
-function tradeEmoji(t){return {electrician:'⚡',hvac:'🔧',plumber:'🚰',controls:'🏭',sheet_metal:'🛠️',solar:'☀️',welder:'🔥',pipefitter:'🔩',cdl_driver:'🚛'}[t]||'🧰';}
+function tradeEmoji(t){return {electrician:'⚡',hvac:'🔧',plumber:'🚰',pipefitter:'🔩',welder:'🔥',sheet_metal:'🛠️',carpenter:'🪚',framer:'🏗️',drywall:'🧱',painter:'🎨',roofer:'🏠',mason:'🧱',concrete:'🪨',flooring:'🪵',tile:'◻️',glazier:'🪟',insulation:'🧤',ironworker:'⛓️',millwright:'⚙️',boilermaker:'♨️',controls:'🏭',solar:'☀️',low_voltage:'🔌',fire_sprinkler:'🚿',elevator_tech:'🛗',heavy_equipment:'🚜',crane_operator:'🏗️',cdl_driver:'🚛',diesel_mechanic:'🔧',automotive_tech:'🚗',machinist:'⚙️',landscaper:'🌳',locksmith:'🔑',facilities:'🧰'}[t]||'🧰';}
 
 function credRow(c){
   const verified = c.verified;
