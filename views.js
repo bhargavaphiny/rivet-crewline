@@ -566,6 +566,19 @@ function jobCard(m, bare = false){
 
 function tradeEmoji(t){ return icon(TRADE_ICON[t] || 'wrench', 'tic'); }
 function isExternal(job){ return !!(job && job.apply_url && /^https?:\/\//i.test(job.apply_url)); }
+// trade <select> grouped by category via <optgroup>
+function tradeOptionsGrouped(sel=''){
+  const seen = new Set();
+  let html = '';
+  for(const [cat, keys] of Object.entries(CATEGORIES)){
+    const ks = keys.filter(k=>TRADES[k]); ks.forEach(k=>seen.add(k));
+    if(!ks.length) continue;
+    html += `<optgroup label="${esc(cat)}">${ks.map(k=>`<option value="${k}" ${sel===k?'selected':''}>${esc(TRADES[k])}</option>`).join('')}</optgroup>`;
+  }
+  const rest = Object.keys(TRADES).filter(k=>!seen.has(k));
+  if(rest.length) html += `<optgroup label="Other">${rest.map(k=>`<option value="${k}" ${sel===k?'selected':''}>${esc(TRADES[k])}</option>`).join('')}</optgroup>`;
+  return html;
+}
 
 function credRow(c){
   const verified = c.verified;
@@ -1170,7 +1183,7 @@ function empJobs({ jobs }) {
 
 const JOB_TYPES = ['Full-time','Part-time','Contract','Temp','Apprenticeship','Outcome-based'];
 function empJobForm(error='') {
-  const opts = Object.entries(TRADES).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
+  const opts = tradeOptionsGrouped();
   const cred = Object.entries(CRED_KINDS).map(([k,v])=>`<label class="ck"><input type="checkbox" name="req_creds" value="${k}"> ${v}</label>`).join('');
   const typeOpts = JOB_TYPES.map(t=>`<option>${t}</option>`).join('');
   return `<section class="wrap narrow"><div class="card">
