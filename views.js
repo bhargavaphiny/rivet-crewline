@@ -342,7 +342,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=51">
+  <link rel="stylesheet" href="/styles.css?v=52">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1276,10 +1276,9 @@ function usMap(points = [], opts = {}){
   const heatDefs = `<defs><radialGradient id="rvheat"><stop offset="0%" stop-color="#E89A2E" stop-opacity=".66"/><stop offset="55%" stop-color="#D9701E" stop-opacity=".2"/><stop offset="100%" stop-color="#B4471F" stop-opacity="0"/></radialGradient></defs>`;
   const nfmt = n => n>=10000 ? Math.round(n/1000)+'k' : (n>=1000 ? (n/1000).toFixed(1).replace(/\.0$/,'')+'k' : String(n));
   const heat = points.map(g=>{ const hr=Math.max(16, Math.min(60, 14 + Math.sqrt(g.n||1)*0.7)); return `<circle class="heat" cx="${px(g.lon)}" cy="${py(g.lat)}" r="${hr.toFixed(1)}" fill="url(#rvheat)"/>`; }).join('');
-  // physical-geography layers
-  const forests = MAP_FORESTS.map(([lo,la,r])=>`<circle class="geo-forest" cx="${px(lo)}" cy="${py(la)}" r="${r}"/>`).join('');
+  // subtle river lines only — geographic context, clearly not interactive markers.
+  // (Forest blobs + mountain triangles removed: they looked like clickable dots but weren't.)
   const rivers = MAP_RIVERS.map(r=>`<polyline class="geo-river" points="${r.map(([lo,la])=>`${px(lo)},${py(la)}`).join(' ')}"/>`).join('');
-  const mtns = MAP_MTNS.map(([lo,la])=>{ const x=+px(lo), y=+py(la); return `<path class="geo-mtn" d="M${(x-3.4).toFixed(1)} ${(y+2.6).toFixed(1)} L${x.toFixed(1)} ${(y-3).toFixed(1)} L${(x+3.4).toFixed(1)} ${(y+2.6).toFixed(1)} Z"/>`; }).join('');
   const total = points.reduce((a,g)=>a+(g.n||0),0);
   const dots = points.map((g,i)=>{
     const r = Math.min(21, 8 + Math.sqrt(g.n||1)*0.2);
@@ -1300,7 +1299,7 @@ function usMap(points = [], opts = {}){
           ${heatDefs}
           <g class="us-states">${statePaths}</g>
           <g class="us-geo"><clipPath id="rvclip"><rect x="0" y="0" width="${VW}" height="${VH}"/></clipPath>
-            <g clip-path="url(#rvclip)"><g class="geo-forests">${forests}</g><g class="geo-rivers">${rivers}</g><g class="geo-mtns">${mtns}</g></g></g>
+            <g clip-path="url(#rvclip)"><g class="geo-rivers">${rivers}</g></g></g>
           <g class="us-heat">${heat}</g>
           <g class="us-cities">${cityLayer}</g>${dots}
         </svg>
