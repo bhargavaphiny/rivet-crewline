@@ -9,6 +9,7 @@ const US_STATES = require('./us-geo');
 // ---- inline SVG icon set (consistent line style; no emoji) ----
 const ICONS = {
   bolt:    { f:1, p:'<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>' },
+  spark:   { f:1, p:'<path d="M12 2l1.8 5.6L19.5 9l-5.7 1.4L12 16l-1.8-5.6L4.5 9l5.7-1.4z"/><path d="M18 14l.8 2.4L21 17l-2.2.6L18 20l-.8-2.4L15 17l2.2-.6z"/>' },
   dot:     { f:1, p:'<circle cx="12" cy="12" r="6"/>' },
   wrench:  { f:0, p:'<path d="M14.5 6.5a4 4 0 0 0 5.3 5.3L17 14.6l3.5 3.5a2 2 0 0 1-2.8 2.8L14.2 17l-2.8 2.8a4 4 0 0 1-5.3-5.3L8.9 12 6 9.1a2 2 0 0 1 2.8-2.8L11.7 9z"/>' },
   droplet: { f:0, p:'<path d="M12 3 6.5 9a7.5 7.5 0 1 0 11 0z"/>' },
@@ -217,6 +218,29 @@ const BUILTIN_ES = {
   'Interview confirmed':'Entrevista confirmada','Interview proposed':'Entrevista propuesta','waiting on candidate':'esperando al candidato',
   'Propose interview times':'Proponer horarios de entrevista','Interview confirmed for':'Entrevista confirmada para',
   'Interview invite':'Invitación a entrevista','Pick a time that works:':'Elige un horario que te sirva:','Interviews':'Entrevistas',
+  // agents (instant, correct)
+  'Career Coach':'Asesor de carrera','See my next move':'Ver mi próximo paso','How to earn it ↗':'Cómo obtenerlo ↗',
+  'Apply Agent':'Agente de postulación','Let Rivet auto-apply you to the best-fit jobs near you — verified Work Card attached.':'Deja que Rivet te postule automáticamente a los empleos que mejor te quedan cerca de ti — con tu tarjeta de trabajo verificada.',
+  'Apply for me':'Postular por mí','Find work':'Buscar trabajo','Home':'Inicio','job':'empleo','jobs':'empleos',
+  'Based on your trades and what employers are hiring for near you right now.':'Según tus oficios y lo que los empleadores están contratando cerca de ti ahora.',
+  'Your highest-impact next credential':'Tu credencial de mayor impacto','jobs unlocked':'empleos desbloqueados','per hour':'por hora',
+  'Add your trade and ZIP to your Work Card and your coach will map the fastest way to more jobs.':'Agrega tu oficio y código postal a tu tarjeta de trabajo y tu asesor trazará el camino más rápido a más empleos.',
+  'Other credentials worth earning':'Otras credenciales que vale la pena obtener',
+  'Done — I applied you to':'Listo — te postulé a','Applications submitted':'Postulaciones enviadas','View all applications':'Ver todas las postulaciones',
+  'You’re already applied to your best matches — nothing new to do.':'Ya estás postulado a tus mejores coincidencias — nada nuevo por hacer.',
+  'No matching open jobs to apply to yet. Add your trade and ZIP to your Work Card.':'Aún no hay empleos abiertos que coincidan. Agrega tu oficio y código postal a tu tarjeta de trabajo.',
+  'Onboarding Agent':'Agente de registro','I’ll build your Work Card by chat — answer in your own words, in English or Spanish.':'Construiré tu tarjeta de trabajo por chat — responde con tus palabras, en inglés o español.',
+  'All set — your Work Card is ready.':'¡Listo — tu tarjeta de trabajo está lista!','Review it →':'Revísala →','Type your answer…':'Escribe tu respuesta…','Send':'Enviar','Go to my Home':'Ir a mi inicio',
+  'Welcome! What trade or trades do you work in?':'¡Bienvenido! ¿En qué oficio u oficios trabajas?','e.g. electrician and some solar':'ej. electricista y algo de solar',
+  'Nice. How many years have you been doing this work?':'Bien. ¿Cuántos años llevas haciendo este trabajo?','e.g. 8':'ej. 8',
+  'What city are you based in?':'¿En qué ciudad estás?','e.g. Phoenix':'ej. Phoenix',
+  'What’s your ZIP code? (so we can show jobs near you)':'¿Cuál es tu código postal? (para mostrarte empleos cercanos)','e.g. 85004':'ej. 85004',
+  'What’s the lowest hourly pay you’d take? Just a number.':'¿Cuál es el pago por hora más bajo que aceptarías? Solo un número.','e.g. 32':'ej. 32',
+  'Last one — what shifts can you work: day, night, or any?':'Última — ¿qué turnos puedes trabajar: día, noche o cualquiera?','day / night / any':'día / noche / cualquiera',
+  'Sourcing Agent':'Agente de búsqueda','Sourcing Agent added':'El agente de búsqueda agregó','to your pipeline.':'a tu proceso.',
+  'Scan all verified workers and auto-add the strongest matches to this pipeline.':'Escanea a todos los trabajadores verificados y agrega automáticamente las mejores coincidencias a este proceso.',
+  'Auto-source candidates':'Buscar candidatos automáticamente','candidate':'candidato','AI screen':'Filtro con IA','offline':'sin conexión','Auto-schedule':'Agendar automático',
+  'Build my card by chat':'Crea mi tarjeta por chat',
 };
 function T(s){
   if(LANG !== 'es' || !s) return s;
@@ -299,7 +323,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=47">
+  <link rel="stylesheet" href="/styles.css?v=48">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -493,13 +517,13 @@ function xToggle(action, on, iconName, onLabel, offLabel, next){
   return `<form method="post" action="${action}" class="xf"><input type="hidden" name="next" value="${next}">
     <button class="xbtn ${on?'on':''}">${icon(iconName,'xic')}<span>${on?onLabel:offLabel}</span></button></form>`;
 }
-function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 0, jobsGeo = null, isNew = false }) {
+function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 0, jobsGeo = null, isNew = false, coach = null }) {
   const top = matches.slice(0,3).map(m=>jobCard(m, isNew)).join('');
   const expiring = creds.filter(c=>c.expires && c.expires < '2026-08').length;
   const welcome = isNew ? `<div class="card welcome">
       <div class="welcome-h">${T('Welcome to Rivet')}, ${esc((user.name||'').split(' ')[0])} 👋</div>
       <p>${T("Here's what's hiring across the country right now. Add your trade to get matched to the best-fit jobs near you — it takes a minute.")}</p>
-      <a class="btn" href="/app/profile">${T('Set up my Work Card')}</a>
+      <div class="agent-act"><a class="btn" href="/app/onboard/chat">${icon('spark','xic')} ${T('Build my card by chat')}</a><a class="btn ghost" href="/app/profile">${T('Set up my Work Card')}</a></div>
     </div>` : '';
   const steps = [
     { done: creds.length>0, label:t('step_cred'), href:'/app/profile' },
@@ -536,6 +560,11 @@ function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 
         ${top || `<div class="card muted">${t('home_nomatch')}</div>`}
       </div>
       <aside>
+        ${coach ? `<div class="card agent-card">
+          <div class="agent-h">${icon('spark','xic')} ${T('Career Coach')}</div>
+          <p class="agent-line">${esc(coach.line)}</p>
+          <div class="agent-act"><a class="btn-sm" href="/app/coach">${T('See my next move')}</a>${coach.url?`<a class="btn-sm ghost" href="${esc(coach.url)}" target="_blank" rel="noopener">${T('How to earn it ↗')}</a>`:''}</div>
+        </div>` : ''}
         ${doneN<4?`<div class="card">
           <div class="sec-h" style="margin-top:0">${t('home_boost')} <span class="muted">${doneN}/4</span></div>
           <div class="checklist">${steps.map(s=>`<a class="chk-step ${s.done?'done':''}" href="${s.href}"><span class="cb">${s.done?'✓':''}</span>${s.label}</a>`).join('')}</div>
@@ -565,6 +594,68 @@ function ring(score){
     <circle cx="33" cy="33" r="26" fill="none" stroke="#F6A623" stroke-width="7" stroke-linecap="round"
       stroke-dasharray="163" stroke-dashoffset="${off}" transform="rotate(-90 33 33)"/>
     <text x="33" y="38" text-anchor="middle" fill="#fff" font-size="16" font-weight="800">${score}</text></svg>`;
+}
+
+// ---------- worker agents ----------
+function workerCoach({ profile, reco, line }){
+  const credCard = (c, primary) => `<div class="card ${primary?'agent-card':''}">
+    <div class="${primary?'agent-h':'sec-h'}" style="margin-top:0">${primary?icon('spark','xic')+' ':''}${esc(c.label)}</div>
+    <div class="coach-stats">
+      <div><b>+${c.jobsUnlocked}</b><span>${T('jobs unlocked')}</span></div>
+      ${c.payDelta>0?`<div><b>+$${c.payDelta}</b><span>${T('per hour')}</span></div>`:''}
+    </div>
+    ${c.how?`<p class="muted sm">${esc(c.how)}</p>`:''}
+    ${c.url?`<a class="btn-sm" href="${esc(c.url)}" target="_blank" rel="noopener">${T('How to earn it ↗')}</a>`:''}
+  </div>`;
+  return `<section class="wrap narrow">
+    <a class="back" href="/app">← ${T('Home')}</a>
+    <div class="card agent-card">
+      <div class="agent-h">${icon('spark','xic')} ${T('Career Coach')}</div>
+      <p class="agent-line big">${esc(line)}</p>
+      <p class="muted sm">${T('Based on your trades and what employers are hiring for near you right now.')}</p>
+    </div>
+    ${reco && reco.topCred ? `<div class="sec-h">${T('Your highest-impact next credential')}</div>${credCard(reco.topCred, true)}` : `<div class="card muted">${T('Add your trade and ZIP to your Work Card and your coach will map the fastest way to more jobs.')} <a href="/app/profile">${T('Set up my Work Card')}</a></div>`}
+    ${reco && reco.alternatives && reco.alternatives.length ? `<div class="sec-h">${T('Other credentials worth earning')}</div>${reco.alternatives.map(c=>credCard(c,false)).join('')}` : ''}
+  </section>`;
+}
+
+function agentApplyResult({ applied = [], already = 0, total = 0 }){
+  return `<section class="wrap narrow">
+    <a class="back" href="/app/jobs">← ${T('Find work')}</a>
+    <div class="card agent-card">
+      <div class="agent-h">${icon('spark','xic')} ${T('Apply Agent')}</div>
+      ${applied.length
+        ? `<p class="agent-line big">${T('Done — I applied you to')} ${applied.length} ${applied.length===1?T('job'):T('jobs')}.</p>`
+        : `<p class="agent-line big">${already?T('You’re already applied to your best matches — nothing new to do.'):T('No matching open jobs to apply to yet. Add your trade and ZIP to your Work Card.')}</p>`}
+    </div>
+    ${applied.length?`<div class="sec-h">${T('Applications submitted')}</div>${applied.map(a=>`<div class="card app-card">
+      <div class="job-row"><div class="badge">${tradeEmoji(a.trade)}</div>
+        <div class="job-main"><h4>${esc(a.title)}</h4>
+          <div class="muted">${esc(a.company||'')} · ${esc(a.city)} · $${a.pay_min}–${a.pay_max}/hr${a.distance!=null?` · <b class="dist">${a.distance} ${T('mi away')}</b>`:''}</div></div>
+        <span class="score-tag ${scoreClass(a.score)}">${a.score}</span></div>
+    </div>`).join('')}<a class="btn" href="/app/applications">${T('View all applications')}</a>`:''}
+  </section>`;
+}
+
+function onboardChat({ question = '', placeholder = '', transcript = [], done = false, step = 0 }){
+  return `<section class="wrap narrow">
+    <a class="back" href="/app">← ${T('Home')}</a>
+    <div class="card agent-card">
+      <div class="agent-h">${icon('spark','xic')} ${T('Onboarding Agent')}</div>
+      <p class="muted sm">${T('I’ll build your Work Card by chat — answer in your own words, in English or Spanish.')}</p>
+    </div>
+    <div class="card">
+      <div class="chat">
+        ${transcript.map(m=>`<div class="bubble ${m.role==='you'?'mine':'theirs'}"><div class="bub-body">${esc(m.text)}</div></div>`).join('')}
+        ${!done?`<div class="bubble theirs"><div class="bub-body">${esc(T(question))}</div></div>`:`<div class="bubble theirs"><div class="bub-body">${T('All set — your Work Card is ready.')} <a href="/app/profile">${T('Review it →')}</a></div></div>`}
+      </div>
+      ${!done?`<form method="post" action="/app/onboard/chat" class="msg-form" style="margin-top:12px">
+        <input type="hidden" name="step" value="${step}">
+        <input name="answer" placeholder="${esc(T(placeholder)||T('Type your answer…'))}" autocomplete="off" required maxlength="200" autofocus>
+        <button class="btn-sm">${T('Send')}</button>
+      </form>`:`<a class="btn" href="/app">${T('Go to my Home')}</a>`}
+    </div>
+  </section>`;
 }
 
 function jobCard(m, bare = false){
@@ -627,6 +718,11 @@ function workerJobs({ matches, filters = {}, jobsGeo = null }) {
   const active = (filters.q||filters.trade||filters.city||filters.minpay||filters.shift||filters.jtype);
   return `<section class="wrap">
     <div class="sec-h big">${T('Find work')} <span class="muted">${matches.length} ${matches.length===1?T('job'):T('jobs')}${active?' · '+T('filtered'):' · '+T('ranked by fit')}</span></div>
+    <div class="card agent-card row">
+      <div><div class="agent-h">${icon('spark','xic')} ${T('Apply Agent')}</div>
+        <p class="agent-line">${T('Let Rivet auto-apply you to the best-fit jobs near you — verified Work Card attached.')}</p></div>
+      <form method="post" action="/app/agent/apply"><button class="btn-sm">${T('Apply for me')}</button></form>
+    </div>
     <form class="jobfilters" method="get" action="/app/jobs">
       <input name="q" value="${esc(filters.q||'')}" placeholder="${T('Search title or company')}" aria-label="Search">
       <select name="trade" aria-label="Trade">${tradeOpts}</select>
@@ -1365,7 +1461,7 @@ function empJobForm(error='', job=null) {
 }
 
 const STAGES = ['Sourced','Screened','Interview','Offer','Hired'];
-function empPipeline({ job, columns, candidates, jobMedia = [], alerted = 0 }) {
+function empPipeline({ job, columns, candidates, jobMedia = [], alerted = 0, sourced = 0 }) {
   const cols = STAGES.map(st=>`<div class="col"><div class="col-h">${st} <span>${(columns[st]||[]).length}</span></div>
     ${(columns[st]||[]).map(a=>`<div class="pcard">
         <a class="pc-nm cand-link" href="/console/candidates/${a.worker_id}"><span class="av-t">${initials(a.name)}</span>${esc(a.name)}</a>
@@ -1384,6 +1480,12 @@ function empPipeline({ job, columns, candidates, jobMedia = [], alerted = 0 }) {
       <form method="post" action="/console/jobs/${job.id}/${job.status==='closed'?'reopen':'close'}"><button class="btn-sm ${job.status==='closed'?'':'ghost'}">${job.status==='closed'?T('Reopen job'):T('Close job')}</button></form></div>
     ${job.status==='closed'?`<div class="card warn-card">${T('This job is closed — it’s hidden from worker search and the map. Reopen it to keep matching.')}</div>`:''}
     ${alerted>0?`<div class="ok-card">${icon('bell','xic')} ${alerted} matching worker${alerted===1?'':'s'} with alerts on ${alerted===1?'was':'were'} notified about this job.</div>`:''}
+    ${sourced>0?`<div class="ok-card">${icon('spark','xic')} ${T('Sourcing Agent added')} ${sourced} ${sourced===1?T('candidate'):T('candidates')} ${T('to your pipeline.')}</div>`:''}
+    <div class="card agent-card row">
+      <div><div class="agent-h">${icon('spark','xic')} ${T('Sourcing Agent')}</div>
+        <p class="agent-line">${T('Scan all verified workers and auto-add the strongest matches to this pipeline.')}</p></div>
+      <form method="post" action="/console/jobs/${job.id}/source"><button class="btn-sm">${T('Auto-source candidates')}</button></form>
+    </div>
     <div class="card">
       <div class="sec-h" style="margin-top:0">Photos of the work <span class="muted sm">candidates see these on the job</span></div>
       ${mediaGallery(jobMedia, {deletable:true, base:`/console/jobs/${job.id}/media`}) || '<p class="muted sm">Add photos or a video of the site / work to be done — it helps candidates self-qualify.</p>'}
@@ -1457,8 +1559,12 @@ function inbox({ convos, base, meId }){
 }
 
 // ---------- employer: candidate detail ----------
-function empCandidate({ worker, profile, creds, matches, apps, messages, meId, notes = [], saved = false, portfolio = [], work = [], rating = {avg:0,count:0}, reviews = [], canReviewJob = null, myReview = null, interviews = {} }) {
+function empCandidate({ worker, profile, creds, matches, apps, messages, meId, notes = [], saved = false, portfolio = [], work = [], rating = {avg:0,count:0}, reviews = [], canReviewJob = null, myReview = null, interviews = {}, screen = null }) {
   const stageByJob = {}; for (const a of apps) stageByJob[a.job_id] = a.stage;
+  const screenPanel = (jobId) => (screen && screen.jobId===jobId) ? `<div class="iv">
+    <div class="iv-h">${icon('spark','xic')} ${T('AI screen')}${screen.ai?'':` <span class="muted sm">(${T('offline')})</span>`}</div>
+    <p class="agent-line sm">${esc(screen.summary)}</p>
+    <ol class="screen-q">${(screen.questions||[]).map(q=>`<li>${esc(q)}</li>`).join('')}</ol></div>` : '';
   return `<section class="wrap narrow">
     <div class="cand-top"><a class="back" href="/console/search">← Talent Search</a>
       <form method="post" action="/console/candidates/${worker.id}/save">
@@ -1501,6 +1607,11 @@ function empCandidate({ worker, profile, creds, matches, apps, messages, meId, n
         <div class="cf-act">${stageByJob[m.job.id]
           ? `<span class="stage-pill">In pipeline · ${esc(stageByJob[m.job.id])}</span>`
           : `<form method="post" action="/console/jobs/${m.job.id}/add"><input type="hidden" name="worker_id" value="${worker.id}"><button class="btn-sm">+ Add to pipeline</button></form>`}</div>
+        ${stageByJob[m.job.id] ? `<div class="agent-row">
+          <form method="post" action="/console/candidates/${worker.id}/screen"><input type="hidden" name="job_id" value="${m.job.id}"><button class="btn-xs">${icon('spark')} ${T('AI screen')}</button></form>
+          ${interviews[m.job.id]?'':`<form method="post" action="/console/candidates/${worker.id}/autoschedule"><input type="hidden" name="job_id" value="${m.job.id}"><button class="btn-xs ghost">${icon('spark')} ${T('Auto-schedule')}</button></form>`}
+        </div>` : ''}
+        ${screenPanel(m.job.id)}
         ${stageByJob[m.job.id] ? (interviews[m.job.id] ? interviewEmp(interviews[m.job.id]) : interviewProposeForm(m.job.id, worker.id)) : ''}
       </div>`).join('') : `<p class="muted">You have no open jobs yet. <a href="/console/jobs/new">Post a job</a> to see how this candidate fits.</p>`}
     </div>
@@ -1563,4 +1674,4 @@ function ogImage() {
 }
 
 module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, empCompany, workerTraining, pulsePage, publicJob };
+  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat };

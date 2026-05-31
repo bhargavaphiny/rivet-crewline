@@ -238,6 +238,115 @@ async function reviewsFor(subjectId, kind, limit=8){
   return db.prepare('SELECT * FROM reviews WHERE subject_id=? AND subject_kind=? ORDER BY created_at DESC, id DESC LIMIT ?').all(subjectId, kind, limit);
 }
 
+// ---------- agents ----------
+function isExternalJob(j){ return !!(j && j.source && j.source!=='Rivet' && j.apply_url); }
+
+// Career Coach: highest-ROI credentials to earn next, grounded in the live market.
+async function coachReco(uid){
+  const prof = await getProfile(uid); if(!prof) return null;
+  const creds = await getCreds(uid);
+  const have = new Set(creds.map(c=>c.kind));
+  const trades = profTrades(prof); if(!trades.length) return null;
+  const broad = new Set(trades); for(const t of trades) for(const a of (M.ADJACENT[t]||[])) broad.add(a);
+  const jobs = (await openJobs()).filter(j=>broad.has(j.trade) && !isExternalJob(j));
+  const tally = {}; // credKey -> {count, paySum}
+  for(const j of jobs){
+    const reqs = String(j.req_creds||'').split(',').map(s=>s.trim()).filter(Boolean);
+    for(const r of reqs){ if(have.has(r)) continue; (tally[r]=tally[r]||{count:0,paySum:0}); tally[r].count++; tally[r].paySum += (j.pay_max||0); }
+  }
+  const floor = prof.pay_floor || 0;
+  const list = Object.entries(tally).map(([key,t])=>{
+    const avgPay = t.count ? Math.round(t.paySum/t.count) : 0;
+    return { key, label: M.CRED_KINDS[key]||key, jobsUnlocked: t.count, payDelta: Math.max(0, avgPay - floor),
+      how: (M.TRAINING[key]||{}).how || '', url: (M.TRAINING[key]||{}).url || '' };
+  }).filter(c=>c.jobsUnlocked>0).sort((a,b)=> b.jobsUnlocked-a.jobsUnlocked || b.payDelta-a.payDelta);
+  if(!list.length) return null;
+  return { topCred: list[0], alternatives: list.slice(1,3), marketJobs: jobs.length };
+}
+function coachLineFallback(c){
+  const pay = c.payDelta>0 ? ` and pay up to about +$${c.payDelta}/hr` : '';
+  return `Earning your ${c.label} would unlock about ${c.jobsUnlocked} more jobs near you${pay}.`;
+}
+
+// Onboarding agent: ordered guided-chat script. Each step parses free text into a profile value.
+const TRADE_SYNONYMS = { electrical:'electrician', electric:'electrician', ac:'hvac', 'air conditioning':'hvac', hvacr:'hvac',
+  plumbing:'plumber', welding:'welder', carpentry:'carpenter', framing:'framer', concrete:'concrete', mason:'mason', masonry:'mason',
+  painting:'painter', roofing:'roofer', driving:'cdl_driver', trucker:'cdl_driver', forklift:'warehouse', warehouseman:'warehouse',
+  cook:'cook', chef:'cook', server:'server', waiter:'server', waitress:'server', cleaner:'janitor', janitorial:'janitor',
+  caregiving:'caregiver', nurse:'cna', security:'security_guard', guard:'security_guard', landscaping:'landscaper', solar:'solar' };
+function matchTrades(text){
+  const s = ' '+String(text||'').toLowerCase().replace(/[^a-z ]/g,' ')+' ';
+  const out = [];
+  for(const key of Object.keys(M.TRADES)){
+    const k = key.replace(/_/g,' ');
+    const label = String(M.TRADES[key]).toLowerCase();
+    if(s.includes(' '+k+' ') || label.split(/[ /]/).some(w=>w.length>3 && s.includes(' '+w+' '))){ if(!out.includes(key)) out.push(key); }
+  }
+  for(const [syn,key] of Object.entries(TRADE_SYNONYMS)){ if(s.includes(' '+syn+' ') && M.TRADES[key] && !out.includes(key)) out.push(key); }
+  return out;
+}
+const ONBOARD_STEPS = [
+  { field:'trades', q:'Welcome! What trade or trades do you work in?', ph:'e.g. electrician and some solar' },
+  { field:'years_exp', q:'Nice. How many years have you been doing this work?', ph:'e.g. 8' },
+  { field:'city', q:'What city are you based in?', ph:'e.g. Phoenix' },
+  { field:'zip', q:'What’s your ZIP code? (so we can show jobs near you)', ph:'e.g. 85004' },
+  { field:'pay_floor', q:'What’s the lowest hourly pay you’d take? Just a number.', ph:'e.g. 32' },
+  { field:'shift', q:'Last one — what shifts can you work: day, night, or any?', ph:'day / night / any' },
+];
+async function applyOnboardAnswer(uid, step, text){
+  const prof = await getProfile(uid) || {};
+  const s = ONBOARD_STEPS[step]; if(!s) return;
+  let val, captured = String(text||'').trim();
+  if(s.field==='trades'){
+    const matched = matchTrades(text);
+    if(matched.length){ await db.prepare('UPDATE worker_profiles SET trades=?, trade=? WHERE user_id=?').run(matched.join(','), matched[0], uid); }
+    else { await db.prepare('UPDATE worker_profiles SET custom_trade=? WHERE user_id=?').run(captured.slice(0,60), uid); }
+    return;
+  }
+  if(s.field==='years_exp'){ val = (String(text).match(/\d+/)||[0])[0]; await db.prepare('UPDATE worker_profiles SET years_exp=? WHERE user_id=?').run(Number(val)||0, uid); return; }
+  if(s.field==='city'){ await db.prepare('UPDATE worker_profiles SET city=? WHERE user_id=?').run(captured.slice(0,60), uid); return; }
+  if(s.field==='zip'){ const z=(String(text).match(/\d{5}/)||[''])[0]; await db.prepare('UPDATE worker_profiles SET zip=? WHERE user_id=?').run(z, uid); if(z){ try{ await geocodeZip(z); }catch(e){} } return; }
+  if(s.field==='pay_floor'){ val=(String(text).match(/\d+/)||[0])[0]; await db.prepare('UPDATE worker_profiles SET pay_floor=? WHERE user_id=?').run(Number(val)||0, uid); return; }
+  if(s.field==='shift'){ const l=String(text).toLowerCase(); const sh = l.includes('night')?'Night':(l.includes('4')?'4x10':(l.includes('day')?'Day':'Any')); await db.prepare('UPDATE worker_profiles SET shift=? WHERE user_id=?').run(sh, uid); return; }
+}
+function onboardTranscript(prof, step){
+  const out = [];
+  for(let i=0;i<step && i<ONBOARD_STEPS.length;i++){
+    const f = ONBOARD_STEPS[i]; out.push({role:'them', text:f.q});
+    let v = '';
+    if(f.field==='trades') v = (profTrades(prof).map(t=>M.TRADES[t]||t).join(', ')) || prof.custom_trade || '';
+    else if(f.field==='years_exp') v = prof.years_exp ? `${prof.years_exp} years` : '';
+    else v = prof[f.field]!=null ? String(prof[f.field]) : '';
+    if(v) out.push({role:'you', text:v});
+  }
+  return out;
+}
+
+// Render the recruiter candidate page (reused by GET and the screening agent POST).
+async function sendCandidate(res, user, wid, screen=null){
+  const w = await db.prepare('SELECT id,name FROM users WHERE id=?').get(wid);
+  const prof = w ? await getProfile(wid) : null;
+  if(!w || !prof) return send(res, V.layout({title:'Candidate',user,active:'search',body:'<section class="wrap narrow"><a class="back" href="/console/search">← Talent Search</a><div class="card">Candidate not found.</div></section>'}),404);
+  const creds = await getCreds(wid);
+  const jobs = await db.prepare('SELECT * FROM jobs WHERE employer_id=? ORDER BY created_at DESC').all(user.id);
+  const matches = jobs.map(j=>{ const r=bestMatch(prof,creds,j); return {job:j, score:r.score, breakdown:r.breakdown, missing:r.missing}; }).sort((a,b)=>b.score-a.score);
+  const apps = jobs.length ? await db.prepare(`SELECT job_id,stage FROM applications WHERE worker_id=? AND job_id IN (${jobs.map(()=>'?').join(',')})`).all(wid, ...jobs.map(j=>j.id)) : [];
+  const messages = await db.prepare(`SELECT * FROM messages WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=?) ORDER BY created_at, id`).all(user.id, wid, wid, user.id);
+  await db.prepare("UPDATE messages SET read_at=datetime('now') WHERE to_id=? AND from_id=? AND read_at IS NULL").run(user.id, wid);
+  const notes = await db.prepare('SELECT * FROM notes WHERE author_id=? AND worker_id=? ORDER BY created_at DESC, id DESC').all(user.id, wid);
+  const saved = !!(await db.prepare('SELECT 1 FROM saved_candidates WHERE employer_id=? AND worker_id=?').get(user.id, wid));
+  const portfolio = await db.prepare("SELECT * FROM media WHERE user_id=? AND target='portfolio' ORDER BY created_at DESC, id DESC").all(wid);
+  const work = await getWorkHistory(wid);
+  const rating = await ratingFor(wid, 'worker');
+  const reviews = await reviewsFor(wid, 'worker');
+  const hiredApp = apps.find(a=>a.stage==='Hired');
+  const canReviewJob = hiredApp ? hiredApp.job_id : null;
+  const myReview = canReviewJob ? await db.prepare('SELECT * FROM reviews WHERE author_id=? AND subject_id=? AND job_id=?').get(user.id, wid, canReviewJob) : null;
+  const ivRows = jobs.length ? await db.prepare(`SELECT * FROM interviews WHERE worker_id=? AND employer_id=? AND job_id IN (${jobs.map(()=>'?').join(',')})`).all(wid, user.id, ...jobs.map(j=>j.id)) : [];
+  const interviews = {}; for(const iv of ivRows) interviews[iv.job_id] = iv;
+  return send(res, V.layout({title:w.name,user,active:'search',body:V.empCandidate({worker:w,profile:prof,creds,matches,apps,messages,meId:user.id,notes,saved,portfolio,work,rating,reviews,canReviewJob,myReview,interviews,screen})}));
+}
+
 // ---------- geo / distance ----------
 function haversineMi(a, b){
   if(!a || !b) return null;
@@ -592,7 +701,48 @@ const server = http.createServer(async (req,res)=>{
         const jobsGeo = isNewWorker ? { points: await jobGeoAll() } : await jobGeoForWorker(prof);
         let matches = await rankJobsForWorker(user.id);
         if(isNewWorker){ matches = matches.slice().sort((a,b)=> (b.job.id||0)-(a.job.id||0)); }
-        return send(res, V.layout({title:'Home',user,active:'home',body:V.workerHome({user,profile:prof,creds,matches,workCount,portCount,jobsGeo,isNew:isNewWorker})}));
+        let coach = null;
+        if(!isNewWorker){ try { const r = await coachReco(user.id); if(r && r.topCred) coach = { line: coachLineFallback(r.topCred), url: r.topCred.url }; } catch(e){} }
+        return send(res, V.layout({title:'Home',user,active:'home',body:V.workerHome({user,profile:prof,creds,matches,workCount,portCount,jobsGeo,isNew:isNewWorker,coach})}));
+      }
+      if(p==='/app/coach' && method==='GET'){
+        const reco = await coachReco(user.id);
+        let line = '';
+        if(reco && reco.topCred){
+          const tradeLabels = profTrades(prof).map(t=>M.TRADES[t]||t);
+          line = await LLM.coachLine({ tradeLabels, credLabel:reco.topCred.label, jobsUnlocked:reco.topCred.jobsUnlocked, payDelta:reco.topCred.payDelta });
+        } else {
+          line = 'Add your trade and ZIP to your Work Card and I’ll map the fastest way to more, better-paying jobs.';
+        }
+        return send(res, V.layout({title:'Career Coach',user,active:'home',body:V.workerCoach({profile:prof, reco, line})}));
+      }
+      if(p==='/app/agent/apply' && method==='POST'){
+        const matches = await rankJobsForWorker(user.id);
+        const appliedIds = new Set((await db.prepare('SELECT job_id FROM applications WHERE worker_id=?').all(user.id)).map(r=>r.job_id));
+        const picks = matches.filter(m=> m.score>=60 && !isExternalJob(m.job) && !appliedIds.has(m.job.id) && (m.distance==null || m.distance<=120)).slice(0,5);
+        const applied = [];
+        for(const m of picks){
+          try { await db.prepare('INSERT INTO applications(job_id,worker_id,stage,score) VALUES(?,?,?,?)').run(m.job.id, user.id, 'Sourced', m.score);
+            applied.push({...m.job, score:m.score, distance:m.distance}); } catch(e){}
+        }
+        return send(res, V.layout({title:'Apply Agent',user,active:'jobs',body:V.agentApplyResult({applied, already:appliedIds.size, total:matches.length})}));
+      }
+      if(p==='/app/onboard/chat' && method==='GET'){
+        const s = ONBOARD_STEPS[0];
+        return send(res, V.layout({title:'Onboarding Agent',user,active:'',body:V.onboardChat({question:s.q, placeholder:s.ph, transcript:[], done:false, step:0})}));
+      }
+      if(p==='/app/onboard/chat' && method==='POST'){
+        const b = await readBody(req);
+        let step = Math.max(0, Math.min(ONBOARD_STEPS.length, Number(b.step)||0));
+        await applyOnboardAnswer(user.id, step, b.answer);
+        step += 1;
+        const fresh = await getProfile(user.id);
+        if(step >= ONBOARD_STEPS.length){
+          await recomputeReadiness(user.id);
+          return send(res, V.layout({title:'Onboarding Agent',user,active:'',body:V.onboardChat({transcript:onboardTranscript(fresh, step), done:true})}));
+        }
+        const s = ONBOARD_STEPS[step];
+        return send(res, V.layout({title:'Onboarding Agent',user,active:'',body:V.onboardChat({question:s.q, placeholder:s.ph, transcript:onboardTranscript(fresh, step), done:false, step})}));
       }
       if(p==='/app/jobs' && method==='GET'){
         const f = {
@@ -957,7 +1107,8 @@ const server = http.createServer(async (req,res)=>{
         const candidates = (await rankWorkersForJob(job)).filter(w=>!inPipe.has(w.name)).slice(0,5);
         const jobMedia = await db.prepare("SELECT * FROM media WHERE job_id=? AND target='job' ORDER BY created_at DESC, id DESC").all(jid);
         const alerted = Number(url.searchParams.get('alerted'))||0;
-        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.empPipeline({job,columns,candidates,jobMedia,alerted})}));
+        const sourced = Number(url.searchParams.get('sourced'))||0;
+        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.empPipeline({job,columns,candidates,jobMedia,alerted,sourced})}));
       }
 
       if(p==='/console/search' && method==='GET'){
@@ -1050,31 +1201,79 @@ const server = http.createServer(async (req,res)=>{
         return send(res, V.layout({title:'Shortlist',user,active:'search',body:V.empShortlist({rows})}));
       }
 
-      const candMatch = p.match(/^\/console\/candidates\/(\d+)$/);
-      if(candMatch && method==='GET'){
-        const wid = Number(candMatch[1]);
-        const w = await db.prepare("SELECT id,name FROM users WHERE id=?").get(wid);
-        const prof = w ? await getProfile(wid) : null;
-        if(!w || !prof) return send(res, V.layout({title:'Candidate',user,active:'search',body:'<section class="wrap narrow"><a class="back" href="/console/search">← Talent Search</a><div class="card">Candidate not found.</div></section>'}),404);
-        const creds = await getCreds(wid);
-        const jobs = await db.prepare('SELECT * FROM jobs WHERE employer_id=? ORDER BY created_at DESC').all(user.id);
-        const matches = jobs.map(j=>{ const r=bestMatch(prof,creds,j); return {job:j, score:r.score, breakdown:r.breakdown, missing:r.missing}; }).sort((a,b)=>b.score-a.score);
-        const apps = jobs.length ? await db.prepare(`SELECT job_id,stage FROM applications WHERE worker_id=? AND job_id IN (${jobs.map(()=>'?').join(',')})`).all(wid, ...jobs.map(j=>j.id)) : [];
-        const messages = await db.prepare(`SELECT * FROM messages WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=?) ORDER BY created_at, id`).all(user.id, wid, wid, user.id);
-        await db.prepare("UPDATE messages SET read_at=datetime('now') WHERE to_id=? AND from_id=? AND read_at IS NULL").run(user.id, wid);
-        const notes = await db.prepare('SELECT * FROM notes WHERE author_id=? AND worker_id=? ORDER BY created_at DESC, id DESC').all(user.id, wid);
-        const saved = !!(await db.prepare('SELECT 1 FROM saved_candidates WHERE employer_id=? AND worker_id=?').get(user.id, wid));
-        const portfolio = await db.prepare("SELECT * FROM media WHERE user_id=? AND target='portfolio' ORDER BY created_at DESC, id DESC").all(wid);
-        const work = await getWorkHistory(wid);
-        const rating = await ratingFor(wid, 'worker');
-        const reviews = await reviewsFor(wid, 'worker');
-        const hiredApp = apps.find(a=>a.stage==='Hired');
-        const canReviewJob = hiredApp ? hiredApp.job_id : null;
-        const myReview = canReviewJob ? await db.prepare('SELECT * FROM reviews WHERE author_id=? AND subject_id=? AND job_id=?').get(user.id, wid, canReviewJob) : null;
-        const ivRows = jobs.length ? await db.prepare(`SELECT * FROM interviews WHERE worker_id=? AND employer_id=? AND job_id IN (${jobs.map(()=>'?').join(',')})`).all(wid, user.id, ...jobs.map(j=>j.id)) : [];
-        const interviews = {}; for(const iv of ivRows) interviews[iv.job_id] = iv;
-        return send(res, V.layout({title:w.name,user,active:'search',body:V.empCandidate({worker:w,profile:prof,creds,matches,apps,messages,meId:user.id,notes,saved,portfolio,work,rating,reviews,canReviewJob,myReview,interviews})}));
+      // Sourcing agent: auto-add top matches for a job to the pipeline (with AI rationale note)
+      const jSource = p.match(/^\/console\/jobs\/(\d+)\/source$/);
+      if(jSource && method==='POST'){
+        const jobId = Number(jSource[1]);
+        const job = await db.prepare('SELECT * FROM jobs WHERE id=? AND employer_id=?').get(jobId, user.id);
+        let sourced = 0;
+        if(job){
+          const inPipe = new Set((await db.prepare('SELECT worker_id FROM applications WHERE job_id=?').all(jobId)).map(r=>r.worker_id));
+          const ranked = (await rankWorkersForJob(job)).filter(w=>!inPipe.has(w.user_id) && w.score>=70).slice(0,5);
+          for(const w of ranked){
+            try {
+              await db.prepare('INSERT INTO applications(job_id,worker_id,stage,score) VALUES(?,?,?,?)').run(jobId, w.user_id, 'Sourced', w.score);
+              const reasons = [];
+              if(w.score>=85) reasons.push(`${M.TRADES[w.trade]||w.trade} match ${w.score}/100`); else reasons.push(`${w.score}/100 fit`);
+              if(w.available) reasons.push('available now');
+              if(w.work_today) reasons.push('can work today');
+              if(w.readiness>=85) reasons.push(`readiness ${w.readiness}`);
+              const line = await LLM.sourceLine({ tradeLabel:M.TRADES[w.trade]||w.trade, jobTitle:job.title, score:w.score, reasons });
+              await db.prepare('INSERT INTO notes(author_id,worker_id,body) VALUES(?,?,?)').run(user.id, w.user_id, `🤖 Sourcing Agent: ${line}`);
+              sourced++;
+            } catch(e){}
+          }
+        }
+        return redirect(res, `/console/jobs/${jobId}?sourced=${sourced}`);
       }
+      // Screening agent: generate tailored screen questions + fit summary, render on candidate page
+      const cScreen = p.match(/^\/console\/candidates\/(\d+)\/screen$/);
+      if(cScreen && method==='POST'){
+        const wid = Number(cScreen[1]); const b = await readBody(req);
+        const jobId = Number(b.job_id)||0;
+        const job = jobId && await db.prepare('SELECT * FROM jobs WHERE id=? AND employer_id=?').get(jobId, user.id);
+        const prof = await getProfile(wid); const creds = await getCreds(wid);
+        let screen = null;
+        if(job && prof){
+          const have = new Set(creds.map(c=>c.kind));
+          const reqs = String(job.req_creds||'').split(',').map(s=>s.trim()).filter(Boolean);
+          const res2 = await LLM.screen({
+            name:(await db.prepare('SELECT name FROM users WHERE id=?').get(wid)||{}).name||'Candidate',
+            tradeLabels: profTrades(prof).map(t=>M.TRADES[t]||t),
+            jobTitle: job.title,
+            reqCredLabels: reqs.map(r=>M.CRED_KINDS[r]||r),
+            missingCredLabels: reqs.filter(r=>!have.has(r)).map(r=>M.CRED_KINDS[r]||r),
+            available: !!prof.available, hasTransport: !!prof.has_transport,
+            payFloor: prof.pay_floor||0, jobPayMax: job.pay_max||0,
+          });
+          screen = { ...res2, jobId };
+        }
+        return sendCandidate(res, user, wid, screen);
+      }
+      // Scheduling agent: auto-propose 3 interview slots to a pipelined candidate
+      const cAuto = p.match(/^\/console\/candidates\/(\d+)\/autoschedule$/);
+      if(cAuto && method==='POST'){
+        const wid = Number(cAuto[1]); const b = await readBody(req);
+        const jobId = Number(b.job_id)||0;
+        const job = jobId && await db.prepare('SELECT id,title FROM jobs WHERE id=? AND employer_id=?').get(jobId, user.id);
+        const inPipe = job && await db.prepare('SELECT 1 FROM applications WHERE job_id=? AND worker_id=?').get(jobId, wid);
+        const existing = job && await db.prepare('SELECT 1 FROM interviews WHERE job_id=? AND worker_id=?').get(jobId, wid);
+        if(job && inPipe && !existing){
+          const slots = []; let added=0, day=2;
+          while(added<3 && day<10){
+            const d = new Date(); d.setDate(d.getDate()+day); d.setHours(added%2?14:10,0,0,0);
+            const dow = d.getDay(); if(dow!==0 && dow!==6){ slots.push(d.toISOString()); added++; }
+            day++;
+          }
+          try {
+            await db.prepare("INSERT INTO interviews(job_id,worker_id,employer_id,slots,status) VALUES(?,?,?,?,'proposed')").run(jobId, wid, user.id, JSON.stringify(slots));
+            await sendMessage(user.id, wid, `Interview invite for "${job.title}" — open your Applications to pick a time.`);
+          } catch(e){}
+        }
+        return redirect(res, `/console/candidates/${wid}`);
+      }
+      const candMatch = p.match(/^\/console\/candidates\/(\d+)$/);
+      if(candMatch && method==='GET') return sendCandidate(res, user, Number(candMatch[1]));
     }
 
     // 404

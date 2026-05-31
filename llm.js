@@ -78,4 +78,60 @@ async function translateBatch(texts, langName = 'Spanish') {
   } catch (e) { return {}; }
 }
 
-module.exports = { enabled, workerAbout, translateBatch };
+// ---------- agent helpers (deterministic fallback so they work with $0 / no key) ----------
+
+// Career Coach: one motivating line about the highest-ROI next credential.
+// d: { tradeLabels:[], credLabel, jobsUnlocked, payDelta }
+async function coachLine(d){
+  const prompt = `You are a blue-collar career coach. In ONE encouraging sentence (under 32 words, plain language, no hashtags), `
+    + `tell a ${ (d.tradeLabels||[]).join('/') || 'tradesperson' } that earning their ${d.credLabel} would unlock about `
+    + `${d.jobsUnlocked} more local jobs${d.payDelta>0?` and roughly +$${d.payDelta}/hr`:''}. Be specific and motivating.`;
+  const ai = await chat(prompt, 80, 6000);
+  if (ai) return ai.replace(/^["']|["']$/g,'');
+  const pay = d.payDelta>0 ? ` and pay up to about +$${d.payDelta}/hr` : '';
+  return `Earning your ${d.credLabel} would unlock about ${d.jobsUnlocked} more jobs near you${pay}. It's one of the fastest ways to level up.`;
+}
+
+// Screening agent: tailored pre-qualifying questions + a short fit summary.
+// d: { name, tradeLabels:[], jobTitle, reqCredLabels:[], missingCredLabels:[], available, hasTransport, payFloor, jobPayMax, distance }
+async function screen(d){
+  const ctx = `Candidate: ${d.name}, trades ${ (d.tradeLabels||[]).join(', ') }. Applying to "${d.jobTitle}". `
+    + `Required credentials: ${ (d.reqCredLabels||[]).join(', ') || 'none listed' }. `
+    + `Missing: ${ (d.missingCredLabels||[]).join(', ') || 'none' }. `
+    + `Available now: ${d.available?'yes':'no'}. Own transport: ${d.hasTransport?'yes':'no'}. `
+    + `Seeks $${d.payFloor||0}/hr; job pays up to $${d.jobPayMax||0}/hr.`;
+  const prompt = `You are a hiring screener for the skilled trades. ${ctx}\n`
+    + `Return ONLY JSON: {"questions":["...","..."],"summary":"..."}. `
+    + `4-5 short, specific phone-screen questions that verify fit (licenses, hands-on experience, availability, reliability). `
+    + `summary = one neutral sentence on overall fit and the main thing to verify. No commentary outside JSON.`;
+  const out = await chat(prompt, 360, 9000);
+  if (out){
+    try {
+      const s = out.indexOf('{'), e = out.lastIndexOf('}');
+      if (s>=0 && e>=0){
+        const j = JSON.parse(out.slice(s,e+1));
+        if (Array.isArray(j.questions) && j.questions.length) return { questions: j.questions.slice(0,6).map(String), summary: String(j.summary||'') , ai:true };
+      }
+    } catch(e){}
+  }
+  // deterministic fallback
+  const q = [];
+  if ((d.missingCredLabels||[]).length) q.push(`You don't show ${d.missingCredLabels.join(' or ')} on file — do you hold it, and can you provide proof?`);
+  q.push(`Walk me through your most recent ${ (d.tradeLabels||['trade'])[0] } project — scope, your role, and crew size.`);
+  q.push(`Are you available to start ${d.available?'this week':'soon'}, and what shifts work for you?`);
+  if (!d.hasTransport) q.push(`Do you have reliable transportation to the job site each day?`);
+  q.push(`Our target is up to $${d.jobPayMax||0}/hr — does that work for you?`);
+  const summary = `${d.name} matches the ${ (d.tradeLabels||['trade'])[0] } scope` + ((d.missingCredLabels||[]).length?`; verify ${d.missingCredLabels.join(', ')} before advancing.`:` and meets the listed credentials.`);
+  return { questions: q.slice(0,5), summary, ai:false };
+}
+
+// Sourcing agent: a short reason this candidate was auto-sourced.
+// d: { tradeLabel, jobTitle, score, reasons:[] }
+async function sourceLine(d){
+  const prompt = `In one short phrase (under 16 words), say why a ${d.tradeLabel} scoring ${d.score}/100 is a good auto-match for "${d.jobTitle}". Reasons: ${ (d.reasons||[]).join(', ') }. No quotes.`;
+  const ai = await chat(prompt, 50, 5000);
+  if (ai) return ai.replace(/^["']|["']$/g,'');
+  return (d.reasons && d.reasons.length) ? d.reasons.join(' · ') : `Strong ${d.tradeLabel} match (${d.score}/100).`;
+}
+
+module.exports = { enabled, workerAbout, translateBatch, coachLine, screen, sourceLine };
