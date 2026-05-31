@@ -117,18 +117,39 @@ function qid(p){ const m=p.match(/(\d+)/); return m?Number(m[1]):null; }
 // ---------- data helpers ----------
 const getProfile = uid => db.prepare('SELECT * FROM worker_profiles WHERE user_id=?').get(uid);
 const getCreds   = uid => db.prepare('SELECT * FROM credentials WHERE user_id=? ORDER BY id').all(uid);
+const getWorkHistory = uid => db.prepare('SELECT * FROM work_history WHERE user_id=? ORDER BY current DESC, COALESCE(end_year,9999) DESC, COALESCE(start_year,0) DESC, id DESC').all(uid);
 const openJobs   = () => db.prepare(`SELECT j.*, u.company FROM jobs j JOIN users u ON u.id=j.employer_id WHERE j.status='open' ORDER BY j.created_at DESC`).all();
+
+// normalize a checkbox field (string | array | undefined) to a clean list of valid trade keys
+function normTrades(v){
+  const arr = [].concat(v||[]).map(s=>String(s).trim()).filter(Boolean);
+  const seen = new Set(); const out = [];
+  for(const t of arr){ if(M.TRADES[t] && !seen.has(t)){ seen.add(t); out.push(t); } }
+  return out;
+}
+// a candidate can hold multiple trades; score against the best-fitting one
+function profTrades(p){
+  const arr = String((p && (p.trades || p.trade)) || '').split(',').map(s=>s.trim()).filter(Boolean);
+  return arr.length ? arr : (p && p.trade ? [p.trade] : []);
+}
+function bestMatch(prof, creds, job){
+  const trades = profTrades(prof);
+  if(!trades.length) return M.scoreMatch(prof, creds, job);
+  let best = null;
+  for(const tr of trades){ const r = M.scoreMatch({ ...prof, trade: tr }, creds, job); if(!best || r.score > best.score) best = r; }
+  return best;
+}
 
 async function rankJobsForWorker(uid){
   const prof = await getProfile(uid); const creds = await getCreds(uid);
   const jobs = await openJobs();
-  return jobs.map(j=>{ const r=M.scoreMatch(prof,creds,j); return {job:j, score:r.score, missing:r.missing}; })
+  return jobs.map(j=>{ const r=bestMatch(prof,creds,j); return {job:j, score:r.score, missing:r.missing}; })
     .sort((a,b)=>b.score-a.score);
 }
 async function rankWorkersForJob(job){
   const workers = await db.prepare(`SELECT u.id user_id,u.name,p.* FROM users u JOIN worker_profiles p ON p.user_id=u.id`).all();
   const out = [];
-  for(const w of workers){ const creds=await getCreds(w.user_id); const r=M.scoreMatch(w,creds,job);
+  for(const w of workers){ const creds=await getCreds(w.user_id); const r=bestMatch(w,creds,job);
     out.push({...w, score:r.score, readiness:w.readiness}); }
   return out.sort((a,b)=>b.score-a.score);
 }
@@ -239,7 +260,8 @@ const server = http.createServer(async (req,res)=>{
       if(!worker || !profile) return send(res, V.layout({title:'Not found',user,body:'<section class="wrap"><div class="card"><h2>Portfolio not found</h2><p><a href="/">Home</a></p></div></section>'}),404);
       const creds = await getCreds(wid);
       const portfolio = await db.prepare("SELECT * FROM media WHERE user_id=? AND target='portfolio' ORDER BY created_at DESC, id DESC").all(wid);
-      return send(res, V.layout({title:`${worker.name} — Trades portfolio`, user, body:V.publicPortfolio({worker,profile,creds,portfolio})}));
+      const work = await getWorkHistory(wid);
+      return send(res, V.layout({title:`${worker.name} — Trades portfolio`, user, body:V.publicPortfolio({worker,profile,creds,portfolio,work})}));
     }
 
     if(p==='/signup' && method==='POST'){
@@ -330,9 +352,14 @@ const server = http.createServer(async (req,res)=>{
       if(p==='/app/onboard' && method==='GET') return send(res, V.layout({title:'Set up',user,active:'',body:V.workerOnboard()}));
       if(p==='/app/onboard' && method==='POST'){
         const b = await readBody(req);
-        const vals = [b.trade, Number(b.years_exp)||0, b.city||'', b.zip||'', Number(b.pay_floor)||0, b.shift||'Any'];
-        if(prof) await db.prepare('UPDATE worker_profiles SET trade=?,years_exp=?,city=?,zip=?,pay_floor=?,shift=? WHERE user_id=?').run(...vals,user.id);
-        else await db.prepare('INSERT INTO worker_profiles(user_id,trade,years_exp,city,zip,pay_floor,shift) VALUES(?,?,?,?,?,?,?)').run(user.id,...vals);
+        const trades = normTrades(b.trades);
+        const trade = trades[0] || b.trade || 'electrician';
+        const tradesCsv = (trades.length?trades:[trade]).join(',');
+        const headline = String(b.headline||'').slice(0,80);
+        const about = String(b.about||'').slice(0,600);
+        const vals = [trade, tradesCsv, headline, about, Number(b.years_exp)||0, b.city||'', b.zip||'', Number(b.pay_floor)||0, b.shift||'Any'];
+        if(prof) await db.prepare('UPDATE worker_profiles SET trade=?,trades=?,headline=?,about=?,years_exp=?,city=?,zip=?,pay_floor=?,shift=? WHERE user_id=?').run(...vals,user.id);
+        else await db.prepare('INSERT INTO worker_profiles(user_id,trade,trades,headline,about,years_exp,city,zip,pay_floor,shift) VALUES(?,?,?,?,?,?,?,?,?,?)').run(user.id,...vals);
         await recomputeReadiness(user.id);
         return redirect(res,'/app');
       }
@@ -385,7 +412,35 @@ const server = http.createServer(async (req,res)=>{
       }
       if(p==='/app/profile' && method==='GET'){
         const portfolio = await db.prepare("SELECT * FROM media WHERE user_id=? AND target='portfolio' ORDER BY created_at DESC, id DESC").all(user.id);
-        return send(res, V.layout({title:'Work Card',user,active:'profile',body:V.workerProfile({user,profile:prof,creds:await getCreds(user.id),portfolio})}));
+        const work = await getWorkHistory(user.id);
+        return send(res, V.layout({title:'Work Card',user,active:'profile',body:V.workerProfile({user,profile:prof,creds:await getCreds(user.id),portfolio,work})}));
+      }
+      if(p==='/app/profile/details' && method==='POST'){
+        const b = await readBody(req);
+        const trades = normTrades(b.trades);
+        const trade = trades[0] || prof.trade;
+        const tradesCsv = (trades.length?trades:[trade]).join(',');
+        await db.prepare('UPDATE worker_profiles SET trade=?,trades=?,headline=?,about=? WHERE user_id=?')
+          .run(trade, tradesCsv, String(b.headline||'').slice(0,80), String(b.about||'').slice(0,600), user.id);
+        await recomputeReadiness(user.id);
+        return redirect(res,'/app/profile');
+      }
+      if(p==='/app/experience' && method==='POST'){
+        const b = await readBody(req);
+        const role = String(b.role||'').trim().slice(0,80);
+        if(role){
+          const sy = Number(b.start_year)||null, ey = Number(b.end_year)||null;
+          await db.prepare(`INSERT INTO work_history(user_id,employer,role,trade,city,start_year,end_year,current,description)
+            VALUES(?,?,?,?,?,?,?,?,?)`).run(user.id,
+            String(b.employer||'').slice(0,80), role, String(b.trade||'').slice(0,40), String(b.city||'').slice(0,60),
+            sy, ey, ey?0:1, String(b.description||'').slice(0,400));
+        }
+        return redirect(res,'/app/profile');
+      }
+      const expDel = p.match(/^\/app\/experience\/(\d+)\/delete$/);
+      if(expDel && method==='POST'){
+        await db.prepare('DELETE FROM work_history WHERE id=? AND user_id=?').run(Number(expDel[1]), user.id);
+        return redirect(res,'/app/profile');
       }
       if(p==='/app/credentials' && method==='POST'){
         const b = await readBody(req);
@@ -444,7 +499,7 @@ const server = http.createServer(async (req,res)=>{
       if(jid && p===`/app/jobs/${jid}` && method==='GET'){
         const job = await db.prepare(`SELECT j.*,u.company FROM jobs j JOIN users u ON u.id=j.employer_id WHERE j.id=?`).get(jid);
         if(!job) return send(res, V.layout({title:'Not found',user,body:'<section class="wrap"><div class="card">Job not found.</div></section>'}),404);
-        const match = M.scoreMatch(prof, await getCreds(user.id), job);
+        const match = bestMatch(prof, await getCreds(user.id), job);
         const applied = !!(await db.prepare('SELECT 1 FROM applications WHERE job_id=? AND worker_id=?').get(jid,user.id));
         const saved = !!(await db.prepare('SELECT 1 FROM saved_jobs WHERE worker_id=? AND job_id=?').get(user.id, jid));
         const jobMedia = await db.prepare("SELECT * FROM media WHERE job_id=? AND target='job' ORDER BY created_at DESC, id DESC").all(jid);
@@ -452,7 +507,7 @@ const server = http.createServer(async (req,res)=>{
       }
       if(jid && p===`/app/jobs/${jid}/apply` && method==='POST'){
         const job = await db.prepare('SELECT * FROM jobs WHERE id=?').get(jid);
-        if(job){ const m=M.scoreMatch(prof,await getCreds(user.id),job);
+        if(job){ const m=bestMatch(prof,await getCreds(user.id),job);
           try{ await db.prepare('INSERT INTO applications(job_id,worker_id,stage,score) VALUES(?,?,?,?)').run(jid,user.id,'Sourced',m.score); }catch(e){}
         }
         return redirect(res, `/app/jobs/${jid}`);
@@ -540,7 +595,7 @@ const server = http.createServer(async (req,res)=>{
         const b = await readBody(req); const jobId=Number(addMatch[1]);
         const job = await db.prepare('SELECT * FROM jobs WHERE id=?').get(jobId);
         const wid = Number(b.worker_id);
-        if(job && wid){ const prof=await getProfile(wid); const m=M.scoreMatch(prof,await getCreds(wid),job);
+        if(job && wid){ const prof=await getProfile(wid); const m=bestMatch(prof,await getCreds(wid),job);
           try{ await db.prepare('INSERT INTO applications(job_id,worker_id,stage,score) VALUES(?,?,?,?)').run(jobId,wid,'Sourced',m.score);}catch(e){} }
         return redirect(res, `/console/jobs/${jobId}`);
       }
@@ -646,14 +701,15 @@ const server = http.createServer(async (req,res)=>{
         if(!w || !prof) return send(res, V.layout({title:'Candidate',user,active:'search',body:'<section class="wrap narrow"><a class="back" href="/console/search">← Talent Search</a><div class="card">Candidate not found.</div></section>'}),404);
         const creds = await getCreds(wid);
         const jobs = await db.prepare('SELECT * FROM jobs WHERE employer_id=? ORDER BY created_at DESC').all(user.id);
-        const matches = jobs.map(j=>{ const r=M.scoreMatch(prof,creds,j); return {job:j, score:r.score, breakdown:r.breakdown, missing:r.missing}; }).sort((a,b)=>b.score-a.score);
+        const matches = jobs.map(j=>{ const r=bestMatch(prof,creds,j); return {job:j, score:r.score, breakdown:r.breakdown, missing:r.missing}; }).sort((a,b)=>b.score-a.score);
         const apps = jobs.length ? await db.prepare(`SELECT job_id,stage FROM applications WHERE worker_id=? AND job_id IN (${jobs.map(()=>'?').join(',')})`).all(wid, ...jobs.map(j=>j.id)) : [];
         const messages = await db.prepare(`SELECT * FROM messages WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=?) ORDER BY created_at, id`).all(user.id, wid, wid, user.id);
         await db.prepare("UPDATE messages SET read_at=datetime('now') WHERE to_id=? AND from_id=? AND read_at IS NULL").run(user.id, wid);
         const notes = await db.prepare('SELECT * FROM notes WHERE author_id=? AND worker_id=? ORDER BY created_at DESC, id DESC').all(user.id, wid);
         const saved = !!(await db.prepare('SELECT 1 FROM saved_candidates WHERE employer_id=? AND worker_id=?').get(user.id, wid));
         const portfolio = await db.prepare("SELECT * FROM media WHERE user_id=? AND target='portfolio' ORDER BY created_at DESC, id DESC").all(wid);
-        return send(res, V.layout({title:w.name,user,active:'search',body:V.empCandidate({worker:w,profile:prof,creds,matches,apps,messages,meId:user.id,notes,saved,portfolio})}));
+        const work = await getWorkHistory(wid);
+        return send(res, V.layout({title:w.name,user,active:'search',body:V.empCandidate({worker:w,profile:prof,creds,matches,apps,messages,meId:user.id,notes,saved,portfolio,work})}));
       }
     }
 

@@ -172,6 +172,15 @@ async function createSchema() {
       zip TEXT PRIMARY KEY, lat REAL, lon REAL, city TEXT,
       updated_at TEXT DEFAULT (datetime('now'))
     );
+    CREATE TABLE IF NOT EXISTS work_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER REFERENCES users(id),
+      employer TEXT, role TEXT, trade TEXT,
+      city TEXT, start_year INTEGER, end_year INTEGER, current INTEGER DEFAULT 0,
+      description TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_work_history_user ON work_history(user_id);
     CREATE INDEX IF NOT EXISTS idx_messages_to ON messages(to_id, read_at);
     CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_id, to_id);
     CREATE INDEX IF NOT EXISTS idx_applications_worker ON applications(worker_id);
@@ -380,6 +389,47 @@ async function seedMedia(){
   console.log('[db] demo media seeded — portfolio pieces + job photos');
 }
 
+// ---- demo work history + multi-trade + headlines/about (idempotent) ----
+async function seedExperience(){
+  if (await metaGet('experience_v1')) return;
+  const wId = async (email) => { const u = await db.prepare('SELECT id FROM users WHERE email=?').get(email); return u && u.id; };
+  // [email, tradesCsv, headline, about]
+  const profiles = [
+    ['marcus@rivet.test','electrician,solar,low_voltage','Journeyman electrician — commercial & solar','15 years running commercial fit-outs, service upgrades, and rooftop PV across the Valley. OSHA-30, clean record, lead-ready.'],
+    ['andre@rivet.test','hvac,controls','HVAC service tech — light commercial & controls','EPA 608 Universal. RTUs, splits, and building controls. Days preferred, available now.'],
+    ['tasha@rivet.test','plumber,pipefitter','Journeyman plumber — commercial repipes','Commercial service, repipes, and process piping. Journeyman card + OSHA 10.'],
+    ['omar@rivet.test','welder,pipefitter,ironworker','Structural & pipe welder — FCAW/SMAW/TIG','9 years structural steel and process piping. AWS-tested, comfortable at height.'],
+    ['will@rivet.test','cdl_driver,heavy_equipment','CDL driver & equipment operator','Class A CDL. Material delivery, skid steer, and loader experience.'],
+  ];
+  for (const [email, trades, headline, about] of profiles){
+    const uid = await wId(email); if(!uid) continue;
+    const first = trades.split(',')[0];
+    try { await db.prepare('UPDATE worker_profiles SET trades=?, headline=?, about=?, trade=? WHERE user_id=?').run(trades, headline, about, first, uid); } catch(e){}
+  }
+  // [email, employer, role, trade, city, start_year, end_year(null=current), description]
+  const history = [
+    ['marcus@rivet.test','Copper Mountain Builders','Lead Electrician','electrician','Phoenix',2019,null,'Run crews of 4–6 on commercial fit-outs and service upgrades; pull permits and coordinate inspections.'],
+    ['marcus@rivet.test','SunRay Solar','Solar Installer','solar','Tempe',2016,2019,'Rooftop and ground-mount PV installs; string sizing and inverter commissioning.'],
+    ['marcus@rivet.test','Apprenticeship — IEC','Apprentice Electrician','electrician','Phoenix',2012,2016,'Completed 4-year apprenticeship; residential and light commercial.'],
+    ['andre@rivet.test','Sun Valley Facilities','HVAC Service Technician','hvac','Phoenix',2020,null,'Service and repair RTUs, splits, and chillers for light-commercial accounts.'],
+    ['andre@rivet.test','Desert Air Mechanical','HVAC Installer','hvac','Mesa',2017,2020,'New-construction installs and changeouts; brazing and startup.'],
+    ['tasha@rivet.test','Valley Plumbing Co.','Journeyman Plumber','plumber','Phoenix',2018,null,'Commercial service, repipes, and fixture rough-in.'],
+    ['tasha@rivet.test','Industrial Piping LLC','Pipefitter','pipefitter','Phoenix',2015,2018,'Process piping for food & beverage plants.'],
+    ['omar@rivet.test','Steelworks AZ','Structural Welder','welder','Phoenix',2018,null,'Structural steel for commercial builds; FCAW and SMAW, certified.'],
+    ['omar@rivet.test','Phoenix Pipe & Fab','Pipe Welder','pipefitter','Phoenix',2015,2018,'TIG/SMAW on carbon and stainless process lines.'],
+    ['will@rivet.test','Copper Mountain Builders','CDL Driver','cdl_driver','Phoenix',2021,null,'Material delivery between yard and active job sites.'],
+  ];
+  for (const [email, employer, role, trade, city, sy, ey, desc] of history){
+    const uid = await wId(email); if(!uid) continue;
+    try {
+      await db.prepare(`INSERT INTO work_history(user_id,employer,role,trade,city,start_year,end_year,current,description)
+        VALUES(?,?,?,?,?,?,?,?,?)`).run(uid, employer, role, trade, city, sy, ey, ey?0:1, desc);
+    } catch(e){}
+  }
+  await metaSet('experience_v1','1');
+  console.log('[db] demo work history + multi-trade profiles seeded');
+}
+
 async function migrate() {
   // additive column migrations (idempotent — errors swallowed when already applied)
   try { await db.exec('ALTER TABLE users ADD COLUMN phone TEXT'); } catch (e) { /* column exists */ }
@@ -387,6 +437,9 @@ async function migrate() {
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN available INTEGER DEFAULT 1'); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN work_today INTEGER DEFAULT 0'); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN alerts INTEGER DEFAULT 0'); } catch (e) { /* column exists */ }
+  try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN trades TEXT'); } catch (e) { /* column exists */ }
+  try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN headline TEXT'); } catch (e) { /* column exists */ }
+  try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN about TEXT'); } catch (e) { /* column exists */ }
 }
 
 async function seedZips() {
@@ -433,6 +486,7 @@ async function init() {
   try { await enrichDemo(); } catch (e) { console.error('[db] enrich skipped (non-fatal):', e.message); }
   try { await seedRealism(); } catch (e) { console.error('[db] realism skipped (non-fatal):', e.message); }
   try { await seedMedia(); } catch (e) { console.error('[db] media seed skipped (non-fatal):', e.message); }
+  try { await seedExperience(); } catch (e) { console.error('[db] experience seed skipped (non-fatal):', e.message); }
 }
 
 module.exports = { db, init, hashPassword, verifyPassword, recomputeReadiness };

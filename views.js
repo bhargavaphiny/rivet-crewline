@@ -157,7 +157,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=18">
+  <link rel="stylesheet" href="/styles.css?v=19">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -303,14 +303,21 @@ function phoneVerify({ phone, demoCode='', error='' }){
 }
 
 // ---------- worker onboarding ----------
+function tradeCheckboxes(selected = []) {
+  const sel = new Set(selected);
+  return Object.entries(TRADES).map(([k,v])=>`<label class="tradechk"><input type="checkbox" name="trades" value="${k}" ${sel.has(k)?'checked':''}><span>${tradeEmoji(k)} ${v}</span></label>`).join('');
+}
 function workerOnboard(error='') {
-  const opts = Object.entries(TRADES).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
   return `<section class="wrap narrow"><div class="card">
     <h2>Set up your Work Card</h2>
-    <p class="muted">This drives your matches and readiness score.</p>
+    <p class="muted">This is what employers see. It drives your matches and readiness score.</p>
     ${error?`<div class="err">${esc(error)}</div>`:''}
     <form method="post" action="/app/onboard">
-      <label>Trade <select name="trade">${opts}</select></label>
+      <label>Headline <input name="headline" maxlength="80" placeholder="e.g. Journeyman electrician — commercial & solar"></label>
+      <div class="fieldset">
+        <div class="fs-lbl">Your trades <span class="muted">pick all you work</span></div>
+        <div class="tradegrid">${tradeCheckboxes(['electrician'])}</div>
+      </div>
       <div class="row2">
         <label>Years experience <input type="number" name="years_exp" min="0" value="3"></label>
         <label>Pay floor ($/hr) <input type="number" name="pay_floor" min="0" value="30"></label>
@@ -319,9 +326,10 @@ function workerOnboard(error='') {
         <label>City <input name="city" value="Phoenix"></label>
         <label>ZIP <input name="zip" value="85004"></label>
       </div>
-      <label>Shift
+      <label>Preferred shift
         <select name="shift"><option>Day</option><option>Night</option><option>4x10</option><option>Any</option></select>
       </label>
+      <label>About you <textarea name="about" rows="3" maxlength="600" placeholder="Where you've worked, what you're great at, what you're looking for."></textarea></label>
       <button class="btn full" type="submit">Save & see matches</button>
     </form>
   </div></section>`;
@@ -487,13 +495,40 @@ function workerApplications({ apps, savedJobs }) {
 function bd(label,val,max){const pct=Math.round(val/max*100);return `<div class="bd"><span>${label}</span><div class="bdbar"><i style="width:${pct}%"></i></div><b>${val}/${max}</b></div>`;}
 
 // ---------- worker: profile / work card ----------
-function workerProfile({ user, profile, creds, error, portfolio = [] }) {
+function tradeChips(profile){
+  return tradesOf(profile).map(t=>`<span class="chip">${tradeEmoji(t)} ${TRADES[t]||t}</span>`).join('');
+}
+function tradesOf(profile){
+  const raw = (profile && (profile.trades || profile.trade)) || '';
+  const arr = String(raw).split(',').map(s=>s.trim()).filter(Boolean);
+  return arr.length ? arr : (profile && profile.trade ? [profile.trade] : []);
+}
+function workRow(w, editable){
+  const yrs = w.current ? `${w.start_year||''}–Present` : `${w.start_year||''}${w.end_year?('–'+w.end_year):''}`;
+  return `<div class="exp">
+    <div class="exp-ic">${tradeEmoji(w.trade)}</div>
+    <div class="exp-main">
+      <div class="exp-top"><b>${esc(w.role||'')}</b>${w.current?'<span class="chip sm green">Current</span>':''}</div>
+      <div class="muted">${esc(w.employer||'')}${w.city?(' · '+esc(w.city)):''}${yrs?(' · '+esc(yrs)):''}</div>
+      ${w.description?`<p class="exp-d">${esc(w.description)}</p>`:''}
+    </div>
+    ${editable?`<form method="post" action="/app/experience/${w.id}/delete"><button class="x" title="Remove">✕</button></form>`:''}
+  </div>`;
+}
+function workHistoryList(items, editable){
+  return items.length ? `<div class="explist">${items.map(w=>workRow(w, editable)).join('')}</div>`
+    : (editable ? '<p class="muted">No past jobs added yet — add the places you’ve worked below. This is what recruiters trust most.</p>' : '');
+}
+function workerProfile({ user, profile, creds, error, portfolio = [], work = [] }) {
   const kinds = Object.entries(CRED_KINDS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
+  const trades = tradesOf(profile);
   return `<section class="wrap narrow">
     <div class="card profile-head">
       <div class="big-av">${initials(user.name)}</div>
       <h2>${esc(user.name)}</h2>
-      <p class="muted">${TRADES[profile.trade]||profile.trade} · ${esc(profile.city)} · ${profile.years_exp} yrs · floor $${profile.pay_floor}/hr</p>
+      ${profile.headline?`<p class="headline">${esc(profile.headline)}</p>`:''}
+      <div class="chips">${tradeChips(profile)}</div>
+      <p class="muted">${esc(profile.city)} · ${profile.years_exp} yrs · floor $${profile.pay_floor}/hr · ${esc(profile.shift)} shift</p>
       <div class="ministats">
         <div><b>${profile.readiness}</b><span>READINESS</span></div>
         <div><b>${creds.filter(c=>c.verified).length}</b><span>VERIFIED</span></div>
@@ -507,6 +542,39 @@ function workerProfile({ user, profile, creds, error, portfolio = [] }) {
       </form>
       <form method="post" action="/app/alerts" class="avail-form" style="margin-top:8px">
         <button class="btn-sm ${profile.alerts?'':'ghost'}">${profile.alerts?'🔔 Job alerts ON — tap to stop':'🔔 Text me new job alerts'}</button>
+      </form>
+    </div>
+    <div class="card">
+      <div class="sec-h" style="margin-top:0">Trades, headline & about</div>
+      ${error?`<div class="err">${esc(error)}</div>`:''}
+      <form method="post" action="/app/profile/details">
+        <label>Headline <input name="headline" maxlength="80" value="${esc(profile.headline||'')}" placeholder="e.g. Journeyman electrician — commercial & solar"></label>
+        <div class="fieldset">
+          <div class="fs-lbl">Your trades <span class="muted">pick all you work</span></div>
+          <div class="tradegrid">${tradeCheckboxes(trades)}</div>
+        </div>
+        <label>About you <textarea name="about" rows="3" maxlength="600" placeholder="Where you've worked, what you're great at, what you're looking for.">${esc(profile.about||'')}</textarea></label>
+        <button class="btn-sm">Save details</button>
+      </form>
+    </div>
+    <div class="card">
+      <div class="sec-h" style="margin-top:0">Work history</div>
+      ${workHistoryList(work, true)}
+      <form method="post" action="/app/experience" class="exp-form">
+        <div class="row2">
+          <label>Role / title <input name="role" maxlength="80" required placeholder="e.g. Lead Electrician"></label>
+          <label>Employer <input name="employer" maxlength="80" placeholder="e.g. Sun Valley Electric"></label>
+        </div>
+        <div class="row2">
+          <label>Trade <select name="trade">${trades.length?trades.map(t=>`<option value="${t}">${TRADES[t]||t}</option>`).join(''):Object.entries(TRADES).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></label>
+          <label>City <input name="city" maxlength="60" placeholder="e.g. Phoenix"></label>
+        </div>
+        <div class="row2">
+          <label>From year <input type="number" name="start_year" min="1960" max="2026" placeholder="2019"></label>
+          <label>To year <input type="number" name="end_year" min="1960" max="2026" placeholder="2023 (blank = current)"></label>
+        </div>
+        <label>What you did <textarea name="description" rows="2" maxlength="400" placeholder="Scope, scale, what you were responsible for."></textarea></label>
+        <button class="btn-sm">Add to work history</button>
       </form>
     </div>
     <div class="card">
@@ -536,11 +604,13 @@ function workerProfile({ user, profile, creds, error, portfolio = [] }) {
 }
 
 // ---------- public shareable portfolio ----------
-function publicPortfolio({ worker, profile, creds, portfolio }) {
+function publicPortfolio({ worker, profile, creds, portfolio, work = [] }) {
   return `<section class="hero pub-hero"><div class="wrap">
       <span class="tag">Verified on Rivet</span>
       <h1>${esc(worker.name)}</h1>
-      <p class="lead">${TRADES[profile.trade]||profile.trade} · ${esc(profile.city)} · ${profile.years_exp} years experience</p>
+      ${profile.headline?`<p class="lead">${esc(profile.headline)}</p>`:''}
+      <div class="chips light">${tradeChips(profile)}</div>
+      <p class="lead">${esc(profile.city)} · ${profile.years_exp} years experience</p>
       <div class="pub-stats">
         <div><b>${profile.readiness}</b><span>Job-readiness</span></div>
         <div><b>${creds.filter(c=>c.verified).length}</b><span>Verified credentials</span></div>
@@ -548,7 +618,8 @@ function publicPortfolio({ worker, profile, creds, portfolio }) {
       </div>
     </div></section>
     <section class="wrap narrow">
-      ${profile.bio?`<div class="card"><p>${esc(profile.bio)}</p></div>`:''}
+      ${(profile.about||profile.bio)?`<div class="card"><div class="sec-h" style="margin-top:0">About</div><p>${esc(profile.about||profile.bio)}</p></div>`:''}
+      ${work.length?`<div class="card"><div class="sec-h" style="margin-top:0">Work history</div>${workHistoryList(work, false)}</div>`:''}
       <div class="card">
         <div class="sec-h" style="margin-top:0">Verified credentials</div>
         ${creds.filter(c=>c.verified).map(credRow).join('') || '<p class="muted">No verified credentials listed.</p>'}
@@ -746,7 +817,7 @@ function inbox({ convos, base, meId }){
 }
 
 // ---------- employer: candidate detail ----------
-function empCandidate({ worker, profile, creds, matches, apps, messages, meId, notes = [], saved = false, portfolio = [] }) {
+function empCandidate({ worker, profile, creds, matches, apps, messages, meId, notes = [], saved = false, portfolio = [], work = [] }) {
   const stageByJob = {}; for (const a of apps) stageByJob[a.job_id] = a.stage;
   return `<section class="wrap narrow">
     <div class="cand-top"><a class="back" href="/console/search">← Talent Search</a>
@@ -757,15 +828,18 @@ function empCandidate({ worker, profile, creds, matches, apps, messages, meId, n
     <div class="card profile-head">
       <div class="big-av">${initials(worker.name)}</div>
       <h2>${esc(worker.name)}</h2>
-      <p class="muted">${TRADES[profile.trade]||profile.trade} · ${esc(profile.city)} ${esc(profile.zip||'')} · ${profile.years_exp} yrs experience · seeks $${profile.pay_floor}+/hr</p>
+      ${profile.headline?`<p class="headline">${esc(profile.headline)}</p>`:''}
+      <div class="chips">${tradeChips(profile)}</div>
+      <p class="muted">${esc(profile.city)} ${esc(profile.zip||'')} · ${profile.years_exp} yrs experience · seeks $${profile.pay_floor}+/hr</p>
       ${profile.available?'<div class="avail-badge">🟢 Available for work</div>':'<div class="avail-badge off">⚪ Not currently available</div>'}${profile.work_today?'<div class="avail-badge today">⚡ Can work today</div>':''}
       <div class="ministats">
         <div><b>${profile.readiness}</b><span>READINESS</span></div>
         <div><b>${creds.filter(c=>c.verified).length}</b><span>VERIFIED</span></div>
         <div><b>${creds.length}</b><span>CREDENTIALS</span></div>
       </div>
-      ${profile.bio?`<p class="cand-bio">${esc(profile.bio)}</p>`:''}
+      ${(profile.about||profile.bio)?`<p class="cand-bio">${esc(profile.about||profile.bio)}</p>`:''}
     </div>
+    ${work.length?`<div class="card"><div class="sec-h" style="margin-top:0">Work history</div>${workHistoryList(work, false)}</div>`:''}
     <div class="card">
       <div class="sec-h" style="margin-top:0">Credential wallet</div>
       ${creds.map(credRow).join('') || '<p class="muted">No credentials listed yet.</p>'}
