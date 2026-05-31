@@ -297,6 +297,35 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--brand)}
 .vbar{display:block;width:62%;min-height:2px;border-radius:5px 5px 0 0;background:linear-gradient(180deg,var(--brand),var(--amber))}
 .vbar-n{font-size:11px;font-weight:800;color:var(--slate)}
 .vbar-l{font-size:10px;color:var(--muted)}
+/* ratings & reviews */
+.stars{display:inline-flex;gap:1px;vertical-align:middle}
+.star{color:#d9cdb6;font-size:15px;line-height:1}
+.star.on{color:var(--amber)}
+.rating{display:inline-flex;align-items:center;gap:6px;font-size:14px}
+.rating-row{margin:6px 0}
+.rating-row.light .star{color:#7d6f57}.rating-row.light .star.on{color:var(--amber)}
+.rating-row.sm{margin:2px 0}
+.revlist{display:flex;flex-direction:column;gap:12px}
+.rev{border-top:1px solid var(--line);padding-top:10px}
+.rev:first-child{border-top:0;padding-top:0}
+.rev-top{display:flex;align-items:center;gap:8px;font-size:13px}
+.rev-t{color:var(--muted);font-size:11.5px;margin-left:auto}
+.rev-b{margin:5px 0 0;font-size:13.5px;color:var(--slate)}
+.rev-cta{margin-top:12px;border-top:1px dashed var(--line);padding-top:12px}
+.rev-form{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.rev-form select{flex:0 0 auto}
+.rev-form input{flex:1;min-width:160px}
+.ok-card.sm{font-size:13px;padding:8px 12px}
+/* interviews */
+.iv{margin-top:10px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px}
+.iv.ok{background:#e9f3ec;border-color:#bcd9c4}
+.iv-h{font-weight:700;margin-bottom:4px}
+.slot-chip{display:inline-block;background:#fff;border:1px solid var(--line);border-radius:7px;padding:2px 8px;margin:2px 3px 0 0;font-size:12px}
+.iv-form{margin-top:10px}
+.iv-slots{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.iv-slots input{flex:1;min-width:150px;font-size:12.5px}
+.iv-pick{display:flex;gap:8px;flex-wrap:wrap}
+.iv-pick form{margin:0}
 .act{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:13px}
 .act:first-child{border-top:0}
 .act-b{flex:1}

@@ -229,6 +229,15 @@ async function rankWorkersForJob(job){
   return out.sort((a,b)=>b.score-a.score);
 }
 
+// ---------- ratings & reviews ----------
+async function ratingFor(subjectId, kind){
+  const r = await db.prepare('SELECT AVG(stars) avg, COUNT(*) c FROM reviews WHERE subject_id=? AND subject_kind=?').get(subjectId, kind);
+  return { avg: r && r.avg ? Number(r.avg) : 0, count: r ? r.c : 0 };
+}
+async function reviewsFor(subjectId, kind, limit=8){
+  return db.prepare('SELECT * FROM reviews WHERE subject_id=? AND subject_kind=? ORDER BY created_at DESC, id DESC LIMIT ?').all(subjectId, kind, limit);
+}
+
 // ---------- geo / distance ----------
 function haversineMi(a, b){
   if(!a || !b) return null;
@@ -449,7 +458,9 @@ const server = http.createServer(async (req,res)=>{
       const creds = await getCreds(wid);
       const portfolio = await db.prepare("SELECT * FROM media WHERE user_id=? AND target='portfolio' ORDER BY created_at DESC, id DESC").all(wid);
       const work = await getWorkHistory(wid);
-      return send(res, V.layout({title:`${worker.name} — Trades portfolio`, user, body:V.publicPortfolio({worker,profile,creds,portfolio,work})}));
+      const rating = await ratingFor(wid, 'worker');
+      const reviews = await reviewsFor(wid, 'worker');
+      return send(res, V.layout({title:`${worker.name} — Trades portfolio`, user, body:V.publicPortfolio({worker,profile,creds,portfolio,work,rating,reviews})}));
     }
 
     if(p==='/signup' && method==='POST'){
@@ -549,6 +560,7 @@ const server = http.createServer(async (req,res)=>{
         if(prof) await db.prepare('UPDATE worker_profiles SET trade=?,trades=?,headline=?,about=?,years_exp=?,city=?,zip=?,pay_floor=?,shift=? WHERE user_id=?').run(...vals,user.id);
         else await db.prepare('INSERT INTO worker_profiles(user_id,trade,trades,headline,about,years_exp,city,zip,pay_floor,shift) VALUES(?,?,?,?,?,?,?,?,?,?)').run(user.id,...vals);
         await recomputeReadiness(user.id);
+        try { await geocodeZip(b.zip); } catch(e){} // pin new worker on the map immediately
         return redirect(res,'/app');
       }
 
@@ -609,7 +621,7 @@ const server = http.createServer(async (req,res)=>{
       if(p==='/app/profile' && method==='GET'){
         const portfolio = await db.prepare("SELECT * FROM media WHERE user_id=? AND target='portfolio' ORDER BY created_at DESC, id DESC").all(user.id);
         const work = await getWorkHistory(user.id);
-        return send(res, V.layout({title:'Work Card',user,active:'profile',body:V.workerProfile({user,profile:prof,creds:await getCreds(user.id),portfolio,work})}));
+        return send(res, V.layout({title:'Work Card',user,active:'profile',body:V.workerProfile({user,profile:prof,creds:await getCreds(user.id),portfolio,work,rating:await ratingFor(user.id,'worker')})}));
       }
       if(p==='/app/profile/details' && method==='POST'){
         const b = await readBody(req);
@@ -681,7 +693,7 @@ const server = http.createServer(async (req,res)=>{
         return send(res, V.layout({title:'Learn & get certified',user,active:'training',body:V.workerTraining({have})}));
       }
       if(p==='/app/applications' && method==='GET'){
-        const apps = await db.prepare(`SELECT a.*, j.title,j.trade,j.pay_min,j.pay_max,j.city,j.zip,u.company
+        const apps = await db.prepare(`SELECT a.*, j.title,j.trade,j.pay_min,j.pay_max,j.city,j.zip,u.company,u.id employer_id
           FROM applications a JOIN jobs j ON j.id=a.job_id JOIN users u ON u.id=j.employer_id
           WHERE a.worker_id=? ORDER BY a.created_at DESC`).all(user.id);
         const savedJobs = await db.prepare(`SELECT j.*, u.company FROM saved_jobs s
@@ -692,7 +704,39 @@ const server = http.createServer(async (req,res)=>{
         const dist = async z => { if(!home||!z) return null; if(!(z in zc)) zc[z]=await geocodeZip(z); return zc[z]?haversineMi(home,zc[z]):null; };
         for(const a of apps) a.distance = await dist(a.zip);
         for(const j of savedJobs) j.distance = await dist(j.zip);
-        return send(res, V.layout({title:'Applications',user,active:'apps',body:V.workerApplications({apps, savedJobs})}));
+        const interviews = await db.prepare(`SELECT iv.*, j.title, u.company FROM interviews iv
+          JOIN jobs j ON j.id=iv.job_id JOIN users u ON u.id=iv.employer_id
+          WHERE iv.worker_id=? ORDER BY iv.status='proposed' DESC, iv.created_at DESC`).all(user.id);
+        const myRev = await db.prepare("SELECT job_id,stars FROM reviews WHERE author_id=? AND subject_kind='employer'").all(user.id);
+        const empReviews = {}; for(const r of myRev) empReviews[r.job_id] = r;
+        return send(res, V.layout({title:'Applications',user,active:'apps',body:V.workerApplications({apps, savedJobs, interviews, empReviews})}));
+      }
+      // worker rates an employer they worked for (Hired)
+      if(p==='/app/reviews' && method==='POST'){
+        const b = await readBody(req);
+        const jobId = Number(b.job_id)||0, empId = Number(b.employer_id)||0;
+        const stars = Math.max(1, Math.min(5, Number(b.stars)||0));
+        const ok = jobId && await db.prepare("SELECT 1 FROM applications WHERE job_id=? AND worker_id=? AND stage='Hired'").get(jobId, user.id);
+        if(ok && empId && stars){
+          try { await db.prepare(`INSERT INTO reviews(author_id,author_name,subject_id,subject_kind,stars,body,job_id)
+            VALUES(?,?,?,'employer',?,?,?)`).run(user.id, user.name, empId, stars, String(b.body||'').slice(0,400), jobId); } catch(e){}
+        }
+        return redirect(res, '/app/applications');
+      }
+      // worker accepts an interview slot
+      const ivAccept = p.match(/^\/app\/interviews\/(\d+)\/accept$/);
+      if(ivAccept && method==='POST'){
+        const ivId = Number(ivAccept[1]); const b = await readBody(req);
+        const iv = await db.prepare('SELECT * FROM interviews WHERE id=? AND worker_id=?').get(ivId, user.id);
+        if(iv && iv.status==='proposed'){
+          let slots = []; try { slots = JSON.parse(iv.slots); } catch(e){}
+          const chosen = String(b.chosen||'');
+          if(slots.includes(chosen)){
+            await db.prepare("UPDATE interviews SET chosen=?, status='confirmed' WHERE id=?").run(chosen, ivId);
+            try { await sendMessage(user.id, iv.employer_id, `I confirmed the interview. See you then.`); } catch(e){}
+          }
+        }
+        return redirect(res, '/app/applications');
       }
       const jid = qid(p);
       if(jid && p===`/app/jobs/${jid}/save` && method==='POST'){
@@ -710,7 +754,8 @@ const server = http.createServer(async (req,res)=>{
         const jobMedia = await db.prepare("SELECT * FROM media WHERE job_id=? AND target='job' ORDER BY created_at DESC, id DESC").all(jid);
         const distance = await workerDistance(prof, job.zip);
         const rules = M.localRules(job.city);
-        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied,saved,jobMedia,distance,rules})}));
+        const empRating = await ratingFor(job.employer_id, 'employer');
+        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied,saved,jobMedia,distance,rules,empRating})}));
       }
       if(jid && p===`/app/jobs/${jid}/apply` && method==='POST'){
         const job = await db.prepare('SELECT * FROM jobs WHERE id=?').get(jid);
@@ -790,7 +835,7 @@ const server = http.createServer(async (req,res)=>{
           kpis:{pipeline, hired, fillRate}, weekly, conv, topTrades, topJobs, avgScore, totalApps})}));
       }
       if(p==='/console/company' && method==='GET')
-        return send(res, V.layout({title:'Company profile',user,active:'',body:V.empCompany({user, saved:url.searchParams.get('saved')==='1'})}));
+        return send(res, V.layout({title:'Company profile',user,active:'',body:V.empCompany({user, saved:url.searchParams.get('saved')==='1', rating:await ratingFor(user.id,'employer'), reviews:await reviewsFor(user.id,'employer')})}));
       if(p==='/console/company' && method==='POST'){
         const b = await readBody(req);
         let site = String(b.company_website||'').trim().slice(0,200);
@@ -821,6 +866,7 @@ const server = http.createServer(async (req,res)=>{
         const info = await db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type)
           VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(user.id,b.title,b.trade,Number(b.pay_min)||0,Number(b.pay_max)||0,b.city||'',b.zip||'',b.shift||'Day',reqCreds,b.descr||'',empType);
         const jobId = info.lastInsertRowid;
+        try { await geocodeZip(b.zip); } catch(e){} // pin new job on the demand map immediately
         // SMS job alerts to matching, opted-in, available workers who have a phone
         let alerted = 0;
         try {
@@ -966,6 +1012,37 @@ const server = http.createServer(async (req,res)=>{
         else await db.prepare('INSERT INTO saved_candidates(employer_id,worker_id) VALUES(?,?)').run(user.id, wid);
         return redirect(res, `/console/candidates/${wid}`);
       }
+      // employer rates a worker they hired
+      const cReview = p.match(/^\/console\/candidates\/(\d+)\/review$/);
+      if(cReview && method==='POST'){
+        const wid = Number(cReview[1]); const b = await readBody(req);
+        const stars = Math.max(1, Math.min(5, Number(b.stars)||0));
+        const jobId = Number(b.job_id)||null;
+        // only allow if this worker is Hired on one of the employer's jobs
+        const ok = jobId && await db.prepare(`SELECT 1 FROM applications a JOIN jobs j ON j.id=a.job_id
+          WHERE a.worker_id=? AND a.job_id=? AND a.stage='Hired' AND j.employer_id=?`).get(wid, jobId, user.id);
+        if(ok && stars){
+          try { await db.prepare(`INSERT INTO reviews(author_id,author_name,subject_id,subject_kind,stars,body,job_id)
+            VALUES(?,?,?,'worker',?,?,?)`).run(user.id, user.company||user.name, wid, stars, String(b.body||'').slice(0,400), jobId); } catch(e){}
+        }
+        return redirect(res, `/console/candidates/${wid}`);
+      }
+      // employer proposes interview times to a candidate in their pipeline
+      if(p==='/console/interviews' && method==='POST'){
+        const b = await readBody(req);
+        const jobId = Number(b.job_id)||0, wid = Number(b.worker_id)||0;
+        const job = jobId && await db.prepare('SELECT id,title FROM jobs WHERE id=? AND employer_id=?').get(jobId, user.id);
+        const inPipe = job && await db.prepare('SELECT 1 FROM applications WHERE job_id=? AND worker_id=?').get(jobId, wid);
+        if(job && inPipe){
+          const slots = [b.slot1,b.slot2,b.slot3].map(s=>String(s||'').trim()).filter(Boolean);
+          if(slots.length){
+            try { await db.prepare(`INSERT INTO interviews(job_id,worker_id,employer_id,slots,status) VALUES(?,?,?,?,'proposed')`)
+              .run(jobId, wid, user.id, JSON.stringify(slots)); } catch(e){}
+            try { await sendMessage(user.id, wid, `Interview invite for "${job.title}" — open your Applications to pick a time.`); } catch(e){}
+          }
+        }
+        return redirect(res, `/console/candidates/${wid}`);
+      }
       if(p==='/console/shortlist' && method==='GET'){
         const rows = await db.prepare(`SELECT u.id,u.name,p.* FROM saved_candidates s
           JOIN users u ON u.id=s.worker_id JOIN worker_profiles p ON p.user_id=s.worker_id
@@ -989,7 +1066,14 @@ const server = http.createServer(async (req,res)=>{
         const saved = !!(await db.prepare('SELECT 1 FROM saved_candidates WHERE employer_id=? AND worker_id=?').get(user.id, wid));
         const portfolio = await db.prepare("SELECT * FROM media WHERE user_id=? AND target='portfolio' ORDER BY created_at DESC, id DESC").all(wid);
         const work = await getWorkHistory(wid);
-        return send(res, V.layout({title:w.name,user,active:'search',body:V.empCandidate({worker:w,profile:prof,creds,matches,apps,messages,meId:user.id,notes,saved,portfolio,work})}));
+        const rating = await ratingFor(wid, 'worker');
+        const reviews = await reviewsFor(wid, 'worker');
+        const hiredApp = apps.find(a=>a.stage==='Hired');
+        const canReviewJob = hiredApp ? hiredApp.job_id : null;
+        const myReview = canReviewJob ? await db.prepare('SELECT * FROM reviews WHERE author_id=? AND subject_id=? AND job_id=?').get(user.id, wid, canReviewJob) : null;
+        const ivRows = jobs.length ? await db.prepare(`SELECT * FROM interviews WHERE worker_id=? AND employer_id=? AND job_id IN (${jobs.map(()=>'?').join(',')})`).all(wid, user.id, ...jobs.map(j=>j.id)) : [];
+        const interviews = {}; for(const iv of ivRows) interviews[iv.job_id] = iv;
+        return send(res, V.layout({title:w.name,user,active:'search',body:V.empCandidate({worker:w,profile:prof,creds,matches,apps,messages,meId:user.id,notes,saved,portfolio,work,rating,reviews,canReviewJob,myReview,interviews})}));
       }
     }
 

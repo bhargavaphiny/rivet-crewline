@@ -203,6 +203,20 @@ const BUILTIN_ES = {
   'Job':'Empleo','Applicants':'Postulantes','No applicants yet.':'Aún no hay postulantes.','No jobs posted yet.':'Aún no has publicado empleos.',
   'Post a job':'Publicar un empleo','Post a job →':'Publicar un empleo →',
   'Analytics light up once candidates start flowing into your jobs. Post a role and source from Talent Search to get going.':'Las analíticas se activan cuando los candidatos empiezan a llegar a tus empleos. Publica un puesto y busca en Talento para comenzar.',
+  // phone verify (instant, correct)
+  'Enter your code':'Ingresa tu código','We sent a 6-digit code to':'Enviamos un código de 6 dígitos a','6-digit code':'Código de 6 dígitos',
+  'Verify & continue':'Verificar y continuar','Use a different number':'Usar otro número',
+  'Demo mode (no SMS provider connected yet): your code is':'Modo demo (aún sin proveedor de SMS): tu código es',
+  // reviews & interviews (instant, correct)
+  'No reviews yet':'Aún sin reseñas','No reviews yet.':'Aún sin reseñas.','review':'reseña','reviews':'reseñas','Rating':'Calificación',
+  'Share how it went…':'Cuenta cómo te fue…','Reviews':'Reseñas','You rated this hire':'Calificaste a este contratado',
+  'You hired this worker — leave a review:':'Contrataste a este trabajador — deja una reseña:','Submit review':'Enviar reseña',
+  'How was their work?':'¿Cómo fue su trabajo?','What workers say':'Lo que dicen los trabajadores',
+  'You reviewed this employer':'Reseñaste a este empleador','You worked here — rate the employer:':'Trabajaste aquí — califica al empleador:',
+  'How was working here?':'¿Cómo fue trabajar aquí?','About the employer':'Sobre el empleador',
+  'Interview confirmed':'Entrevista confirmada','Interview proposed':'Entrevista propuesta','waiting on candidate':'esperando al candidato',
+  'Propose interview times':'Proponer horarios de entrevista','Interview confirmed for':'Entrevista confirmada para',
+  'Interview invite':'Invitación a entrevista','Pick a time that works:':'Elige un horario que te sirva:','Interviews':'Entrevistas',
 };
 function T(s){
   if(LANG !== 'es' || !s) return s;
@@ -285,7 +299,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=46">
+  <link rel="stylesheet" href="/styles.css?v=47">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -418,16 +432,16 @@ function phoneStart({ role='worker', name='', phone='', error='' }){
 }
 function phoneVerify({ phone, demoCode='', error='' }){
   return `<section class="wrap narrow"><div class="card auth">
-    <h2>Enter your code</h2>
-    <p class="muted">We sent a 6-digit code to <b>${esc(phone)}</b>.</p>
-    ${demoCode?`<div class="ok-card">Demo mode (no SMS provider connected yet): your code is <b style="font-size:18px;letter-spacing:2px">${esc(demoCode)}</b></div>`:''}
+    <h2>${T('Enter your code')}</h2>
+    <p class="muted">${T('We sent a 6-digit code to')} <b>${esc(phone)}</b>.</p>
+    ${demoCode?`<div class="ok-card">${T('Demo mode (no SMS provider connected yet): your code is')} <b style="font-size:18px;letter-spacing:2px">${esc(demoCode)}</b></div>`:''}
     ${error?`<div class="err">${esc(error)}</div>`:''}
     <form method="post" action="/phone/verify">
       <input type="hidden" name="phone" value="${esc(phone)}">
-      <label>6-digit code <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]*" placeholder="123456" required></label>
-      <button class="btn full" type="submit">Verify &amp; continue</button>
+      <label>${T('6-digit code')} <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]*" placeholder="123456" required></label>
+      <button class="btn full" type="submit">${T('Verify & continue')}</button>
     </form>
-    <p class="muted"><a href="/phone">Use a different number</a></p>
+    <p class="muted"><a href="/phone">${T('Use a different number')}</a></p>
   </div></section>`;
 }
 
@@ -633,7 +647,7 @@ function workerJobs({ matches, filters = {}, jobsGeo = null }) {
 }
 
 // ---------- worker: job detail ----------
-function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance = null, rules = null }) {
+function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance = null, rules = null, empRating = {avg:0,count:0} }) {
   const belowMin = rules && job.pay_min && job.pay_min < rules.minWage;
   return `<section class="wrap narrow">
     <a class="back" href="/app/jobs">← All matches</a>
@@ -675,11 +689,12 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
           : `<form method="post" action="/app/jobs/${job.id}/apply"><button class="btn full">Apply with verified Work Card</button></form>`)}
       <form method="post" action="/app/jobs/${job.id}/save"><button class="btn full ghost">${saved?'★ Saved — remove':'☆ Save this job'}</button></form>
     </div>
-    ${(job.company_about||job.company_website||job.company_size)?`<div class="card">
-      <div class="sec-h" style="margin-top:0">About the employer</div>
+    ${(job.company_about||job.company_website||job.company_size||empRating.count)?`<div class="card">
+      <div class="sec-h" style="margin-top:0">${T('About the employer')}</div>
       <div class="job-row"><div class="big-av c sm">${initials(job.company||'')}</div>
         <div class="job-main"><b>${esc(job.company||'')}</b>
-          <div class="muted sm">${esc(job.company_city||'')}${job.company_size?` · ${esc(job.company_size)} employees`:''}</div></div></div>
+          <div class="muted sm">${esc(job.company_city||'')}${job.company_size?` · ${esc(job.company_size)} employees`:''}</div>
+          ${empRating.count?`<div class="rating-row sm">${ratingHead(empRating)}</div>`:''}</div></div>
       ${job.company_about?`<p class="descr" style="margin-top:10px">${esc(job.company_about)}</p>`:''}
       ${job.company_website?`<a class="nav-link" style="color:var(--brand-d)" href="${esc(job.company_website)}" target="_blank" rel="noopener">${esc(job.company_website)} ↗</a>`:''}
     </div>`:''}
@@ -733,8 +748,9 @@ function stageTimeline(current){
   const idx = STAGES.indexOf(current);
   return `<div class="timeline">${STAGES.map((s,i)=>`<div class="tl-step ${i<idx?'done':''}${i===idx?'now':''}"><span class="tl-dot"></span><span class="tl-lbl">${s}</span></div>`).join('')}</div>`;
 }
-function workerApplications({ apps, savedJobs }) {
+function workerApplications({ apps, savedJobs, interviews = [], empReviews = {} }) {
   return `<section class="wrap">
+    ${interviews.length ? `<div class="sec-h big">${T('Interviews')}</div>${interviews.map(interviewWorker).join('')}` : ''}
     <div class="sec-h big">${T('Your applications')}</div>
     ${apps.length ? apps.map(a=>`<div class="card app-card">
       <div class="job-row"><div class="badge">${tradeEmoji(a.trade)}</div>
@@ -742,6 +758,9 @@ function workerApplications({ apps, savedJobs }) {
           <div class="muted">${esc(a.company||'')} · ${esc(a.city)} · $${a.pay_min}–${a.pay_max}/hr${a.distance!=null?` · <b class="dist">${a.distance} ${T('mi away')}</b>`:''}</div></div>
         <span class="score-tag ${scoreClass(a.score)}">${a.score}</span></div>
       ${stageTimeline(a.stage)}
+      ${a.stage==='Hired' ? (empReviews[a.job_id]
+        ? `<div class="ok-card sm">${T('You reviewed this employer')} ${starBar(empReviews[a.job_id].stars)}</div>`
+        : `<div class="rev-cta"><div class="muted sm">${T('You worked here — rate the employer:')}</div>${reviewForm({action:'/app/reviews', hidden:{job_id:a.job_id, employer_id:a.employer_id}, label:T('Submit review'), prompt:T('How was working here?')})}</div>`) : ''}
     </div>`).join('') : `<div class="card muted">${T('No applications yet.')} <a href="/app/jobs">${T('Browse matches →')}</a></div>`}
     <div class="sec-h big" style="margin-top:26px">${T('Saved jobs')}</div>
     ${savedJobs.length ? savedJobs.map(j=>`<a class="jobline" href="/app/jobs/${j.id}">
@@ -781,7 +800,7 @@ function workHistoryList(items, editable){
   return items.length ? `<div class="explist">${items.map(w=>workRow(w, editable)).join('')}</div>`
     : (editable ? `<p class="muted">${T('No past jobs added yet — add the places you’ve worked below. This is what recruiters trust most.')}</p>` : '');
 }
-function workerProfile({ user, profile, creds, error, portfolio = [], work = [] }) {
+function workerProfile({ user, profile, creds, error, portfolio = [], work = [], rating = {avg:0,count:0} }) {
   const kinds = Object.entries(CRED_KINDS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
   const trades = tradesOf(profile);
   return `<section class="wrap">
@@ -790,6 +809,7 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [] 
       <h2>${esc(user.name)}</h2>
       ${profile.headline?`<p class="headline">${esc(profile.headline)}</p>`:''}
       <div class="chips">${tradeChips(profile)}</div>
+      ${rating.count?`<div class="rating-row">${ratingHead(rating)}</div>`:''}
       <p class="muted">${esc(profile.city)} · ${profile.years_exp} yrs · floor $${profile.pay_floor}/hr · ${esc(profile.shift)} shift</p>
       <div class="ministats">
         <div><b>${profile.readiness}</b><span>${T('READINESS')}</span></div>
@@ -971,12 +991,13 @@ function pulsePage({ user, trending, posts, totalOpen, companies = [], demandGeo
 }
 
 // ---------- public shareable portfolio ----------
-function publicPortfolio({ worker, profile, creds, portfolio, work = [] }) {
+function publicPortfolio({ worker, profile, creds, portfolio, work = [], rating = {avg:0,count:0}, reviews = [] }) {
   return `<section class="hero pub-hero"><div class="wrap">
       <span class="tag">Verified on Rivet</span>
       <h1>${esc(worker.name)}</h1>
       ${profile.headline?`<p class="lead">${esc(profile.headline)}</p>`:''}
       <div class="chips light">${tradeChips(profile)}</div>
+      ${rating.count?`<div class="rating-row light">${ratingHead(rating)}</div>`:''}
       <p class="lead">${esc(profile.city)} · ${profile.years_exp} years experience</p>
       <div class="pub-stats">
         <div><b>${profile.readiness}</b><span>Job-readiness</span></div>
@@ -995,6 +1016,7 @@ function publicPortfolio({ worker, profile, creds, portfolio, work = [] }) {
         <div class="sec-h" style="margin-top:0">Work portfolio</div>
         ${mediaGallery(portfolio) || '<p class="muted">No portfolio pieces yet.</p>'}
       </div>
+      ${rating.count?`<div class="card"><div class="sec-h" style="margin-top:0">Reviews from employers ${ratingHead(rating)}</div>${reviewList(reviews)}</div>`:''}
       <div class="card cta-card">
         <b>${esc(worker.name.split(' ')[0])} is on Rivet — verified, job-ready trades talent.</b>
         <div class="cta-row" style="margin-top:12px"><a class="btn" href="/signup?role=employer">Hire on Crewline</a><a class="btn ghost" href="/signup?role=worker">Build your own card</a></div>
@@ -1016,6 +1038,56 @@ function timeAgo(sqlTs){
   const h=Math.floor(m/60); if(h<24) return `${h}h ago`;
   const d=Math.floor(h/24); if(d<30) return `${d}d ago`;
   const mo=Math.floor(d/30); return `${mo}mo ago`;
+}
+// ---------- ratings & reviews ----------
+function starBar(avg){
+  const full = Math.round(Number(avg)||0);
+  let s=''; for(let i=1;i<=5;i++) s+=`<span class="star ${i<=full?'on':''}">★</span>`;
+  return `<span class="stars">${s}</span>`;
+}
+function ratingHead(rating){
+  const count = rating && rating.count || 0;
+  if(!count) return `<span class="rating muted sm">${starBar(0)} ${T('No reviews yet')}</span>`;
+  return `<span class="rating">${starBar(rating.avg)} <b>${Number(rating.avg).toFixed(1)}</b> <span class="muted sm">(${count} ${count===1?T('review'):T('reviews')})</span></span>`;
+}
+function reviewList(items){
+  if(!items || !items.length) return `<p class="muted sm">${T('No reviews yet.')}</p>`;
+  return `<div class="revlist">${items.map(r=>`<div class="rev">
+    <div class="rev-top">${starBar(r.stars)} <b>${esc(r.author_name||'')}</b> <span class="rev-t">${timeAgo(r.created_at)}</span></div>
+    ${r.body?`<p class="rev-b">${esc(r.body)}</p>`:''}</div>`).join('')}</div>`;
+}
+function reviewForm({ action, hidden = {}, label, prompt }){
+  const h = Object.entries(hidden).map(([k,v])=>`<input type="hidden" name="${esc(k)}" value="${esc(String(v))}">`).join('');
+  const opts = [5,4,3,2,1].map(n=>`<option value="${n}">${'★'.repeat(n)} (${n})</option>`).join('');
+  return `<form method="post" action="${action}" class="rev-form">${h}
+    <select name="stars" aria-label="${T('Rating')}">${opts}</select>
+    <input name="body" placeholder="${esc(prompt||T('Share how it went…'))}" maxlength="400">
+    <button class="btn-sm">${label}</button></form>`;
+}
+function fmtSlot(iso){
+  const d = new Date(iso); if(isNaN(d)) return esc(iso);
+  return d.toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+}
+// recruiter-side interview block for a given job/worker
+function interviewEmp(iv){
+  if(!iv) return '';
+  if(iv.status==='confirmed') return `<div class="iv ok">${icon('bell','xic')} ${T('Interview confirmed')}: <b>${fmtSlot(iv.chosen)}</b></div>`;
+  const slots = (()=>{try{return JSON.parse(iv.slots)}catch(e){return []}})();
+  return `<div class="iv">${icon('bell','xic')} ${T('Interview proposed')} — ${T('waiting on candidate')}: ${slots.map(s=>`<span class="slot-chip">${fmtSlot(s)}</span>`).join('')}</div>`;
+}
+function interviewProposeForm(jobId, workerId){
+  return `<form method="post" action="/console/interviews" class="iv-form">
+    <input type="hidden" name="job_id" value="${jobId}"><input type="hidden" name="worker_id" value="${workerId}">
+    <div class="iv-slots"><input type="datetime-local" name="slot1" required><input type="datetime-local" name="slot2"><input type="datetime-local" name="slot3"></div>
+    <button class="btn-sm">${T('Propose interview times')}</button></form>`;
+}
+// worker-side interview card
+function interviewWorker(iv){
+  const slots = (()=>{try{return JSON.parse(iv.slots)}catch(e){return []}})();
+  if(iv.status==='confirmed') return `<div class="iv ok">${icon('bell','xic')} ${T('Interview confirmed for')} <b>${fmtSlot(iv.chosen)}</b> — ${esc(iv.company||iv.title||'')}</div>`;
+  return `<div class="iv"><div class="iv-h">${icon('bell','xic')} ${T('Interview invite')} — ${esc(iv.company||'')} · <b>${esc(iv.title||'')}</b></div>
+    <p class="muted sm">${T('Pick a time that works:')}</p>
+    <div class="iv-pick">${slots.map(s=>`<form method="post" action="/app/interviews/${iv.id}/accept"><input type="hidden" name="chosen" value="${esc(s)}"><button class="btn-sm">${fmtSlot(s)}</button></form>`).join('')}</div></div>`;
 }
 // ---------- US map (real state outlines from us-geo, same linear projection as dots) ----------
 // Interactive US map: real state outlines + clickable count dots that open a
@@ -1215,12 +1287,13 @@ function empAnalytics({ user, kpis, weekly = [], conv = [], topTrades = [], topJ
 }
 
 const COMPANY_SIZES = ['1–10','11–50','51–200','201–500','500+'];
-function empCompany({ user, saved = false }) {
+function empCompany({ user, saved = false, rating = {avg:0,count:0}, reviews = [] }) {
   const sizeOpts = `<option value="">Company size</option>`+COMPANY_SIZES.map(s=>`<option ${user.company_size===s?'selected':''}>${s}</option>`).join('');
   return `<section class="wrap narrow">
     <div class="card profile-head">
       <div class="big-av c">${initials(user.company||user.name)}</div>
       <h2>${esc(user.company||'Your company')}</h2>
+      <div class="rating-row">${ratingHead(rating)}</div>
       <p class="muted">${esc(user.company_city||'')}${user.company_size?` · ${esc(user.company_size)} employees`:''}</p>
       ${user.company_website?`<p><a class="nav-link" style="color:var(--brand-d)" href="${esc(user.company_website)}" target="_blank" rel="noopener">${esc(user.company_website)} ↗</a></p>`:''}
       ${user.company_about?`<p class="cand-bio">${esc(user.company_about)}</p>`:''}
@@ -1238,6 +1311,10 @@ function empCompany({ user, saved = false }) {
         <label>About the company <textarea name="company_about" rows="4" maxlength="800" placeholder="What you build, who you hire, why crews stay. Candidates read this before applying.">${esc(user.company_about||'')}</textarea></label>
         <button class="btn">${T('Save company profile')}</button>
       </form>
+    </div>
+    <div class="card">
+      <div class="sec-h" style="margin-top:0">${T('What workers say')} ${ratingHead(rating)}</div>
+      ${reviewList(reviews)}
     </div>
   </section>`;
 }
@@ -1380,7 +1457,7 @@ function inbox({ convos, base, meId }){
 }
 
 // ---------- employer: candidate detail ----------
-function empCandidate({ worker, profile, creds, matches, apps, messages, meId, notes = [], saved = false, portfolio = [], work = [] }) {
+function empCandidate({ worker, profile, creds, matches, apps, messages, meId, notes = [], saved = false, portfolio = [], work = [], rating = {avg:0,count:0}, reviews = [], canReviewJob = null, myReview = null, interviews = {} }) {
   const stageByJob = {}; for (const a of apps) stageByJob[a.job_id] = a.stage;
   return `<section class="wrap narrow">
     <div class="cand-top"><a class="back" href="/console/search">← Talent Search</a>
@@ -1394,6 +1471,7 @@ function empCandidate({ worker, profile, creds, matches, apps, messages, meId, n
       ${profile.headline?`<p class="headline">${esc(profile.headline)}</p>`:''}
       <div class="chips">${tradeChips(profile)}</div>
       <p class="muted">${esc(profile.city)} ${esc(profile.zip||'')} · ${profile.years_exp} yrs experience · seeks $${profile.pay_floor}+/hr</p>
+      <div class="rating-row">${ratingHead(rating)}</div>
       ${profile.available?`<div class="avail-badge">${icon('dot','xic')} ${T('Available for work')}</div>`:`<div class="avail-badge off">${T('Not currently available')}</div>`}${profile.work_today?`<div class="avail-badge today">${icon('bolt','xic')} ${T('Can work today')}</div>`:''}${profile.relocate?`<div class="avail-badge relo">${icon('send','xic')} ${T('Open to relocate')}</div>`:''}
       <div class="ministats">
         <div><b>${profile.readiness}</b><span>READINESS</span></div>
@@ -1423,7 +1501,15 @@ function empCandidate({ worker, profile, creds, matches, apps, messages, meId, n
         <div class="cf-act">${stageByJob[m.job.id]
           ? `<span class="stage-pill">In pipeline · ${esc(stageByJob[m.job.id])}</span>`
           : `<form method="post" action="/console/jobs/${m.job.id}/add"><input type="hidden" name="worker_id" value="${worker.id}"><button class="btn-sm">+ Add to pipeline</button></form>`}</div>
+        ${stageByJob[m.job.id] ? (interviews[m.job.id] ? interviewEmp(interviews[m.job.id]) : interviewProposeForm(m.job.id, worker.id)) : ''}
       </div>`).join('') : `<p class="muted">You have no open jobs yet. <a href="/console/jobs/new">Post a job</a> to see how this candidate fits.</p>`}
+    </div>
+    <div class="card">
+      <div class="sec-h" style="margin-top:0">${T('Reviews')} ${ratingHead(rating)}</div>
+      ${reviewList(reviews)}
+      ${canReviewJob ? (myReview
+        ? `<div class="ok-card sm">${T('You rated this hire')} ${starBar(myReview.stars)}</div>`
+        : `<div class="rev-cta"><div class="muted sm">${T('You hired this worker — leave a review:')}</div>${reviewForm({action:`/console/candidates/${worker.id}/review`, hidden:{job_id:canReviewJob}, label:T('Submit review'), prompt:T('How was their work?')})}</div>`) : ''}
     </div>
     <div class="card" id="messages">
       <div class="sec-h" style="margin-top:0">Message ${esc(worker.name.split(' ')[0])}</div>

@@ -191,6 +191,31 @@ async function createSchema() {
       body TEXT NOT NULL,
       created_at TEXT DEFAULT (datetime('now'))
     );
+    CREATE TABLE IF NOT EXISTS reviews (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      author_id INTEGER REFERENCES users(id),
+      author_name TEXT,
+      subject_id INTEGER REFERENCES users(id),
+      subject_kind TEXT NOT NULL,
+      stars INTEGER NOT NULL,
+      body TEXT DEFAULT '',
+      job_id INTEGER,
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(author_id, subject_id, job_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_reviews_subject ON reviews(subject_id, subject_kind);
+    CREATE TABLE IF NOT EXISTS interviews (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id INTEGER REFERENCES jobs(id),
+      worker_id INTEGER REFERENCES users(id),
+      employer_id INTEGER REFERENCES users(id),
+      slots TEXT NOT NULL,
+      chosen TEXT,
+      status TEXT DEFAULT 'proposed',
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_interviews_worker ON interviews(worker_id, status);
+    CREATE INDEX IF NOT EXISTS idx_interviews_job ON interviews(job_id);
     CREATE INDEX IF NOT EXISTS idx_messages_to ON messages(to_id, read_at);
     CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_id, to_id);
     CREATE INDEX IF NOT EXISTS idx_applications_worker ON applications(worker_id);
@@ -832,6 +857,51 @@ async function seedActivity2(){
   console.log('[db] deeper demo activity seeded — backdated applications across 8 weeks for analytics');
 }
 
+// ---- demo reviews (two-sided) + a sample interview so the features aren't empty (idempotent) ----
+async function seedReviews(){
+  if (await metaGet('reviews_v1')) return;
+  const uid = async (email) => { const u = await db.prepare('SELECT id,name,company FROM users WHERE email=?').get(email); return u; };
+  const job = async (empId,title) => (await db.prepare('SELECT id FROM jobs WHERE employer_id=? AND title=?').get(empId,title) || {}).id;
+  const ins = db.prepare(`INSERT INTO reviews(author_id,author_name,subject_id,subject_kind,stars,body,job_id,created_at) VALUES(?,?,?,?,?,?,?,datetime('now',?))`);
+  const sun = await uid('ops@sunvalley.test'), copper = await uid('hr@coppermountain.test');
+  const marcus = await uid('marcus@rivet.test'), andre = await uid('andre@rivet.test'), kim = await uid('kim@rivet.test'),
+        tasha = await uid('tasha@rivet.test'), omar = await uid('omar@rivet.test');
+  // employer -> worker
+  const empReviews = [
+    [sun, marcus, 5, 'Marcus ran our downtown fit-out lead and never missed an inspection. Hire again in a heartbeat.', await job(sun&&sun.id,'Commercial Electrician'), '-45 days'],
+    [sun, andre, 5, 'Showed up early, EPA-608 work was clean, great with our service customers.', await job(sun&&sun.id,'HVAC Service Technician'), '-40 days'],
+    [sun, kim, 4, 'Strong journeyman. Knocked the TI work out fast; would bring back on the next phase.', await job(sun&&sun.id,'Commercial Electrician'), '-30 days'],
+    [copper, tasha, 5, 'Best plumber we’ve had on a commercial repipe — organized and safety-first.', null, '-25 days'],
+    [copper, omar, 5, 'AWS-tested and it shows. Tight welds, comfortable at height.', null, '-20 days'],
+  ];
+  // worker -> employer (company)
+  const workerReviews = [
+    [marcus, sun, 5, 'Paid weekly like they said, good crews, foreman actually listens. Solid shop.', await job(sun&&sun.id,'Commercial Electrician'), '-44 days'],
+    [andre, sun, 5, 'Steady hours and real overtime. They promote from within — that’s rare.', await job(sun&&sun.id,'HVAC Service Technician'), '-39 days'],
+    [tasha, copper, 4, 'Big pipeline of work and safety is taken seriously. Tools list was clear up front.', null, '-24 days'],
+  ];
+  for(const [a, s, stars, body, jid, when] of empReviews){
+    if(!a || !s) continue;
+    try { await ins.run(a.id, a.company||a.name, s.id, 'worker', stars, body, jid||null, when); } catch(e){}
+  }
+  for(const [a, s, stars, body, jid, when] of workerReviews){
+    if(!a || !s) continue;
+    try { await ins.run(a.id, a.name, s.id, 'employer', stars, body, jid||null, when); } catch(e){}
+  }
+  // a confirmed sample interview so the scheduling UI isn't empty in the demo
+  if(sun && kim){
+    const jid = await job(sun.id,'Commercial Electrician');
+    if(jid){
+      const d = new Date(Date.now()+2*864e5); d.setHours(10,0,0,0);
+      const slots = JSON.stringify([d.toISOString()]);
+      try { await db.prepare(`INSERT INTO interviews(job_id,worker_id,employer_id,slots,chosen,status,created_at) VALUES(?,?,?,?,?,?,datetime('now','-1 days'))`)
+        .run(jid, kim.id, sun.id, slots, d.toISOString(), 'confirmed'); } catch(e){}
+    }
+  }
+  await metaSet('reviews_v1','1');
+  console.log('[db] demo reviews + sample interview seeded');
+}
+
 async function migrate() {
   // additive column migrations (idempotent — errors swallowed when already applied)
   try { await db.exec('ALTER TABLE users ADD COLUMN phone TEXT'); } catch (e) { /* column exists */ }
@@ -911,6 +981,7 @@ async function init() {
   try { await seedExternal(); } catch (e) { console.error('[db] external seed skipped (non-fatal):', e.message); }
   try { await seedUsajobs(); } catch (e) { console.error('[db] usajobs seed skipped (non-fatal):', e.message); }
   try { await seedActivity2(); } catch (e) { console.error('[db] activity2 seed skipped (non-fatal):', e.message); }
+  try { await seedReviews(); } catch (e) { console.error('[db] reviews seed skipped (non-fatal):', e.message); }
   try {
     if(!(await metaGet('xfactor_v1'))){
       // own tools (most trades), reliable transport, bilingual — high-signal flags for recruiters
