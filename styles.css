@@ -209,6 +209,18 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--orange)}
 .foot-col a:hover{color:var(--amber)}
 .foot-base{border-top:1px solid rgba(255,255,255,.1);margin-top:26px;padding-top:18px;font-size:12.5px;color:#8da0ab}
 
+/* candidate detail (recruiter) */
+.cand-link{color:inherit;font-weight:600;display:inline-flex;align-items:center;gap:8px}
+.cand-link:hover{color:var(--orange-d)}
+.cand-bio{margin-top:12px;color:var(--slate);font-size:14px}
+.cand-fit{border-top:1px solid var(--line);padding:14px 0}
+.cand-fit:first-of-type{border-top:0}
+.cf-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.cf-act{margin-top:10px}
+.breakdown.sm{margin-top:8px}
+.breakdown.sm .bd{font-size:12px}
+.muted.sm{font-size:12.5px;margin-top:6px}
+
 /* accessibility */
 .skip{position:absolute;left:-9999px;top:0;z-index:100;background:#fff;color:var(--ink);padding:10px 16px;border-radius:0 0 10px 0;font-weight:700;font-size:13px}
 .skip:focus{left:0}

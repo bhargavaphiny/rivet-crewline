@@ -348,7 +348,7 @@ function empOverview({ user, kpis, hot, alerts }) {
       <div class="card">
         <div class="sec-h" style="margin-top:0">Hot candidates — ready now <a href="/console/search">Search all</a></div>
         <table class="tbl"><tr><th>Candidate</th><th>Trade</th><th>Readiness</th><th>Creds</th></tr>
-        ${hot.map(w=>`<tr><td><span class="av-t">${initials(w.name)}</span> ${esc(w.name)}</td>
+        ${hot.map(w=>`<tr><td><a class="cand-link" href="/console/candidates/${w.id}"><span class="av-t">${initials(w.name)}</span> ${esc(w.name)}</a></td>
           <td>${TRADES[w.trade]||w.trade}</td>
           <td><span class="score-tag ${scoreClass(w.readiness)}">${w.readiness}</span></td>
           <td>${w.vcount} verified</td></tr>`).join('') || '<tr><td colspan=4 class="muted">No workers yet.</td></tr>'}
@@ -399,7 +399,7 @@ const STAGES = ['Sourced','Screened','Interview','Offer','Hired'];
 function empPipeline({ job, columns, candidates }) {
   const cols = STAGES.map(st=>`<div class="col"><div class="col-h">${st} <span>${(columns[st]||[]).length}</span></div>
     ${(columns[st]||[]).map(a=>`<div class="pcard">
-        <div class="pc-nm"><span class="av-t">${initials(a.name)}</span>${esc(a.name)}</div>
+        <a class="pc-nm cand-link" href="/console/candidates/${a.worker_id}"><span class="av-t">${initials(a.name)}</span>${esc(a.name)}</a>
         <div class="muted sm">${TRADES[a.trade]||a.trade}</div>
         <div class="pc-ft"><span class="score-tag ${scoreClass(a.score)}">${a.score}</span>
           <form method="post" action="/console/applications/${a.app_id}/stage" class="stageform">
@@ -414,7 +414,7 @@ function empPipeline({ job, columns, candidates }) {
     <div class="card" style="margin-top:18px">
       <div class="sec-h" style="margin-top:0">Recommended candidates (not yet in pipeline)</div>
       <table class="tbl"><tr><th>Candidate</th><th>Trade</th><th>Match</th><th>Readiness</th><th></th></tr>
-      ${candidates.map(c=>`<tr><td><span class="av-t">${initials(c.name)}</span> ${esc(c.name)}</td>
+      ${candidates.map(c=>`<tr><td><a class="cand-link" href="/console/candidates/${c.user_id}"><span class="av-t">${initials(c.name)}</span> ${esc(c.name)}</a></td>
         <td>${TRADES[c.trade]||c.trade}</td>
         <td><span class="score-tag ${scoreClass(c.score)}">${c.score}</span></td>
         <td>${c.readiness}</td>
@@ -436,12 +436,49 @@ function empSearch({ rows, filters }) {
     </form>
     <div class="card" style="padding:0">
       <table class="tbl wide"><tr><th>Candidate</th><th>Trade</th><th>Exp</th><th>Credentials</th><th>Readiness</th><th>Pay floor</th></tr>
-      ${rows.map(w=>`<tr><td><span class="av-t">${initials(w.name)}</span> ${esc(w.name)}</td>
+      ${rows.map(w=>`<tr><td><a class="cand-link" href="/console/candidates/${w.id}"><span class="av-t">${initials(w.name)}</span> ${esc(w.name)}</a></td>
         <td>${TRADES[w.trade]||w.trade}</td><td>${w.years_exp} yr</td>
         <td>${w.creds.map(c=>`<span class="cred-chip">${esc(c.name)}</span>`).join('')||'<span class="muted">—</span>'}</td>
         <td><span class="score-tag ${scoreClass(w.readiness)}">${w.readiness}</span></td>
         <td>$${w.pay_floor}/hr</td></tr>`).join('') || '<tr><td colspan=6 class="muted">No matches for these filters.</td></tr>'}
       </table>
+    </div>
+  </section>`;
+}
+
+// ---------- employer: candidate detail ----------
+function empCandidate({ worker, profile, creds, matches, apps }) {
+  const stageByJob = {}; for (const a of apps) stageByJob[a.job_id] = a.stage;
+  return `<section class="wrap narrow">
+    <a class="back" href="/console/search">← Talent Search</a>
+    <div class="card profile-head">
+      <div class="big-av">${initials(worker.name)}</div>
+      <h2>${esc(worker.name)}</h2>
+      <p class="muted">${TRADES[profile.trade]||profile.trade} · ${esc(profile.city)} ${esc(profile.zip||'')} · ${profile.years_exp} yrs experience · seeks $${profile.pay_floor}+/hr</p>
+      <div class="ministats">
+        <div><b>${profile.readiness}</b><span>READINESS</span></div>
+        <div><b>${creds.filter(c=>c.verified).length}</b><span>VERIFIED</span></div>
+        <div><b>${creds.length}</b><span>CREDENTIALS</span></div>
+      </div>
+      ${profile.bio?`<p class="cand-bio">${esc(profile.bio)}</p>`:''}
+    </div>
+    <div class="card">
+      <div class="sec-h" style="margin-top:0">Credential wallet</div>
+      ${creds.map(credRow).join('') || '<p class="muted">No credentials listed yet.</p>'}
+    </div>
+    <div class="card">
+      <div class="sec-h" style="margin-top:0">Fit for your jobs</div>
+      ${matches.length ? matches.map(m=>`<div class="cand-fit">
+        <div class="cf-top">
+          <div><b>${esc(m.job.title)}</b> <span class="muted sm">$${m.job.pay_min}–${m.job.pay_max}/hr · ${esc(m.job.city)} · ${esc(m.job.shift)}</span></div>
+          <span class="score-pill ${scoreClass(m.score)}">${m.score}<small>match</small></span>
+        </div>
+        <div class="breakdown sm">${bd('Trade fit',m.breakdown.trade,45)}${bd('Pay',m.breakdown.pay,20)}${bd('Location',m.breakdown.loc,20)}${bd('Credentials',m.breakdown.cred,15)}</div>
+        ${m.missing.length?`<div class="muted sm">Missing: ${m.missing.map(k=>CRED_KINDS[k]||k).join(', ')}</div>`:''}
+        <div class="cf-act">${stageByJob[m.job.id]
+          ? `<span class="stage-pill">In pipeline · ${esc(stageByJob[m.job.id])}</span>`
+          : `<form method="post" action="/console/jobs/${m.job.id}/add"><input type="hidden" name="worker_id" value="${worker.id}"><button class="btn-sm">+ Add to pipeline</button></form>`}</div>
+      </div>`).join('') : `<p class="muted">You have no open jobs yet. <a href="/console/jobs/new">Post a job</a> to see how this candidate fits.</p>`}
     </div>
   </section>`;
 }
@@ -464,4 +501,4 @@ function ogImage() {
 }
 
 module.exports = { layout, landing, authForm, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, empOverview, empJobs, empJobForm, empPipeline, empSearch, ogImage, STAGES };
+  jobDetail, workerProfile, empOverview, empJobs, empJobForm, empPipeline, empSearch, empCandidate, ogImage, STAGES };

@@ -261,7 +261,7 @@ const server = http.createServer(async (req,res)=>{
         const applicants = jobIds.length? (await db.prepare(`SELECT COUNT(*) c FROM applications WHERE job_id IN (${jobIds.map(()=>'?').join(',')})`).get(...jobIds)).c : 0;
         const pipeline = jobIds.length? (await db.prepare(`SELECT COUNT(*) c FROM applications WHERE stage!='Sourced' AND job_id IN (${jobIds.map(()=>'?').join(',')})`).get(...jobIds)).c : 0;
         const pool = (await db.prepare(`SELECT COUNT(*) c FROM worker_profiles`).get()).c;
-        const hot = await db.prepare(`SELECT u.name,p.trade,p.readiness,(SELECT COUNT(*) FROM credentials c WHERE c.user_id=u.id AND c.verified=1) vcount
+        const hot = await db.prepare(`SELECT u.id,u.name,p.trade,p.readiness,(SELECT COUNT(*) FROM credentials c WHERE c.user_id=u.id AND c.verified=1) vcount
           FROM users u JOIN worker_profiles p ON p.user_id=u.id WHERE u.role='worker' ORDER BY p.readiness DESC LIMIT 5`).all();
         const alerts = [];
         const expiring = (await db.prepare(`SELECT COUNT(*) c FROM credentials WHERE verified=1 AND expires IS NOT NULL AND expires < '2026-08'`).get()).c;
@@ -315,7 +315,7 @@ const server = http.createServer(async (req,res)=>{
       if(jid && p===`/console/jobs/${jid}` && method==='GET'){
         const job = await db.prepare('SELECT * FROM jobs WHERE id=? AND employer_id=?').get(jid,user.id);
         if(!job) return send(res, V.layout({title:'Not found',user,body:'<section class="wrap"><div class="card">Job not found.</div></section>'}),404);
-        const apps = await db.prepare(`SELECT a.id app_id,a.stage,a.score,u.name,p.trade FROM applications a
+        const apps = await db.prepare(`SELECT a.id app_id,a.stage,a.score,u.id worker_id,u.name,p.trade FROM applications a
           JOIN users u ON u.id=a.worker_id JOIN worker_profiles p ON p.user_id=a.worker_id WHERE a.job_id=?`).all(jid);
         const columns = {}; for(const st of V.STAGES) columns[st]=[];
         const inPipe = new Set(); for(const a of apps){ (columns[a.stage]=columns[a.stage]||[]).push(a); inPipe.add(a.name); }
@@ -332,6 +332,19 @@ const server = http.createServer(async (req,res)=>{
         if(filters.ready) rows = rows.filter(w=>w.readiness>=85);
         rows.sort((a,b)=>b.readiness-a.readiness);
         return send(res, V.layout({title:'Talent Search',user,active:'search',body:V.empSearch({rows,filters})}));
+      }
+
+      const candMatch = p.match(/^\/console\/candidates\/(\d+)$/);
+      if(candMatch && method==='GET'){
+        const wid = Number(candMatch[1]);
+        const w = await db.prepare("SELECT id,name,role FROM users WHERE id=? AND role='worker'").get(wid);
+        const prof = w ? await getProfile(wid) : null;
+        if(!w || !prof) return send(res, V.layout({title:'Candidate',user,active:'search',body:'<section class="wrap narrow"><a class="back" href="/console/search">← Talent Search</a><div class="card">Candidate not found.</div></section>'}),404);
+        const creds = await getCreds(wid);
+        const jobs = await db.prepare('SELECT * FROM jobs WHERE employer_id=? ORDER BY created_at DESC').all(user.id);
+        const matches = jobs.map(j=>{ const r=M.scoreMatch(prof,creds,j); return {job:j, score:r.score, breakdown:r.breakdown, missing:r.missing}; }).sort((a,b)=>b.score-a.score);
+        const apps = jobs.length ? await db.prepare(`SELECT job_id,stage FROM applications WHERE worker_id=? AND job_id IN (${jobs.map(()=>'?').join(',')})`).all(wid, ...jobs.map(j=>j.id)) : [];
+        return send(res, V.layout({title:w.name,user,active:'search',body:V.empCandidate({worker:w,profile:prof,creds,matches,apps})}));
       }
     }
 
