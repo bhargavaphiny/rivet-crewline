@@ -189,6 +189,12 @@ const BUILTIN_ES = {
   'Junk Removal':'Retiro de escombros','Pressure Washing':'Lavado a presión','Pool Service Tech':'Técnico de piscinas','Courier / Gig Delivery':'Mensajero / Repartidor','Event Setup Crew':'Montaje de eventos',
   'Full-time':'Tiempo completo','Part-time':'Medio tiempo','Contract':'Contrato','Temp':'Temporal','Apprenticeship':'Aprendizaje','Outcome-based':'Por resultados',
   'Day':'Día','Night':'Noche','Any':'Cualquiera','mi away':'mi de distancia','Apply':'Aplicar','View':'Ver',
+  // first-login welcome banners + key dashboard terms (instant, correct)
+  'Welcome to Rivet':'Bienvenido a Rivet','Welcome to Crewline':'Bienvenido a Crewline',
+  'Set up my Work Card':'Configura mi tarjeta de trabajo','Post your first job':'Publica tu primer trabajo',
+  'Open roles hiring now':'Empleos disponibles ahora','There are':'Hay','Hiring funnel':'Embudo de contratación','candidates':'candidatos',
+  "Here's what's hiring across the country right now. Add your trade to get matched to the best-fit jobs near you — it takes a minute.":'Esto es lo que se está contratando en todo el país ahora. Agrega tu oficio para encontrar los empleos que mejor te quedan cerca de ti — toma un minuto.',
+  'verified blue-collar workers ready across the U.S. Post your first job and we’ll match you instantly — see who’s available on the map below.':'trabajadores de oficios verificados listos en todo EE. UU. Publica tu primer trabajo y te emparejamos al instante — mira quién está disponible en el mapa.',
 };
 function T(s){
   if(LANG !== 'es' || !s) return s;
