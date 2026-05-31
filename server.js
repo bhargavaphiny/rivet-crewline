@@ -523,6 +523,10 @@ const server = http.createServer(async (req,res)=>{
         await db.prepare('UPDATE worker_profiles SET relocate=? WHERE user_id=?').run(cur?0:1, user.id);
         return redirect(res, '/app/profile');
       }
+      if(p==='/app/training' && method==='GET'){
+        const have = (await getCreds(user.id)).map(c=>c.kind);
+        return send(res, V.layout({title:'Learn & get certified',user,active:'training',body:V.workerTraining({have})}));
+      }
       if(p==='/app/applications' && method==='GET'){
         const apps = await db.prepare(`SELECT a.*, j.title,j.trade,j.pay_min,j.pay_max,j.city,j.zip,u.company
           FROM applications a JOIN jobs j ON j.id=a.job_id JOIN users u ON u.id=j.employer_id

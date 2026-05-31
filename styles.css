@@ -375,3 +375,12 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .maplegend i{width:13px;height:13px;border-radius:50%;display:inline-block}
 .maplegend i.d-direct{background:var(--amber)}
 .maplegend i.d-related{background:var(--brand);opacity:.55}
+
+/* ---- training & certifications ---- */
+.info-card{background:rgba(23,99,166,.06);border:1px solid rgba(23,99,166,.18);color:var(--slate);font-size:14px}
+.traingrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-bottom:8px}
+.train{background:#fff;border:1px solid var(--line);border-radius:12px;padding:15px}
+.train.have{background:var(--paper-2);border-style:dashed}
+.train-h{display:flex;align-items:center;gap:8px;justify-content:space-between;margin-bottom:6px}
+.train-h b{font-size:14.5px}
+.train p{font-size:13px;color:var(--slate);line-height:1.5;margin-bottom:10px}

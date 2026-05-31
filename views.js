@@ -3,7 +3,7 @@
  * Rivet x Crewline - server-side HTML views.
  * Plain template-literal rendering. No template engine, no client framework.
  */
-const { TRADES, CRED_KINDS } = require('./matching');
+const { TRADES, CRED_KINDS, TRAINING } = require('./matching');
 
 const esc = s => String(s == null ? '' : s)
   .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -16,7 +16,7 @@ function setLang(l){ LANG = (l === 'es') ? 'es' : 'en'; }
 const I18N = {
   en: {
     nav_login:'Log in', nav_get_started:'Get started', nav_home:'Home', nav_find_work:'Jobs',
-    nav_work_card:'Work Card', nav_applications:'Applications', nav_messages:'Messages',
+    nav_work_card:'Work Card', nav_applications:'Applications', nav_training:'Learn', nav_messages:'Messages',
     nav_hiring:'Hiring →', nav_working:'Working →', nav_logout:'Log out',
     nav_overview:'Overview', nav_talent:'Talent', nav_jobs:'Jobs',
     hero_tag:'The blue-collar hiring platform · U.S.',
@@ -52,7 +52,7 @@ const I18N = {
   },
   es: {
     nav_login:'Entrar', nav_get_started:'Empezar', nav_home:'Inicio', nav_find_work:'Empleos',
-    nav_work_card:'Mi perfil', nav_applications:'Solicitudes', nav_messages:'Mensajes',
+    nav_work_card:'Mi perfil', nav_applications:'Solicitudes', nav_training:'Aprender', nav_messages:'Mensajes',
     nav_hiring:'Contratar →', nav_working:'Trabajar →', nav_logout:'Salir',
     nav_overview:'Resumen', nav_talent:'Talento', nav_jobs:'Empleos',
     hero_tag:'La plataforma de empleo para oficios · EE. UU.',
@@ -122,7 +122,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   } else if ((user.mode || user.role) === 'worker') {
     const L = (h,l,k)=>`<a class="nav-link ${active===k?'on':''}" href="${h}">${l}</a>`;
     const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/app/messages">${t('nav_messages')}${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
-    nav = `${L('/app',t('nav_home'),'home')}${L('/app/jobs',t('nav_find_work'),'jobs')}${L('/app/profile',t('nav_work_card'),'profile')}${L('/app/applications',t('nav_applications'),'apps')}${msg}
+    nav = `${L('/app',t('nav_home'),'home')}${L('/app/jobs',t('nav_find_work'),'jobs')}${L('/app/profile',t('nav_work_card'),'profile')}${L('/app/applications',t('nav_applications'),'apps')}${L('/app/training',t('nav_training'),'training')}${msg}
            <a class="nav-link switch" href="/console" title="Switch to hiring">${t('nav_hiring')}</a>
            <span class="who">${initials(user.name)}</span>
            <a class="nav-link" href="/logout">${t('nav_logout')}</a>${langTg}`;
@@ -157,7 +157,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=23">
+  <link rel="stylesheet" href="/styles.css?v=24">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -466,7 +466,7 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
         ${bd('Location',match.breakdown.loc,20)}
         ${bd('Credentials',match.breakdown.cred,15)}
       </div>
-      ${match.missing.length?`<div class="warn-card">Missing: ${match.missing.map(k=>CRED_KINDS[k]||k).join(', ')} — add it to your Work Card to boost this match.</div>`:''}
+      ${match.missing.length?`<div class="warn-card">Missing: ${match.missing.map(k=>CRED_KINDS[k]||k).join(', ')} — <a href="/app/training" style="font-weight:700;color:inherit;text-decoration:underline">see how to earn it</a> to boost this match.</div>`:''}
       ${applied
         ? `<div class="ok-card">✓ Applied — the employer can see your verified Work Card.</div>`
         : `<form method="post" action="/app/jobs/${job.id}/apply"><button class="btn full">Apply with verified Work Card</button></form>`}
@@ -618,6 +618,29 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [] 
         <button class="btn-sm">Add to portfolio</button>
       </form>
     </div>
+  </section>`;
+}
+
+// ---------- worker: training & certifications ----------
+function trainCard(kind, have){
+  const tr = TRAINING[kind]; if(!tr) return '';
+  return `<div class="train ${have?'have':''}">
+    <div class="train-h"><b>${esc(CRED_KINDS[kind]||kind)}</b>${have?'<span class="chip sm green">On your card ✓</span>':''}</div>
+    <p>${esc(tr.how)}</p>
+    <a class="nav-link" style="color:var(--brand-d);font-weight:700" href="${esc(tr.url)}" target="_blank" rel="noopener noreferrer">How to earn it ↗</a>
+  </div>`;
+}
+function workerTraining({ have = [] }) {
+  const haveSet = new Set(have);
+  const all = Object.keys(TRAINING);
+  const todo = all.filter(k=>!haveSet.has(k));
+  const done = all.filter(k=>haveSet.has(k));
+  return `<section class="wrap">
+    <div class="sec-h big">Learn & get certified <span class="muted">Real credentials open more jobs and raise your readiness score</span></div>
+    <div class="card info-card">Certifications are the fastest way to stand out. Every one you add to your Work Card is verified and boosts how you match to jobs. Below is how to earn each — most can be done online or through a local provider.</div>
+    <div class="sec-h">Recommended — not on your card yet</div>
+    <div class="traingrid">${todo.map(k=>trainCard(k,false)).join('') || '<p class="muted">You’ve added every credential we track. Impressive.</p>'}</div>
+    ${done.length?`<div class="sec-h">Already on your Work Card</div><div class="traingrid">${done.map(k=>trainCard(k,true)).join('')}</div>`:''}
   </section>`;
 }
 
@@ -999,4 +1022,4 @@ function ogImage() {
 }
 
 module.exports = { setLang, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, empCompany };
+  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, empCompany, workerTraining };

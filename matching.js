@@ -105,6 +105,31 @@ const CRED_KINDS = {
   twic:           'TWIC Card',
 };
 
+// How to earn each credential — issuer + short path + an official resource link.
+const TRAINING = {
+  license:        { how: 'Issued by your state licensing board after an apprenticeship and a trade exam. Requirements vary by state and trade.', url: 'https://www.careeronestop.org/Toolkit/Training/find-certifications.aspx' },
+  osha10:         { how: 'OSHA 10-hour Outreach safety course. Take it online or in person from an authorized trainer; they issue your card.', url: 'https://www.osha.gov/training/outreach' },
+  osha30:         { how: 'OSHA 30-hour Outreach course — deeper safety training, often expected of leads and supervisors.', url: 'https://www.osha.gov/training/outreach' },
+  nccer:          { how: 'Industry credential earned through NCCER-accredited training centers: modules plus hands-on performance verification.', url: 'https://www.nccer.org' },
+  epa608:         { how: 'Required to handle refrigerants. Pass the EPA Section 608 exam (Type I/II/III or Universal).', url: 'https://www.epa.gov/section608' },
+  nate:           { how: 'HVAC competency exams from North American Technician Excellence.', url: 'https://www.natex.org' },
+  aws_welding:    { how: 'Welder performance qualification / Certified Welder through an AWS Accredited Test Facility.', url: 'https://www.aws.org' },
+  nccco_crane:    { how: 'Crane operator certification from the National Commission for the Certification of Crane Operators.', url: 'https://www.nccco.org' },
+  cdl:            { how: 'Commercial Driver’s License from your state DMV — entry-level driver training (ELDT) plus the CDL skills test.', url: 'https://www.fmcsa.dot.gov/registration/commercial-drivers-license' },
+  forklift:       { how: 'Powered-industrial-truck operator training and evaluation per OSHA; your employer or a provider certifies you.', url: 'https://www.osha.gov/powered-industrial-trucks' },
+  aerial_lift:    { how: 'Aerial / scissor-lift operator training to ANSI and OSHA standards.', url: 'https://www.osha.gov/aerial-lifts' },
+  confined_space: { how: 'Confined-space entry training per OSHA 1910.146.', url: 'https://www.osha.gov/confined-spaces' },
+  fall_protection:{ how: 'Fall-protection training per OSHA — required for most work at height.', url: 'https://www.osha.gov/fall-protection' },
+  nfpa70e:        { how: 'Arc-flash and electrical-safety training to NFPA 70E.', url: 'https://www.nfpa.org' },
+  hazwoper:       { how: 'Hazardous Waste Operations & Emergency Response training (24- or 40-hour).', url: 'https://www.osha.gov/hazwoper' },
+  ase:            { how: 'Automotive Service Excellence certification exams.', url: 'https://www.ase.com' },
+  epa_lead:       { how: 'EPA Lead Renovator (RRP) certification for work on pre-1978 buildings.', url: 'https://www.epa.gov/lead' },
+  backflow:       { how: 'Backflow-prevention assembly tester certification (state or ABPA program).', url: 'https://www.careeronestop.org/Toolkit/Training/find-certifications.aspx' },
+  med_gas:        { how: 'Medical gas brazing / installer certification (ASSE 6010 series).', url: 'https://www.careeronestop.org/Toolkit/Training/find-certifications.aspx' },
+  cpr:            { how: 'First Aid / CPR certification from the American Red Cross or American Heart Association.', url: 'https://www.redcross.org/take-a-class/cpr' },
+  twic:           { how: 'Transportation Worker Identification Credential from the TSA — needed for many ports and secure sites.', url: 'https://www.tsa.gov/for-industry/twic' },
+};
+
 const clamp = (n, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, n));
 
 /**
@@ -159,4 +184,4 @@ function scoreMatch(profile, creds, job) {
   return { score: total, breakdown: { trade, pay, loc, cred: credScore }, missing };
 }
 
-module.exports = { TRADES, ADJACENT, CRED_KINDS, readiness, scoreMatch, clamp };
+module.exports = { TRADES, ADJACENT, CRED_KINDS, TRAINING, readiness, scoreMatch, clamp };
