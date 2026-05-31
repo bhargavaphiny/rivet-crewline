@@ -251,6 +251,20 @@ async function ratingFor(subjectId, kind){
 async function reviewsFor(subjectId, kind, limit=8){
   return db.prepare('SELECT * FROM reviews WHERE subject_id=? AND subject_kind=? ORDER BY created_at DESC, id DESC LIMIT ?').all(subjectId, kind, limit);
 }
+// Show-Up Score: % of completed starts where the worker showed up.
+async function showUp(workerId){
+  const r = await db.prepare("SELECT COUNT(*) total, SUM(CASE WHEN outcome='showed' THEN 1 ELSE 0 END) showed FROM applications WHERE worker_id=? AND outcome IS NOT NULL AND outcome!='cancelled'").get(workerId);
+  const total = r && r.total || 0; const showed = r && r.showed || 0;
+  return { starts: total, pct: total ? Math.round((showed/total)*100) : null };
+}
+// Paid-Like-Promised: % of an employer's completed jobs paid on time.
+async function payRep(employerId){
+  const r = await db.prepare(`SELECT COUNT(*) total, SUM(CASE WHEN a.pay_outcome='ontime' THEN 1 ELSE 0 END) ontime
+    FROM applications a JOIN jobs j ON j.id=a.job_id WHERE j.employer_id=? AND a.pay_outcome IS NOT NULL`).get(employerId);
+  const total = r && r.total || 0; const ontime = r && r.ontime || 0;
+  return { n: total, pct: total ? Math.round((ontime/total)*100) : null };
+}
+const crewOf = (workerId) => db.prepare('SELECT * FROM crew_members WHERE worker_id=? ORDER BY id').all(workerId);
 
 // ---------- agents ----------
 function isExternalJob(j){ return !!(j && j.source && j.source!=='Rivet' && j.apply_url); }
@@ -358,7 +372,9 @@ async function sendCandidate(res, user, wid, screen=null){
   const myReview = canReviewJob ? await db.prepare('SELECT * FROM reviews WHERE author_id=? AND subject_id=? AND job_id=?').get(user.id, wid, canReviewJob) : null;
   const ivRows = jobs.length ? await db.prepare(`SELECT * FROM interviews WHERE worker_id=? AND employer_id=? AND job_id IN (${jobs.map(()=>'?').join(',')})`).all(wid, user.id, ...jobs.map(j=>j.id)) : [];
   const interviews = {}; for(const iv of ivRows) interviews[iv.job_id] = iv;
-  return send(res, V.layout({title:w.name,user,active:'search',body:V.empCandidate({worker:w,profile:prof,creds,matches,apps,messages,meId:user.id,notes,saved,portfolio,work,rating,reviews,canReviewJob,myReview,interviews,screen})}));
+  const su = await showUp(wid);
+  const crew = await crewOf(wid);
+  return send(res, V.layout({title:w.name,user,active:'search',body:V.empCandidate({worker:w,profile:prof,creds,matches,apps,messages,meId:user.id,notes,saved,portfolio,work,rating,reviews,canReviewJob,myReview,interviews,screen,showUp:su,crew})}));
 }
 
 // ---------- geo / distance ----------
@@ -795,7 +811,7 @@ const server = http.createServer(async (req,res)=>{
       if(p==='/app/profile' && method==='GET'){
         const portfolio = await db.prepare("SELECT * FROM media WHERE user_id=? AND target='portfolio' ORDER BY created_at DESC, id DESC").all(user.id);
         const work = await getWorkHistory(user.id);
-        return send(res, V.layout({title:'Work Card',user,active:'profile',body:V.workerProfile({user,profile:prof,creds:await getCreds(user.id),portfolio,work,rating:await ratingFor(user.id,'worker')})}));
+        return send(res, V.layout({title:'Work Card',user,active:'profile',body:V.workerProfile({user,profile:prof,creds:await getCreds(user.id),portfolio,work,rating:await ratingFor(user.id,'worker'),crew:await crewOf(user.id),showUp:await showUp(user.id)})}));
       }
       if(p==='/app/profile/details' && method==='POST'){
         const b = await readBody(req);
@@ -835,6 +851,25 @@ const server = http.createServer(async (req,res)=>{
           .run(user.id, b.kind, M.CRED_KINDS[b.kind]||b.kind, b.expires||null);
         await recomputeReadiness(user.id);
         return redirect(res,'/app/profile');
+      }
+      if(p==='/app/crew' && method==='POST'){
+        const b = await readBody(req);
+        const name = String(b.name||'').trim().slice(0,60);
+        if(name) await db.prepare('INSERT INTO crew_members(worker_id,name,trade,note) VALUES(?,?,?,?)')
+          .run(user.id, name, (M.TRADES[b.trade]?b.trade:'')||'', String(b.note||'').slice(0,80));
+        return redirect(res,'/app/profile');
+      }
+      const crewDel = p.match(/^\/app\/crew\/(\d+)\/delete$/);
+      if(crewDel && method==='POST'){
+        await db.prepare('DELETE FROM crew_members WHERE id=? AND worker_id=?').run(Number(crewDel[1]), user.id);
+        return redirect(res,'/app/profile');
+      }
+      const payOut = p.match(/^\/app\/applications\/(\d+)\/pay$/);
+      if(payOut && method==='POST'){
+        const b = await readBody(req);
+        if(['ontime','late','short','unpaid'].includes(b.pay_outcome))
+          await db.prepare("UPDATE applications SET pay_outcome=? WHERE id=? AND worker_id=? AND stage='Hired'").run(b.pay_outcome, Number(payOut[1]), user.id);
+        return redirect(res,'/app/applications');
       }
       if(p==='/app/work-auth' && method==='POST'){
         const b = await readBody(req);
@@ -954,7 +989,8 @@ const server = http.createServer(async (req,res)=>{
         const distance = await workerDistance(prof, job.zip);
         const rules = M.localRules(job.city);
         const empRating = await ratingFor(job.employer_id, 'employer');
-        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied,saved,jobMedia,distance,rules,empRating,workAuth:prof.work_auth||''})}));
+        const empPay = await payRep(job.employer_id);
+        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied,saved,jobMedia,distance,rules,empRating,workAuth:prof.work_auth||'',empPay})}));
       }
       if(jid && p===`/app/jobs/${jid}/apply` && method==='POST'){
         const job = await db.prepare('SELECT * FROM jobs WHERE id=?').get(jid);
@@ -1039,7 +1075,7 @@ const server = http.createServer(async (req,res)=>{
           kpis:{pipeline, hired, fillRate}, weekly, conv, topTrades, topJobs, avgScore, totalApps})}));
       }
       if(p==='/console/company' && method==='GET')
-        return send(res, V.layout({title:'Company profile',user,active:'',body:V.empCompany({user, saved:url.searchParams.get('saved')==='1', rating:await ratingFor(user.id,'employer'), reviews:await reviewsFor(user.id,'employer')})}));
+        return send(res, V.layout({title:'Company profile',user,active:'',body:V.empCompany({user, saved:url.searchParams.get('saved')==='1', rating:await ratingFor(user.id,'employer'), reviews:await reviewsFor(user.id,'employer'), payRep:await payRep(user.id)})}));
       if(p==='/console/company' && method==='POST'){
         const b = await readBody(req);
         let site = String(b.company_website||'').trim().slice(0,200);
@@ -1075,8 +1111,9 @@ const server = http.createServer(async (req,res)=>{
         const reqCreds = [].concat(b.req_creds||[]).filter(Boolean).join(',');
         const empType = V.JOB_TYPES.includes(b.employment_type) ? b.employment_type : 'Full-time';
         const spon = ['authorized','h2a','h2b'].includes(b.sponsorship) ? b.sponsorship : 'authorized';
-        const info = await db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type,sponsorship)
-          VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).run(user.id,b.title,b.trade,Number(b.pay_min)||0,Number(b.pay_max)||0,b.city||'',b.zip||'',b.shift||'Day',reqCreds,b.descr||'',empType,spon);
+        const crewOk = b.crew_ok ? 1 : 0;
+        const info = await db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type,sponsorship,crew_ok)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(user.id,b.title,b.trade,Number(b.pay_min)||0,Number(b.pay_max)||0,b.city||'',b.zip||'',b.shift||'Day',reqCreds,b.descr||'',empType,spon,crewOk);
         const jobId = info.lastInsertRowid;
         try { await geocodeZip(b.zip); } catch(e){} // pin new job on the demand map immediately
         // SMS job alerts to matching, opted-in, available workers who have a phone
@@ -1115,6 +1152,16 @@ const server = http.createServer(async (req,res)=>{
           }
         }
         return redirect(res, `/console/jobs/${before?before.job_id:''}`);
+      }
+      // Show-Up Score: employer records whether a hired worker showed up
+      const outMatch = p.match(/^\/console\/applications\/(\d+)\/outcome$/);
+      if(outMatch && method==='POST'){
+        const b = await readBody(req); const appId = Number(outMatch[1]);
+        const ok = await db.prepare(`SELECT a.id FROM applications a JOIN jobs j ON j.id=a.job_id WHERE a.id=? AND j.employer_id=?`).get(appId, user.id);
+        const app = await db.prepare('SELECT job_id FROM applications WHERE id=?').get(appId);
+        if(ok && ['showed','noshow','cancelled'].includes(b.outcome))
+          await db.prepare('UPDATE applications SET outcome=? WHERE id=?').run(b.outcome, appId);
+        return redirect(res, `/console/jobs/${app?app.job_id:''}`);
       }
       const addMatch = p.match(/^\/console\/jobs\/(\d+)\/add$/);
       if(addMatch && method==='POST'){
@@ -1167,8 +1214,9 @@ const server = http.createServer(async (req,res)=>{
         const reqCreds = [].concat(b.req_creds||[]).filter(Boolean).join(',');
         const empType = V.JOB_TYPES.includes(b.employment_type) ? b.employment_type : (job.employment_type||'Full-time');
         const spon = ['authorized','h2a','h2b'].includes(b.sponsorship) ? b.sponsorship : (job.sponsorship||'authorized');
-        await db.prepare(`UPDATE jobs SET title=?,trade=?,pay_min=?,pay_max=?,city=?,zip=?,shift=?,req_creds=?,descr=?,employment_type=?,sponsorship=? WHERE id=? AND employer_id=?`)
-          .run(String(b.title).slice(0,120), b.trade||job.trade, Number(b.pay_min)||0, Number(b.pay_max)||0, b.city||'', b.zip||'', b.shift||'Day', reqCreds, String(b.descr||'').slice(0,2000), empType, spon, jobId, user.id);
+        const crewOk = b.crew_ok ? 1 : 0;
+        await db.prepare(`UPDATE jobs SET title=?,trade=?,pay_min=?,pay_max=?,city=?,zip=?,shift=?,req_creds=?,descr=?,employment_type=?,sponsorship=?,crew_ok=? WHERE id=? AND employer_id=?`)
+          .run(String(b.title).slice(0,120), b.trade||job.trade, Number(b.pay_min)||0, Number(b.pay_max)||0, b.city||'', b.zip||'', b.shift||'Day', reqCreds, String(b.descr||'').slice(0,2000), empType, spon, crewOk, jobId, user.id);
         return redirect(res, `/console/jobs/${jobId}`);
       }
 
@@ -1176,7 +1224,7 @@ const server = http.createServer(async (req,res)=>{
       if(jid && p===`/console/jobs/${jid}` && method==='GET'){
         const job = await db.prepare('SELECT * FROM jobs WHERE id=? AND employer_id=?').get(jid,user.id);
         if(!job) return send(res, V.layout({title:'Not found',user,body:'<section class="wrap"><div class="card">Job not found.</div></section>'}),404);
-        const apps = await db.prepare(`SELECT a.id app_id,a.stage,a.score,u.id worker_id,u.name,p.trade FROM applications a
+        const apps = await db.prepare(`SELECT a.id app_id,a.stage,a.score,a.outcome,u.id worker_id,u.name,p.trade FROM applications a
           JOIN users u ON u.id=a.worker_id JOIN worker_profiles p ON p.user_id=a.worker_id WHERE a.job_id=?`).all(jid);
         const columns = {}; for(const st of V.STAGES) columns[st]=[];
         const inPipe = new Set(); for(const a of apps){ (columns[a.stage]=columns[a.stage]||[]).push(a); inPipe.add(a.name); }

@@ -214,6 +214,13 @@ async function createSchema() {
       status TEXT DEFAULT 'proposed',
       created_at TEXT DEFAULT (datetime('now'))
     );
+    CREATE TABLE IF NOT EXISTS crew_members (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      worker_id INTEGER REFERENCES users(id),
+      name TEXT NOT NULL, trade TEXT, note TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_crew_worker ON crew_members(worker_id);
     CREATE INDEX IF NOT EXISTS idx_interviews_worker ON interviews(worker_id, status);
     CREATE INDEX IF NOT EXISTS idx_interviews_job ON interviews(job_id);
     CREATE INDEX IF NOT EXISTS idx_messages_to ON messages(to_id, read_at);
@@ -906,6 +913,35 @@ async function seedReviews(){
   console.log('[db] demo reviews + sample interview seeded');
 }
 
+// ---- X-factors demo data: show-up outcomes, pay outcomes, crews, crew-open jobs (idempotent) ----
+async function seedXfactors(){
+  if (await metaGet('xfactors_v1')) return;
+  // Hired applications get a real outcome + pay record (mostly good, a little texture).
+  const hired = await db.prepare("SELECT id FROM applications WHERE stage='Hired' ORDER BY id").all();
+  hired.forEach(()=>{}); // (no-op to keep lints calm)
+  for(let i=0;i<hired.length;i++){
+    const out = (i%7===5) ? 'noshow' : ((i%11===9) ? 'cancelled' : 'showed');
+    const pay = (i%6===4) ? 'late' : 'ontime';
+    try { await db.prepare('UPDATE applications SET outcome=?, pay_outcome=? WHERE id=?').run(out, pay, hired[i].id); } catch(e){}
+  }
+  // a couple of crews so "brings a crew" shows in the demo
+  const wId = async (email)=>{ const u=await db.prepare('SELECT id FROM users WHERE email=?').get(email); return u&&u.id; };
+  const crews = [
+    ['marcus@rivet.test', [['Tony Marchetti','pipefitter','Worked together 3 yrs at Copper Mountain'],['Ray Banks','controls','Reliable, OSHA-30']]],
+    ['omar@rivet.test', [['DeShawn Carter','welder','6G, travels for work'],['Sam Okafor','pipefitter','Fast, clean welds']]],
+  ];
+  for(const [email, members] of crews){
+    const uid = await wId(email); if(!uid) continue;
+    for(const [name,trade,note] of members){
+      try { await db.prepare('INSERT INTO crew_members(worker_id,name,trade,note) VALUES(?,?,?,?)').run(uid, name, trade, note); } catch(e){}
+    }
+  }
+  // mark some jobs open to crews (crew-friendly trades)
+  try { await db.exec("UPDATE jobs SET crew_ok=1 WHERE trade IN ('welder','pipefitter','concrete','carpenter','framer','ironworker','fruit_picker','farmworker','event_setup','landscaper')"); } catch(e){}
+  await metaSet('xfactors_v1','1');
+  console.log('[db] X-factors seeded — show-up + pay outcomes, crews, crew-open jobs');
+}
+
 async function migrate() {
   // additive column migrations (idempotent — errors swallowed when already applied)
   try { await db.exec('ALTER TABLE users ADD COLUMN phone TEXT'); } catch (e) { /* column exists */ }
@@ -932,6 +968,9 @@ async function migrate() {
   try { await db.exec("ALTER TABLE credentials ADD COLUMN verify_status TEXT DEFAULT 'unverified'"); } catch (e) { /* column exists */ }
   try { await db.exec("ALTER TABLE jobs ADD COLUMN sponsorship TEXT DEFAULT 'authorized'"); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN work_auth TEXT'); } catch (e) { /* column exists */ }
+  try { await db.exec('ALTER TABLE applications ADD COLUMN outcome TEXT'); } catch (e) { /* showed/noshow/cancelled */ }
+  try { await db.exec('ALTER TABLE applications ADD COLUMN pay_outcome TEXT'); } catch (e) { /* ontime/late/short/unpaid */ }
+  try { await db.exec('ALTER TABLE jobs ADD COLUMN crew_ok INTEGER DEFAULT 0'); } catch (e) { /* column exists */ }
 }
 
 async function seedZips() {
@@ -990,6 +1029,7 @@ async function init() {
   try { await seedUsajobs(); } catch (e) { console.error('[db] usajobs seed skipped (non-fatal):', e.message); }
   try { await seedActivity2(); } catch (e) { console.error('[db] activity2 seed skipped (non-fatal):', e.message); }
   try { await seedReviews(); } catch (e) { console.error('[db] reviews seed skipped (non-fatal):', e.message); }
+  try { await seedXfactors(); } catch (e) { console.error('[db] xfactors seed skipped (non-fatal):', e.message); }
   try {
     if(!(await metaGet('sponsorship_v2'))){
       // Recompute cleanly by trade (no employment_type sweep, which mis-tagged Temp jobs).

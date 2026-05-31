@@ -296,6 +296,18 @@ const BUILTIN_ES = {
   'No matches for these filters.':'No hay coincidencias para estos filtros.',
   // map hero
   'across':'en','metro':'metro','metros':'metros','warmer & bigger = more hiring':'más grande = más contratación',
+  // X-factors: show-up, pay, crew, renewals
+  'Shows up':'Asiste','start':'inicio','starts':'inicios','Confirmed start outcomes — showed up vs no-showed':'Resultados confirmados — se presentó vs. no se presentó',
+  'Pays on time':'Paga a tiempo','Worker-confirmed pay outcomes':'Pagos confirmados por trabajadores',
+  'My crew':'Mi cuadrilla','people you’d vouch for & bring to a job':'gente que recomiendas y llevarías a un trabajo',
+  'Add teammates you’ve worked with — employers hiring crews will see you bring a team.':'Agrega compañeros con los que has trabajado — los empleadores que contratan cuadrillas verán que llevas equipo.',
+  'No crew listed yet.':'Aún no hay cuadrilla.','How you know them (optional)':'Cómo los conoces (opcional)','Name':'Nombre','Add':'Agregar',
+  'Renewals due':'Renovaciones pendientes','keep these current to stay hireable':'manténlas vigentes para seguir contratable',
+  'expired':'vencida','expires today':'vence hoy','expires in':'vence en','days':'días','Renew ↗':'Renovar ↗',
+  'Did this employer pay you as promised?':'¿Este empleador te pagó como prometió?','Paid on time':'Pagó a tiempo','Paid late':'Pagó tarde','Paid short':'Pagó de menos','Not paid':'No pagó','Pay reported':'Pago reportado',
+  '✓ Showed up':'✓ Se presentó','✗ No-showed':'✗ No se presentó','Cancelled w/ notice':'Canceló con aviso','Did they show?':'¿Se presentó?',
+  'Showed up':'Se presentó','No-showed':'No se presentó','Cancelled with notice':'Canceló con aviso',
+  'Open to crews':'Abierto a cuadrillas','Crews ok':'Cuadrillas ok','Open to crews — a worker can bring vetted teammates':'Abierto a cuadrillas — el trabajador puede llevar compañeros verificados',
 };
 function T(s){
   if(LANG !== 'es' || !s) return s;
@@ -378,7 +390,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=56">
+  <link rel="stylesheet" href="/styles.css?v=57">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -791,6 +803,7 @@ function jobCard(m, bare = false){
       <span class="js-shift">${esc(T(j.shift))}</span>
       ${isExternal(j)?`<span class="ext-badge">${esc(j.source)} ↗</span>`:''}
       ${sponsorBadge(j)}
+      ${j.crew_ok?`<span class="crew-badge">${icon('truck')} ${T('Crews ok')}</span>`:''}
       ${bare?'':fit}
     </div>
     ${bare?'':`<div class="matchbar"><i style="width:${m.score}%"></i></div>`}
@@ -867,7 +880,7 @@ function workerJobs({ matches, filters = {}, jobsGeo = null, needZip = false }) 
 }
 
 // ---------- worker: job detail ----------
-function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance = null, rules = null, empRating = {avg:0,count:0}, workAuth = '' }) {
+function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance = null, rules = null, empRating = {avg:0,count:0}, workAuth = '', empPay = {} }) {
   const belowMin = rules && job.pay_min && job.pay_min < rules.minWage;
   const spon = (job.sponsorship)||'authorized';
   const sponMatch = (spon==='h2a'&&workAuth==='need_h2a')||(spon==='h2b'&&workAuth==='need_h2b');
@@ -878,7 +891,7 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
         <div class="badge big">${tradeEmoji(job.trade)}</div>
         <div class="job-main">
           <h2>${esc(job.title)}</h2>
-          ${job.employment_type?`<span class="jtype">${esc(T(job.employment_type))}</span>`:''}
+          ${job.employment_type?`<span class="jtype">${esc(T(job.employment_type))}</span>`:''}${job.crew_ok?`<span class="jtype crew">${icon('truck')} ${T('Open to crews')}</span>`:''}
           <div class="job-c">${esc(job.company||'')} · ${esc(job.city)} ${esc(job.zip)} · ${esc(T(job.shift))}${distance!=null?` · <b class="dist">${distance} ${T('mi away')}</b>`:''}</div>
           <div class="pay big">$${job.pay_min}–${job.pay_max}/hr</div>
         </div>
@@ -923,7 +936,7 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
       <div class="job-row"><div class="big-av c sm">${initials(job.company||'')}</div>
         <div class="job-main"><b>${esc(job.company||'')}</b>
           <div class="muted sm">${esc(job.company_city||'')}${job.company_size?` · ${esc(job.company_size)} ${T('employees')}`:''}</div>
-          ${empRating.count?`<div class="rating-row sm">${ratingHead(empRating)}</div>`:''}</div></div>
+          ${(empRating.count||empPay.pct!=null)?`<div class="rating-row sm">${empRating.count?ratingHead(empRating):''} ${payRepBadge(empPay)}</div>`:''}</div></div>
       ${job.company_about?`<p class="descr" style="margin-top:10px">${esc(job.company_about)}</p>`:''}
       ${job.company_website?`<a class="nav-link" style="color:var(--brand-d)" href="${esc(job.company_website)}" target="_blank" rel="noopener">${esc(job.company_website)} ↗</a>`:''}
     </div>`:''}
@@ -990,6 +1003,10 @@ function workerApplications({ apps, savedJobs, interviews = [], empReviews = {} 
       ${a.stage==='Hired' ? (empReviews[a.job_id]
         ? `<div class="ok-card sm">${T('You reviewed this employer')} ${starBar(empReviews[a.job_id].stars)}</div>`
         : `<div class="rev-cta"><div class="muted sm">${T('You worked here — rate the employer:')}</div>${reviewForm({action:'/app/reviews', hidden:{job_id:a.job_id, employer_id:a.employer_id}, label:T('Submit review'), prompt:T('How was working here?')})}</div>`) : ''}
+      ${a.stage==='Hired' ? (a.pay_outcome
+        ? `<div class="ok-card sm">${T('Pay reported')}: ${T({ontime:'Paid on time',late:'Paid late',short:'Paid short',unpaid:'Not paid'}[a.pay_outcome]||a.pay_outcome)}</div>`
+        : `<div class="rev-cta"><div class="muted sm">${T('Did this employer pay you as promised?')}</div>
+          <div class="pay-btns">${[['ontime','Paid on time'],['late','Paid late'],['short','Paid short'],['unpaid','Not paid']].map(([v,l])=>`<form method="post" action="/app/applications/${a.id}/pay"><input type="hidden" name="pay_outcome" value="${v}"><button class="btn-xs${v==='ontime'?'':' ghost'}">${T(l)}</button></form>`).join('')}</div></div>`) : ''}
     </div>`).join('') : `<div class="card muted">${T('No applications yet.')} <a href="/app/jobs">${T('Browse matches →')}</a></div>`}
     <div class="sec-h big" style="margin-top:26px">${T('Saved jobs')}</div>
     ${savedJobs.length ? savedJobs.map(j=>`<a class="jobline" href="/app/jobs/${j.id}">
@@ -1029,7 +1046,7 @@ function workHistoryList(items, editable){
   return items.length ? `<div class="explist">${items.map(w=>workRow(w, editable)).join('')}</div>`
     : (editable ? `<p class="muted">${T('No past jobs added yet — add the places you’ve worked below. This is what recruiters trust most.')}</p>` : '');
 }
-function workerProfile({ user, profile, creds, error, portfolio = [], work = [], rating = {avg:0,count:0} }) {
+function workerProfile({ user, profile, creds, error, portfolio = [], work = [], rating = {avg:0,count:0}, crew = [], showUp = {} }) {
   const kinds = Object.entries(CRED_KINDS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
   const trades = tradesOf(profile);
   return `<section class="wrap">
@@ -1038,7 +1055,7 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [],
       <h2>${esc(user.name)}</h2>
       ${profile.headline?`<p class="headline">${esc(profile.headline)}</p>`:''}
       <div class="chips">${tradeChips(profile)}</div>
-      ${rating.count?`<div class="rating-row">${ratingHead(rating)}</div>`:''}
+      ${(rating.count||showUp.pct!=null)?`<div class="rating-row">${rating.count?ratingHead(rating):''} ${showUpBadge(showUp)}</div>`:''}
       <p class="muted">${esc(profile.city)} · ${profile.years_exp} yrs · floor $${profile.pay_floor}/hr · ${esc(profile.shift)} shift</p>
       <div class="ministats">
         <div><b>${profile.readiness}</b><span>${T('READINESS')}</span></div>
@@ -1129,6 +1146,8 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [],
         <button class="btn">${T('Add credential')}</button>
       </form>
     </div>
+    ${renewalRadar(creds)}
+    ${crewCard({crew, editable:true})}
     <div class="card">
       <div class="sec-h" style="margin-top:0">${T('Portfolio — your past work')} <a href="/p/${user.id}" target="_blank" rel="noopener">${T('View public page ↗')}</a></div>
       ${mediaGallery(portfolio, {deletable:true, base:'/app/portfolio'}) || `<p class="muted">${T('Add photos or videos of jobs you’ve completed — it builds your shareable portfolio and helps recruiters trust your work.')}</p>`}
@@ -1316,6 +1335,46 @@ function reviewForm({ action, hidden = {}, label, prompt }){
 function fmtSlot(iso){
   const d = new Date(iso); if(isNaN(d)) return esc(iso);
   return d.toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+}
+// ---------- X-factors: reliability, pay reputation, crew, renewals ----------
+function repClass(p){ return p>=90?'good':(p>=75?'mid':'low'); }
+function showUpBadge(s){
+  if(!s || s.pct==null) return '';
+  return `<span class="rep-badge ${repClass(s.pct)}" title="${T('Confirmed start outcomes — showed up vs no-showed')}">${icon('dot')} ${T('Shows up')} ${s.pct}% <span class="rep-n">(${s.starts} ${s.starts===1?T('start'):T('starts')})</span></span>`;
+}
+function payRepBadge(p){
+  if(!p || p.pct==null) return '';
+  return `<span class="rep-badge ${repClass(p.pct)}" title="${T('Worker-confirmed pay outcomes')}">${icon('dot')} ${T('Pays on time')} ${p.pct}% <span class="rep-n">(${p.n})</span></span>`;
+}
+function crewCard({ crew = [], editable = false }){
+  const rows = crew.map(m=>`<div class="crew-row"><span class="crew-av">${initials(m.name)}</span>
+    <div class="crew-main"><b>${esc(m.name)}</b><span class="muted sm">${esc(TRADES[m.trade]||m.trade||'')}${m.note?` · ${esc(m.note)}`:''}</span></div>
+    ${editable?`<form method="post" action="/app/crew/${m.id}/delete"><button class="x" aria-label="${T('Remove')}">✕</button></form>`:''}</div>`).join('');
+  return `<div class="card">
+    <div class="sec-h" style="margin-top:0">${icon('truck','xic')} ${T('My crew')} <span class="muted sm">${T('people you’d vouch for & bring to a job')}</span></div>
+    ${rows || `<p class="muted sm">${editable?T('Add teammates you’ve worked with — employers hiring crews will see you bring a team.'):T('No crew listed yet.')}</p>`}
+    ${editable?`<form method="post" action="/app/crew" class="crew-form">
+      <input name="name" placeholder="${T('Name')}" maxlength="60" required>
+      <select name="trade"><option value="">${T('Trade')}</option>${Object.entries(TRADES).map(([k,v])=>`<option value="${k}">${esc(v)}</option>`).join('')}</select>
+      <input name="note" placeholder="${T('How you know them (optional)')}" maxlength="80">
+      <button class="btn-sm">${T('Add')}</button>
+    </form>`:''}
+  </div>`;
+}
+function renewalRadar(creds){
+  const now = Date.now();
+  const due = creds.filter(c=>c.verified && c.expires).map(c=>{
+    const t = Date.parse((String(c.expires).length===7?c.expires+'-01':c.expires)+'T00:00:00Z');
+    return { ...c, days: isNaN(t)?9999:Math.round((t-now)/864e5) };
+  }).filter(c=>c.days<=180).sort((a,b)=>a.days-b.days);
+  if(!due.length) return '';
+  return `<div class="card">
+    <div class="sec-h" style="margin-top:0">${icon('bell','xic')} ${T('Renewals due')} <span class="muted sm">${T('keep these current to stay hireable')}</span></div>
+    ${due.map(c=>{ const urgent=c.days<=30; return `<div class="renew ${urgent?'urgent':''}">
+      <div class="renew-main"><b>${esc(c.name)}</b><span class="muted sm">${c.days<0?T('expired'):c.days===0?T('expires today'):`${T('expires in')} ${c.days} ${T('days')}`} · ${esc(c.expires)}</span></div>
+      ${TRAINING[c.kind]?`<a class="btn-xs" href="${esc(TRAINING[c.kind].url)}" target="_blank" rel="noopener">${T('Renew ↗')}</a>`:''}
+    </div>`; }).join('')}
+  </div>`;
 }
 // recruiter-side interview block for a given job/worker
 function interviewEmp(iv){
@@ -1539,14 +1598,14 @@ function empAnalytics({ user, kpis, weekly = [], conv = [], topTrades = [], topJ
 }
 
 const COMPANY_SIZES = ['1–10','11–50','51–200','201–500','500+'];
-function empCompany({ user, saved = false, rating = {avg:0,count:0}, reviews = [] }) {
+function empCompany({ user, saved = false, rating = {avg:0,count:0}, reviews = [], payRep = {} }) {
   const sizeOpts = `<option value="">Company size</option>`+COMPANY_SIZES.map(s=>`<option ${user.company_size===s?'selected':''}>${s}</option>`).join('');
   return `<section class="wrap narrow">
     <div class="card profile-head">
       <div class="big-av c">${initials(user.company||user.name)}</div>
       <h2>${esc(user.company||'Your company')}</h2>
-      <div class="rating-row">${ratingHead(rating)}</div>
-      <p class="muted">${esc(user.company_city||'')}${user.company_size?` · ${esc(user.company_size)} employees`:''}</p>
+      <div class="rating-row">${ratingHead(rating)} ${payRepBadge(payRep)}</div>
+      <p class="muted">${esc(user.company_city||'')}${user.company_size?` · ${esc(user.company_size)} ${T('employees')}`:''}</p>
       ${user.company_website?`<p><a class="nav-link" style="color:var(--brand-d)" href="${esc(user.company_website)}" target="_blank" rel="noopener">${esc(user.company_website)} ↗</a></p>`:''}
       ${user.company_about?`<p class="cand-bio">${esc(user.company_about)}</p>`:''}
     </div>
@@ -1622,6 +1681,7 @@ function empJobForm(error='', job=null) {
       <label>${T('Shift')} <select name="shift">${shiftOpts}</select></label>
       <label>${T('Work authorization')} <select name="sponsorship">${Object.entries(SPONSORSHIP).map(([k,vv])=>`<option value="${k}" ${editing&&job.sponsorship===k?'selected':(k==='authorized'&&!(editing&&job.sponsorship)?'selected':'')}>${T(vv)}</option>`).join('')}</select></label>
       <p class="muted sm" style="margin-top:-4px">${T('If you sponsor H-2A/H-2B workers, candidates seeking that sponsorship will see it. Informational only — not legal advice.')}</p>
+      <label class="ck"><input type="checkbox" name="crew_ok" value="1" ${editing&&job.crew_ok?'checked':''}> ${T('Open to crews — a worker can bring vetted teammates')}</label>
       <label>${T('Required credentials')}</label><div class="ckrow">${cred}</div>
       <label>${T('Description')} <textarea name="descr" rows="3">${v('descr')}</textarea></label>
       <button class="btn full">${editing?T('Save changes'):T('Post & match')}</button>
@@ -1639,6 +1699,9 @@ function empPipeline({ job, columns, candidates, jobMedia = [], alerted = 0, sou
           <form method="post" action="/console/applications/${a.app_id}/stage" class="stageform">
             <select name="stage" onchange="this.form.submit()">${STAGES.map(s=>`<option ${s===st?'selected':''}>${s}</option>`).join('')}</select>
           </form></div>
+        ${st==='Hired' ? (a.outcome
+          ? `<div class="pc-out ${a.outcome}">${({showed:T('✓ Showed up'),noshow:T('✗ No-showed'),cancelled:T('Cancelled w/ notice')})[a.outcome]||a.outcome}</div>`
+          : `<div class="pc-outset"><span class="muted sm">${T('Did they show?')}</span>${[['showed','✓'],['noshow','✗'],['cancelled','~']].map(([v,g])=>`<form method="post" action="/console/applications/${a.app_id}/outcome"><input type="hidden" name="outcome" value="${v}"><button class="btn-xs ${v==='showed'?'':'ghost'}" title="${({showed:T('Showed up'),noshow:T('No-showed'),cancelled:T('Cancelled with notice')})[v]}">${g}</button></form>`).join('')}</div>`) : ''}
       </div>`).join('')}
     </div>`).join('');
   return `<section class="wrap">
@@ -1728,7 +1791,7 @@ function inbox({ convos, base, meId }){
 }
 
 // ---------- employer: candidate detail ----------
-function empCandidate({ worker, profile, creds, matches, apps, messages, meId, notes = [], saved = false, portfolio = [], work = [], rating = {avg:0,count:0}, reviews = [], canReviewJob = null, myReview = null, interviews = {}, screen = null }) {
+function empCandidate({ worker, profile, creds, matches, apps, messages, meId, notes = [], saved = false, portfolio = [], work = [], rating = {avg:0,count:0}, reviews = [], canReviewJob = null, myReview = null, interviews = {}, screen = null, showUp = {}, crew = [] }) {
   const stageByJob = {}; for (const a of apps) stageByJob[a.job_id] = a.stage;
   const screenPanel = (jobId) => (screen && screen.jobId===jobId) ? `<div class="iv">
     <div class="iv-h">${icon('spark','xic')} ${T('AI screen')}${screen.ai?'':` <span class="muted sm">(${T('offline')})</span>`}</div>
@@ -1746,7 +1809,7 @@ function empCandidate({ worker, profile, creds, matches, apps, messages, meId, n
       ${profile.headline?`<p class="headline">${esc(profile.headline)}</p>`:''}
       <div class="chips">${tradeChips(profile)}</div>
       <p class="muted">${esc(profile.city)} ${esc(profile.zip||'')} · ${profile.years_exp} yrs experience · seeks $${profile.pay_floor}+/hr</p>
-      <div class="rating-row">${ratingHead(rating)}</div>
+      <div class="rating-row">${ratingHead(rating)} ${showUpBadge(showUp)}</div>
       ${profile.available?`<div class="avail-badge">${icon('dot','xic')} ${T('Available for work')}</div>`:`<div class="avail-badge off">${T('Not currently available')}</div>`}${profile.work_today?`<div class="avail-badge today">${icon('bolt','xic')} ${T('Can work today')}</div>`:''}${profile.relocate?`<div class="avail-badge relo">${icon('send','xic')} ${T('Open to relocate')}</div>`:''}
       <div class="ministats">
         <div><b>${profile.readiness}</b><span>READINESS</span></div>
@@ -1755,10 +1818,11 @@ function empCandidate({ worker, profile, creds, matches, apps, messages, meId, n
       </div>
       ${(profile.about||profile.bio)?`<p class="cand-bio">${esc(profile.about||profile.bio)}</p>`:''}
     </div>
-    ${work.length?`<div class="card"><div class="sec-h" style="margin-top:0">Work history</div>${workHistoryList(work, false)}</div>`:''}
+    ${work.length?`<div class="card"><div class="sec-h" style="margin-top:0">${T('Work history')}</div>${workHistoryList(work, false)}</div>`:''}
+    ${crew.length?crewCard({crew, editable:false}):''}
     <div class="card">
-      <div class="sec-h" style="margin-top:0">Credential wallet</div>
-      ${creds.map(c=>credRow(c)).join('') || '<p class="muted">No credentials listed yet.</p>'}
+      <div class="sec-h" style="margin-top:0">${T('Credential wallet')}</div>
+      ${creds.map(c=>credRow(c)).join('') || `<p class="muted">${T('No credentials listed yet.')}</p>`}
     </div>
     <div class="card">
       <div class="sec-h" style="margin-top:0">Portfolio <a href="/p/${worker.id}" target="_blank" rel="noopener">Public page ↗</a></div>
