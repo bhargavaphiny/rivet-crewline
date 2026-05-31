@@ -496,7 +496,7 @@ const server = http.createServer(async (req,res)=>{
     // ---- worker (Rivet) ----
     if(p.startsWith('/app')){
       if(!user) return redirect(res,'/login');
-      const prof = await getProfile(user.id);
+      let prof = await getProfile(user.id);
 
       if(p==='/app/onboard' && method==='GET') return send(res, V.layout({title:'Set up',user,active:'',body:V.workerOnboard()}));
       if(p==='/app/onboard' && method==='POST'){
@@ -525,14 +525,23 @@ const server = http.createServer(async (req,res)=>{
         return redirect(res, '/app/messages');
       }
 
-      if(!prof) return redirect(res,'/app/onboard');
+      // First login: never show an empty app. Auto-create a blank Work Card so every
+      // page renders populated (all open jobs + full demand map), with a gentle setup nudge.
+      if(!prof){
+        try { await db.prepare("INSERT INTO worker_profiles(user_id,trade,trades,city,zip,pay_floor,shift,available) VALUES(?,'','','','',0,'Any',1)").run(user.id); } catch(e){}
+        prof = await getProfile(user.id);
+      }
+      const isNewWorker = !(prof && (prof.trades || prof.trade));
 
       if(p==='/app' && method==='GET'){
         const creds = await getCreds(user.id);
         const workCount = (await db.prepare('SELECT COUNT(*) c FROM work_history WHERE user_id=?').get(user.id)).c;
         const portCount = (await db.prepare("SELECT COUNT(*) c FROM media WHERE user_id=? AND target='portfolio'").get(user.id)).c;
-        const jobsGeo = await jobGeoForWorker(prof);
-        return send(res, V.layout({title:'Home',user,active:'home',body:V.workerHome({user,profile:prof,creds,matches:await rankJobsForWorker(user.id),workCount,portCount,jobsGeo})}));
+        // new users (no trade yet): show the FULL national demand map + recent open jobs, unscored
+        const jobsGeo = isNewWorker ? { points: await jobGeoAll() } : await jobGeoForWorker(prof);
+        let matches = await rankJobsForWorker(user.id);
+        if(isNewWorker){ matches = matches.slice().sort((a,b)=> (b.job.id||0)-(a.job.id||0)); }
+        return send(res, V.layout({title:'Home',user,active:'home',body:V.workerHome({user,profile:prof,creds,matches,workCount,portCount,jobsGeo,isNew:isNewWorker})}));
       }
       if(p==='/app/jobs' && method==='GET'){
         const f = {

@@ -505,3 +505,10 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .geo-forest{fill:rgba(86,120,72,.18)}
 .geo-river{fill:none;stroke:rgba(120,158,178,.55);stroke-width:1;stroke-linecap:round;stroke-linejoin:round}
 .geo-mtn{fill:rgba(196,176,142,.4);stroke:rgba(120,100,72,.4);stroke-width:.4;stroke-linejoin:round}
+
+/* ---- first-login welcome banner ---- */
+.welcome{background:linear-gradient(135deg,var(--brand),var(--brand-d));color:#fff;border:0}
+.welcome-h{font-size:19px;font-weight:850;margin-bottom:6px}
+.welcome p{font-size:14px;color:rgba(255,255,255,.9);margin-bottom:14px;max-width:640px}
+.welcome .btn{background:#fff;color:var(--brand-d)}
+.welcome .btn:hover{background:var(--paper-2)}

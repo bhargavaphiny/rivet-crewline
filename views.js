@@ -246,7 +246,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=37">
+  <link rel="stylesheet" href="/styles.css?v=38">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -430,9 +430,14 @@ function xToggle(action, on, iconName, onLabel, offLabel, next){
   return `<form method="post" action="${action}" class="xf"><input type="hidden" name="next" value="${next}">
     <button class="xbtn ${on?'on':''}">${icon(iconName,'xic')}<span>${on?onLabel:offLabel}</span></button></form>`;
 }
-function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 0, jobsGeo = null }) {
-  const top = matches.slice(0,3).map(m=>jobCard(m)).join('');
+function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 0, jobsGeo = null, isNew = false }) {
+  const top = matches.slice(0,3).map(m=>jobCard(m, isNew)).join('');
   const expiring = creds.filter(c=>c.expires && c.expires < '2026-08').length;
+  const welcome = isNew ? `<div class="card welcome">
+      <div class="welcome-h">${T('Welcome to Rivet')}, ${esc((user.name||'').split(' ')[0])} 👋</div>
+      <p>${T("Here's what's hiring across the country right now. Add your trade to get matched to the best-fit jobs near you — it takes a minute.")}</p>
+      <a class="btn" href="/app/profile">${T('Set up my Work Card')}</a>
+    </div>` : '';
   const steps = [
     { done: creds.length>0, label:t('step_cred'), href:'/app/profile' },
     { done: !!profile.about, label:t('step_about'), href:'/app/profile' },
@@ -450,20 +455,21 @@ function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 
       ${xToggle('/app/transport', profile.has_transport, 'truck', t('x_transport_on'), t('x_transport_off'), '/app')}
       ${xToggle('/app/bilingual', profile.bilingual, 'globe', t('x_bilingual_on'), t('x_bilingual_off'), '/app')}
     </div>
-    ${jobsGeo && jobsGeo.points.length ? usMap(jobsGeo.points, {title:t('home_top'), noun:T('job'), cta:T('Apply'),
-        legend:`<span class="lg"><i class="d-direct"></i> ${T('Your trades')}</span><span class="lg"><i class="d-related"></i> ${T('Related trades')}</span>`,
+    ${welcome}
+    ${jobsGeo && jobsGeo.points.length ? usMap(jobsGeo.points, {title:isNew?T('Where the work is'):t('home_top'), noun:T('job'), cta:T('Apply'),
+        legend:isNew?null:`<span class="lg"><i class="d-direct"></i> ${T('Your trades')}</span><span class="lg"><i class="d-related"></i> ${T('Related trades')}</span>`,
         emptyMsg:T('No mapped openings yet.')}) : ''}
     <div class="dash-grid">
       <div>
-        <div class="readiness card">
+        ${isNew ? '' : `<div class="readiness card">
           <div class="ring">${ring(profile.readiness)}</div>
           <div>
             <div class="r-lbl">${t('home_readiness')}</div>
             <div class="r-big">${profile.readiness>=85?t('home_hireready'):profile.readiness>=70?t('home_almost'):t('home_build')}</div>
             <p>${creds.length} ${t('home_credentials')} · ${tradesOf(profile).map(t=>TRADES[t]||t).join(', ')} · ${esc(profile.city)}</p>
           </div>
-        </div>
-        <div class="sec-h">${t('home_top')} <a href="/app/jobs">${t('home_seeall')}</a></div>
+        </div>`}
+        <div class="sec-h">${isNew?T('Open roles hiring now'):t('home_top')} <a href="/app/jobs">${t('home_seeall')}</a></div>
         ${top || `<div class="card muted">${t('home_nomatch')}</div>`}
       </div>
       <aside>
@@ -498,7 +504,7 @@ function ring(score){
     <text x="33" y="38" text-anchor="middle" fill="#fff" font-size="16" font-weight="800">${score}</text></svg>`;
 }
 
-function jobCard(m){
+function jobCard(m, bare = false){
   const j = m.job;
   const fit = (m.missing && m.missing.length)
     ? `<span class="mtag warn">${T('Needs')} ${CRED_KINDS[m.missing[0]]||m.missing[0]}</span>`
@@ -510,15 +516,15 @@ function jobCard(m){
         <div class="job-t">${esc(j.title)}</div>
         <div class="job-c">${esc(j.company||'')} · ${esc(j.city)}${m.distance!=null?` · <b class="dist">${m.distance} ${T('mi away')}</b>`:''}</div>
       </div>
-      <span class="score-chip ${scoreClass(m.score)}">${m.score}</span>
+      ${bare?`<span class="mtag fit" style="margin-left:auto">${TRADES[j.trade]||j.trade}</span>`:`<span class="score-chip ${scoreClass(m.score)}">${m.score}</span>`}
     </div>
     <div class="job-foot">
       <span class="pay">$${j.pay_min}–${j.pay_max}<small>/hr</small></span>
       ${j.employment_type?`<span class="jtype">${esc(j.employment_type)}</span>`:''}
       <span class="js-shift">${esc(j.shift)}</span>
-      ${fit}
+      ${bare?'':fit}
     </div>
-    <div class="matchbar"><i style="width:${m.score}%"></i></div>
+    ${bare?'':`<div class="matchbar"><i style="width:${m.score}%"></i></div>`}
   </a>`;
 }
 
