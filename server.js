@@ -167,6 +167,29 @@ function candidateGeo(){
     FROM worker_profiles p JOIN zip_geo z ON z.zip=p.zip
     GROUP BY p.zip ORDER BY n DESC`).all();
 }
+// open-job locations relevant to a worker: their trades (direct) + adjacent trades (related)
+async function jobGeoForWorker(prof){
+  const trades = profTrades(prof);
+  if(!trades.length) return { points: [] };
+  const direct = new Set(trades);
+  const related = new Set();
+  for(const t of trades) (M.ADJACENT[t]||[]).forEach(a=>{ if(!direct.has(a)) related.add(a); });
+  const rows = await db.prepare(`SELECT j.zip, z.lat, z.lon, z.city, j.trade
+    FROM jobs j JOIN zip_geo z ON z.zip=j.zip WHERE j.status='open'`).all();
+  const byZip = {};
+  for(const r of rows){
+    const isDirect = direct.has(r.trade), isRelated = related.has(r.trade);
+    if(!isDirect && !isRelated) continue;
+    const b = byZip[r.zip] || (byZip[r.zip] = {city:r.city, lat:r.lat, lon:r.lon, n:0, anyDirect:false, trades:{}});
+    b.n++; if(isDirect) b.anyDirect = true;
+    b.trades[r.trade] = (b.trades[r.trade]||0)+1;
+  }
+  const points = Object.values(byZip).map(b=>({
+    city:b.city, lat:b.lat, lon:b.lon, n:b.n, kind:b.anyDirect?'direct':'related',
+    label:`${b.city}: ${b.n} open job${b.n===1?'':'s'} — ${Object.entries(b.trades).map(([t,c])=>`${(M.TRADES[t]||t)} ${c}`).join(', ')}`
+  })).sort((a,b)=>b.n-a.n);
+  return { points };
+}
 async function rankWorkersForJob(job){
   const workers = await db.prepare(`SELECT u.id user_id,u.name,p.* FROM users u JOIN worker_profiles p ON p.user_id=u.id`).all();
   const out = [];
@@ -422,7 +445,8 @@ const server = http.createServer(async (req,res)=>{
         // distance is precomputed in rankJobsForWorker (cached; null when geo unavailable)
         if(f.maxmi) matches = matches.filter(m=> m.distance!=null && m.distance<=f.maxmi);
         if(f.sort==='distance') matches.sort((a,b)=> (a.distance==null?1e9:a.distance)-(b.distance==null?1e9:b.distance));
-        return send(res, V.layout({title:'Find work',user,active:'jobs',body:V.workerJobs({matches, filters:f})}));
+        const jobsGeo = await jobGeoForWorker(prof);
+        return send(res, V.layout({title:'Find work',user,active:'jobs',body:V.workerJobs({matches, filters:f, jobsGeo})}));
       }
       if(p==='/app/profile' && method==='GET'){
         const portfolio = await db.prepare("SELECT * FROM media WHERE user_id=? AND target='portfolio' ORDER BY created_at DESC, id DESC").all(user.id);

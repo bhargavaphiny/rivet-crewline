@@ -157,7 +157,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=21">
+  <link rel="stylesheet" href="/styles.css?v=22">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -415,7 +415,7 @@ function credRow(c){
 }
 
 // ---------- worker: all matches ----------
-function workerJobs({ matches, filters = {} }) {
+function workerJobs({ matches, filters = {}, jobsGeo = null }) {
   const tradeOpts = `<option value="">All trades</option>`+Object.entries(TRADES).map(([k,v])=>`<option value="${k}" ${filters.trade===k?'selected':''}>${v}</option>`).join('');
   const shifts = ['Day','Night','4x10','Any'];
   const shiftOpts = `<option value="">Any shift</option>`+shifts.map(s=>`<option value="${s}" ${filters.shift===s?'selected':''}>${s}</option>`).join('');
@@ -435,6 +435,9 @@ function workerJobs({ matches, filters = {} }) {
       <button class="btn-sm">Search</button>
       ${active?`<a class="nav-link" style="color:var(--brand-d)" href="/app/jobs">Clear</a>`:''}
     </form>
+    ${jobsGeo && jobsGeo.points.length ? usMap(jobsGeo.points, {title:'Where the work is', noun:'job',
+        legend:'<span class="lg"><i class="d-direct"></i> Your trades</span><span class="lg"><i class="d-related"></i> Related trades</span>',
+        emptyMsg:'No mapped openings yet.'}) : ''}
     <div class="grid3">${matches.map(jobCard).join('') || '<div class="card muted">No jobs match those filters. <a href="/app/jobs">Clear filters</a> to see all open work.</div>'}</div>
   </section>`;
 }
@@ -668,23 +671,27 @@ const US_OUTLINE = [
   [-82.5,45.0],[-84.7,45.8],[-87.0,45.4],[-87.8,47.5],[-90.0,46.7],[-92.0,46.8],
   [-95.0,49.0],[-104.0,49.0],[-117.0,49.0],[-122.8,49.0]
 ];
-function usMap(geo = []){
+// generalized: points = [{city,lat,lon,n,kind?}]; opts controls labels/legend
+function usMap(points = [], opts = {}){
+  const { title='Where your talent is', noun='candidate', emptyMsg='No mapped locations yet.', legend=null } = opts;
   const MINLON=-125, MAXLON=-66, MINLAT=24, MAXLAT=50, VW=620, VH=350;
   const px = lon => ((lon-MINLON)/(MAXLON-MINLON)*VW).toFixed(1);
   const py = lat => ((MAXLAT-lat)/(MAXLAT-MINLAT)*VH).toFixed(1);
   const path = US_OUTLINE.map(([lo,la],i)=>`${i?'L':'M'}${px(lo)} ${py(la)}`).join(' ')+' Z';
-  const total = geo.reduce((a,g)=>a+(g.n||0),0);
-  const dots = geo.map(g=>{
+  const total = points.reduce((a,g)=>a+(g.n||0),0);
+  const dots = points.map(g=>{
     const r = Math.min(20, 5 + (g.n||1)*2.5);
-    return `<g class="mdot"><circle cx="${px(g.lon)}" cy="${py(g.lat)}" r="${r}"><title>${esc(g.city||'')}: ${g.n} candidate${g.n===1?'':'s'}</title></circle>${g.n>1?`<text x="${px(g.lon)}" y="${(+py(g.lat)+3.5).toFixed(1)}" text-anchor="middle">${g.n}</text>`:''}</g>`;
+    const cls = g.kind==='related' ? 'mdot related' : 'mdot';
+    const lbl = g.label || `${g.city||''}: ${g.n} ${noun}${g.n===1?'':'s'}`;
+    return `<g class="${cls}"><circle cx="${px(g.lon)}" cy="${py(g.lat)}" r="${r}"><title>${esc(lbl)}</title></circle>${g.n>1?`<text x="${px(g.lon)}" y="${(+py(g.lat)+3.5).toFixed(1)}" text-anchor="middle">${g.n}</text>`:''}</g>`;
   }).join('');
-  const top = geo.slice(0,6).map(g=>`<li><span>${esc(g.city||'—')}</span><b>${g.n}</b></li>`).join('');
+  const top = points.slice(0,6).map(g=>`<li><span>${esc(g.city||'—')}</span><b>${g.n}</b></li>`).join('');
   return `<div class="card">
-    <div class="sec-h" style="margin-top:0">Where your talent is <span class="muted">${total} candidate${total===1?'':'s'} mapped</span></div>
-    ${geo.length ? `<div class="mapwrap"><svg class="usmap" viewBox="0 0 ${VW} ${VH}" role="img" aria-label="US map of candidate locations">
+    <div class="sec-h" style="margin-top:0">${esc(title)} <span class="muted">${total} ${noun}${total===1?'':'s'} mapped</span></div>
+    ${points.length ? `<div class="mapwrap"><svg class="usmap" viewBox="0 0 ${VW} ${VH}" role="img" aria-label="US map">
         <path class="us-out" d="${path}"/>${dots}</svg>
-      <ul class="maplist">${top}</ul></div>`
-      : '<p class="muted">No mapped candidate locations yet. Locations appear as workers add a ZIP to their Work Card.</p>'}
+      <ul class="maplist">${top}</ul></div>${legend?`<div class="maplegend">${legend}</div>`:''}`
+      : `<p class="muted">${esc(emptyMsg)}</p>`}
   </div>`;
 }
 function empOverview({ user, kpis, funnel, recent, hot, alerts, fillRate, geo = [] }) {
@@ -718,7 +725,7 @@ function empOverview({ user, kpis, funnel, recent, hot, alerts, fillRate, geo = 
         </div>`).join('') : '<p class="muted">No recent activity yet.</p>'}
       </div>
     </div>
-    ${usMap(geo)}
+    ${usMap(geo, {title:'Where your talent is', noun:'candidate', emptyMsg:'No mapped candidate locations yet. Locations appear as workers add a ZIP to their Work Card.'})}
     <div class="grid2">
       <div class="card">
         <div class="sec-h" style="margin-top:0">Hot candidates — ready now <a href="/console/search">Search all</a></div>

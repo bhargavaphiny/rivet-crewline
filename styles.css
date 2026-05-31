@@ -365,3 +365,11 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .maplist li:last-child{border-bottom:none}
 .maplist b{color:var(--brand-d)}
 @media(max-width:560px){.maplist{width:100%}}
+
+/* ---- map: related-trade dots + legend ---- */
+.mdot.related circle{fill:var(--brand);fill-opacity:.55}
+.maplegend{display:flex;gap:18px;margin-top:12px;font-size:12.5px;color:var(--muted)}
+.maplegend .lg{display:inline-flex;align-items:center;gap:6px}
+.maplegend i{width:13px;height:13px;border-radius:50%;display:inline-block}
+.maplegend i.d-direct{background:var(--amber)}
+.maplegend i.d-related{background:var(--brand);opacity:.55}
