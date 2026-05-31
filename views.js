@@ -271,7 +271,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=44">
+  <link rel="stylesheet" href="/styles.css?v=45">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1171,13 +1171,19 @@ function empCompany({ user, saved = false }) {
 }
 
 function empJobs({ jobs }) {
+  const open = jobs.filter(j=>j.status!=='closed').length;
   return `<section class="wrap">
-    <div class="page-h"><h2>${T('Job Postings')}</h2><a class="btn-sm right" href="/console/jobs/new">${T('+ Post a job')}</a></div>
-    ${jobs.map(j=>`<a class="jobline" href="/console/jobs/${j.id}">
-      <div class="jl-left"><div class="badge">${tradeEmoji(j.trade)}</div>
-        <div><h4>${esc(j.title)}</h4><div class="muted">${esc(j.city)} · $${j.pay_min}–${j.pay_max}/hr · ${esc(j.shift)}</div></div></div>
-      <div class="jl-nums"><div><b>${j.matched}</b><span>matched</span></div><div><b>${j.applicants}</b><span>applied</span></div></div>
-    </a>`).join('') || '<div class="card muted">No jobs yet. Post one to start matching.</div>'}
+    <div class="page-h"><h2>${T('Job Postings')}</h2><p class="muted">${open} ${T('open')}</p><a class="btn-sm right" href="/console/jobs/new">${T('+ Post a job')}</a></div>
+    ${jobs.map(j=>`<div class="jobline ${j.status==='closed'?'is-closed':''}">
+      <a class="jl-left" href="/console/jobs/${j.id}"><div class="badge">${tradeEmoji(j.trade)}</div>
+        <div><h4>${esc(T(j.title))} ${j.status==='closed'?`<span class="closed-tag">${T('Closed')}</span>`:''}</h4>
+          <div class="muted">${esc(j.city)} · $${j.pay_min}–${j.pay_max}/hr · ${esc(T(j.shift))}</div></div></a>
+      <div class="jl-nums">
+        <div><b>${j.matched}</b><span>${T('matched')}</span></div>
+        <div><b>${j.applicants}</b><span>${T('applied')}</span></div>
+        <form method="post" action="/console/jobs/${j.id}/${j.status==='closed'?'reopen':'close'}?from=list"><button class="btn-xs ${j.status==='closed'?'':'ghost'}">${j.status==='closed'?T('Reopen'):T('Close')}</button></form>
+      </div>
+    </div>`).join('') || `<div class="card muted">${T('No jobs yet. Post one to start matching.')}</div>`}
   </section>`;
 }
 
@@ -1219,7 +1225,10 @@ function empPipeline({ job, columns, candidates, jobMedia = [], alerted = 0 }) {
     </div>`).join('');
   return `<section class="wrap">
     <a class="back" href="/console/jobs">← All jobs</a>
-    <div class="page-h"><h2>${esc(job.title)}</h2><p class="muted">$${job.pay_min}–${job.pay_max}/hr · ${esc(job.city)}</p></div>
+    <div class="page-h"><h2>${esc(T(job.title))} ${job.status==='closed'?`<span class="closed-tag">${T('Closed')}</span>`:''}</h2>
+      <p class="muted">$${job.pay_min}–${job.pay_max}/hr · ${esc(job.city)}</p>
+      <form method="post" action="/console/jobs/${job.id}/${job.status==='closed'?'reopen':'close'}" class="right"><button class="btn-sm ${job.status==='closed'?'':'ghost'}">${job.status==='closed'?T('Reopen job'):T('Close job')}</button></form></div>
+    ${job.status==='closed'?`<div class="card warn-card">${T('This job is closed — it’s hidden from worker search and the map. Reopen it to keep matching.')}</div>`:''}
     ${alerted>0?`<div class="ok-card">${icon('bell','xic')} ${alerted} matching worker${alerted===1?'':'s'} with alerts on ${alerted===1?'was':'were'} notified about this job.</div>`:''}
     <div class="card">
       <div class="sec-h" style="margin-top:0">Photos of the work <span class="muted sm">candidates see these on the job</span></div>

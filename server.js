@@ -845,6 +845,13 @@ const server = http.createServer(async (req,res)=>{
         return redirect(res, `/console/jobs/${jobId}`);
       }
 
+      const jClose = p.match(/^\/console\/jobs\/(\d+)\/(close|reopen)$/);
+      if(jClose && method==='POST'){
+        const jobId=Number(jClose[1]), status = jClose[2]==='close' ? 'closed' : 'open';
+        await db.prepare('UPDATE jobs SET status=? WHERE id=? AND employer_id=?').run(status, jobId, user.id);
+        return redirect(res, url.searchParams.get('from')==='list' ? '/console/jobs' : `/console/jobs/${jobId}`);
+      }
+
       const jid = qid(p);
       if(jid && p===`/console/jobs/${jid}` && method==='GET'){
         const job = await db.prepare('SELECT * FROM jobs WHERE id=? AND employer_id=?').get(jid,user.id);
