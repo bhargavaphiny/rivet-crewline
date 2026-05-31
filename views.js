@@ -241,6 +241,8 @@ const BUILTIN_ES = {
   'Scan all verified workers and auto-add the strongest matches to this pipeline.':'Escanea a todos los trabajadores verificados y agrega automáticamente las mejores coincidencias a este proceso.',
   'Auto-source candidates':'Buscar candidatos automáticamente','candidate':'candidato','AI screen':'Filtro con IA','offline':'sin conexión','Auto-schedule':'Agendar automático',
   'Build my card by chat':'Crea mi tarjeta por chat',
+  'add ZIP for distance':'agrega tu código postal para ver distancia',
+  'Add your ZIP to your Work Card to see how far each job is.':'Agrega tu código postal a tu tarjeta de trabajo para ver a qué distancia está cada empleo.',
 };
 function T(s){
   if(LANG !== 'es' || !s) return s;
@@ -323,7 +325,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=48">
+  <link rel="stylesheet" href="/styles.css?v=49">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -517,8 +519,9 @@ function xToggle(action, on, iconName, onLabel, offLabel, next){
   return `<form method="post" action="${action}" class="xf"><input type="hidden" name="next" value="${next}">
     <button class="xbtn ${on?'on':''}">${icon(iconName,'xic')}<span>${on?onLabel:offLabel}</span></button></form>`;
 }
-function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 0, jobsGeo = null, isNew = false, coach = null }) {
+function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 0, jobsGeo = null, isNew = false, coach = null, needZip = false }) {
   const top = matches.slice(0,3).map(m=>jobCard(m, isNew)).join('');
+  const zipBanner = (!isNew && needZip) ? `<a class="zip-banner" href="/app/profile">${icon('pin','xic')} ${T('Add your ZIP to your Work Card to see how far each job is.')}</a>` : '';
   const expiring = creds.filter(c=>c.expires && c.expires < '2026-08').length;
   const welcome = isNew ? `<div class="card welcome">
       <div class="welcome-h">${T('Welcome to Rivet')}, ${esc((user.name||'').split(' ')[0])} 👋</div>
@@ -557,6 +560,7 @@ function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 
           </div>
         </div>`}
         <div class="sec-h">${isNew?T('Open roles hiring now'):t('home_top')} <a href="/app/jobs">${t('home_seeall')}</a></div>
+        ${zipBanner}
         ${top || `<div class="card muted">${t('home_nomatch')}</div>`}
       </div>
       <aside>
@@ -668,7 +672,7 @@ function jobCard(m, bare = false){
       <div class="badge">${tradeEmoji(j.trade)}</div>
       <div class="job-main">
         <div class="job-t">${esc(T(j.title))}</div>
-        <div class="job-c">${esc(j.company||'')} · ${esc(j.city)}${m.distance!=null?` · <b class="dist">${m.distance} ${T('mi away')}</b>`:''}</div>
+        <div class="job-c">${esc(j.company||'')} · ${esc(j.city)}${m.distance!=null?` · <b class="dist">${m.distance} ${T('mi away')}</b>`:(!bare && m.needZip?` · <span class="zip-hint">${T('add ZIP for distance')}</span>`:'')}</div>
       </div>
       ${bare?`<span class="mtag fit" style="margin-left:auto">${esc(tl(j.trade))}</span>`:`<span class="score-chip ${scoreClass(m.score)}">${m.score}</span>`}
     </div>
@@ -710,7 +714,8 @@ function credRow(c){
 }
 
 // ---------- worker: all matches ----------
-function workerJobs({ matches, filters = {}, jobsGeo = null }) {
+function workerJobs({ matches, filters = {}, jobsGeo = null, needZip = false }) {
+  const zipBanner = needZip ? `<a class="zip-banner" href="/app/profile">${icon('pin','xic')} ${T('Add your ZIP to your Work Card to see how far each job is.')}</a>` : '';
   const tradeOpts = `<option value="">${T('All trades')}</option>`+Object.entries(TRADES).map(([k,v])=>`<option value="${k}" ${filters.trade===k?'selected':''}>${esc(T(v))}</option>`).join('');
   const shifts = ['Day','Night','4x10','Any'];
   const shiftOpts = `<option value="">${T('Any shift')}</option>`+shifts.map(s=>`<option value="${s}" ${filters.shift===s?'selected':''}>${esc(T(s))}</option>`).join('');
@@ -738,7 +743,8 @@ function workerJobs({ matches, filters = {}, jobsGeo = null }) {
     ${jobsGeo && jobsGeo.points.length ? usMap(jobsGeo.points, {title:T('Where the work is'), noun:T('job'), cta:T('Apply'),
         legend:`<span class="lg"><i class="d-direct"></i> ${T('Your trades')}</span><span class="lg"><i class="d-related"></i> ${T('Related trades')}</span>`,
         emptyMsg:T('No mapped openings yet.')}) : ''}
-    <div class="grid3">${matches.map(jobCard).join('') || `<div class="card muted">${T('No jobs match those filters.')} <a href="/app/jobs">${T('Clear filters')}</a></div>`}</div>
+    ${zipBanner}
+    <div class="grid3">${matches.map(m=>jobCard(m)).join('') || `<div class="card muted">${T('No jobs match those filters.')} <a href="/app/jobs">${T('Clear filters')}</a></div>`}</div>
   </section>`;
 }
 

@@ -147,11 +147,12 @@ async function rankJobsForWorker(uid){
   const home = prof ? await geocodeZip(prof.zip) : null;
   const zc = {};
   const out = [];
+  const needZip = !home; // worker hasn't set a geocodable ZIP, so distance can't be computed
   for(const j of jobs){
     const r = bestMatch(prof, creds, j);
     let distance = null;
     if(home && j.zip){ if(!(j.zip in zc)) zc[j.zip] = await geocodeZip(j.zip); distance = zc[j.zip] ? haversineMi(home, zc[j.zip]) : null; }
-    out.push({job:j, score:r.score, missing:r.missing, distance});
+    out.push({job:j, score:r.score, missing:r.missing, distance, needZip});
   }
   return out.sort((a,b)=>b.score-a.score);
 }
@@ -703,7 +704,8 @@ const server = http.createServer(async (req,res)=>{
         if(isNewWorker){ matches = matches.slice().sort((a,b)=> (b.job.id||0)-(a.job.id||0)); }
         let coach = null;
         if(!isNewWorker){ try { const r = await coachReco(user.id); if(r && r.topCred) coach = { line: coachLineFallback(r.topCred), url: r.topCred.url }; } catch(e){} }
-        return send(res, V.layout({title:'Home',user,active:'home',body:V.workerHome({user,profile:prof,creds,matches,workCount,portCount,jobsGeo,isNew:isNewWorker,coach})}));
+        const needZip = matches.length ? !!matches[0].needZip : false;
+        return send(res, V.layout({title:'Home',user,active:'home',body:V.workerHome({user,profile:prof,creds,matches,workCount,portCount,jobsGeo,isNew:isNewWorker,coach,needZip})}));
       }
       if(p==='/app/coach' && method==='GET'){
         const reco = await coachReco(user.id);
@@ -756,6 +758,7 @@ const server = http.createServer(async (req,res)=>{
           sort:url.searchParams.get('sort')||'',
         };
         let matches = await rankJobsForWorker(user.id);
+        const needZip = matches.length ? !!matches[0].needZip : false;
         if(f.q){ const q=f.q.toLowerCase(); matches=matches.filter(m=>(m.job.title||'').toLowerCase().includes(q)||(m.job.company||'').toLowerCase().includes(q)); }
         if(f.trade) matches=matches.filter(m=>m.job.trade===f.trade);
         if(f.city){ const c=f.city.toLowerCase(); matches=matches.filter(m=>(m.job.city||'').toLowerCase().includes(c)); }
@@ -766,7 +769,7 @@ const server = http.createServer(async (req,res)=>{
         if(f.maxmi) matches = matches.filter(m=> m.distance!=null && m.distance<=f.maxmi);
         if(f.sort==='distance') matches.sort((a,b)=> (a.distance==null?1e9:a.distance)-(b.distance==null?1e9:b.distance));
         const jobsGeo = await jobGeoForWorker(prof);
-        return send(res, V.layout({title:'Find work',user,active:'jobs',body:V.workerJobs({matches, filters:f, jobsGeo})}));
+        return send(res, V.layout({title:'Find work',user,active:'jobs',body:V.workerJobs({matches, filters:f, jobsGeo, needZip})}));
       }
       if(p==='/app/profile' && method==='GET'){
         const portfolio = await db.prepare("SELECT * FROM media WHERE user_id=? AND target='portfolio' ORDER BY created_at DESC, id DESC").all(user.id);
