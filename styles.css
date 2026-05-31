@@ -514,3 +514,6 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .welcome p{font-size:14px;color:rgba(255,255,255,.9);margin-bottom:14px;max-width:640px}
 .welcome .btn{background:#fff;color:var(--brand-d)}
 .welcome .btn:hover{background:var(--paper-2)}
+
+/* ---- training links ---- */
+.train-links{display:flex;flex-direction:column;gap:8px;margin-top:10px}

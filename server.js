@@ -183,7 +183,7 @@ async function jobGeoAll(){
   for(const r of rows){
     const _k=r.city||r.zip; const b = byZip[_k] || (byZip[_k] = {city:r.city, lat:r.lat, lon:r.lon, n:0, items:[]});
     b.n++;
-    if(b.items.length<12) b.items.push({ label:`${r.title} · $${r.pay_min}–${r.pay_max}/hr`, sub:`${r.company||''} · ${M.TRADES[r.trade]||r.trade}`, href:`/app/jobs/${r.id}` });
+    if(b.items.length<12) b.items.push({ label:`${r.title} · $${r.pay_min}–${r.pay_max}/hr`, sub:`${r.company||''} · ${M.TRADES[r.trade]||r.trade}`, href:`/jobs/${r.id}` });
   }
   return Object.values(byZip).sort((a,b)=>b.n-a.n);
 }
@@ -328,7 +328,34 @@ const server = http.createServer(async (req,res)=>{
     if(p==='/styles.css'){ res.writeHead(200,{'Content-Type':'text/css','Cache-Control':'no-cache'}); return res.end(fs.readFileSync(path.join(__dirname,'styles.css'))); }
     if(p==='/og.svg'){ res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'public, max-age=86400'}); return res.end(V.ogImage()); }
     if(p==='/healthz'){ res.writeHead(200,{'Content-Type':'text/plain'}); return res.end('ok'); }
-    if(p==='/robots.txt'){ res.writeHead(200,{'Content-Type':'text/plain'}); return res.end('User-agent: *\nAllow: /\nDisallow: /app\nDisallow: /console\nDisallow: /auth\n'); }
+    if(p==='/robots.txt'){ res.writeHead(200,{'Content-Type':'text/plain'}); return res.end('User-agent: *\nAllow: /\nAllow: /jobs\nDisallow: /app\nDisallow: /console\nDisallow: /auth\n\nSitemap: https://rivet-crewline.onrender.com/sitemap.xml\n'); }
+    if(p==='/sitemap.xml'){
+      const ids = await db.prepare("SELECT id FROM jobs WHERE status='open' ORDER BY id DESC LIMIT 1000").all();
+      const urls = ['https://rivet-crewline.onrender.com/','https://rivet-crewline.onrender.com/pulse']
+        .concat(ids.map(r=>`https://rivet-crewline.onrender.com/jobs/${r.id}`));
+      res.writeHead(200,{'Content-Type':'application/xml'});
+      return res.end(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.map(u=>`<url><loc>${u}</loc></url>`).join('')}</urlset>`);
+    }
+
+    // ---- public, crawlable job page (Google for Jobs) ----
+    const pj = p.match(/^\/jobs\/(\d+)$/);
+    if(pj && method==='GET'){
+      const job = await db.prepare(`SELECT j.*,u.company,u.company_about,u.company_city,u.company_size FROM jobs j JOIN users u ON u.id=j.employer_id WHERE j.id=?`).get(Number(pj[1]));
+      if(!job) return send(res, V.layout({title:'Job not found',user,body:'<section class="wrap"><div class="card"><h2>Job not found</h2><p><a href="/">Browse all jobs</a></p></div></section>'}),404);
+      const rules = M.localRules(job.city);
+      const ETMAP = {'Full-time':'FULL_TIME','Part-time':'PART_TIME','Contract':'CONTRACTOR','Temp':'TEMPORARY','Apprenticeship':'OTHER','Outcome-based':'CONTRACTOR'};
+      const ld = {
+        '@context':'https://schema.org/','@type':'JobPosting',
+        title: job.title, description: `<p>${String(job.descr||job.title)}</p>`,
+        datePosted: String(job.created_at||'').replace(' ','T'),
+        employmentType: ETMAP[job.employment_type]||'FULL_TIME',
+        hiringOrganization: { '@type':'Organization', name: job.company||'Employer' },
+        jobLocation: { '@type':'Place', address: { '@type':'PostalAddress', addressLocality: job.city||'', addressRegion: (rules&&rules.state)||'', postalCode: job.zip||'', addressCountry:'US' } },
+        baseSalary: { '@type':'MonetaryAmount', currency:'USD', value: { '@type':'QuantitativeValue', minValue: job.pay_min||0, maxValue: job.pay_max||0, unitText:'HOUR' } },
+      };
+      const jsonld = JSON.stringify(ld).replace(/</g,'\\u003c');
+      return send(res, V.layout({title:`${job.title} — ${job.company||'Hiring'} (${job.city})`, user, body:V.publicJob({job, rules, jsonld})}));
+    }
 
     // ---- Industry Pulse (trends + community board) — open to all ----
     if(p==='/pulse' && method==='GET'){

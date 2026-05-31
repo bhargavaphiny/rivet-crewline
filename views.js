@@ -249,7 +249,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=39">
+  <link rel="stylesheet" href="/styles.css?v=40">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -632,6 +632,44 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
   </section>`;
 }
 
+// ---------- public, crawlable job page (Google for Jobs) ----------
+function publicJob({ job, rules, jsonld }) {
+  const belowMin = rules && job.pay_min && job.pay_min < rules.minWage;
+  return `<script type="application/ld+json">${jsonld}</script>
+  <section class="wrap narrow">
+    <a class="back" href="/">← ${esc('Rivet — all jobs')}</a>
+    <div class="card">
+      <div class="job-row">
+        <div class="badge big">${tradeEmoji(job.trade)}</div>
+        <div class="job-main">
+          <h1 style="font-size:24px">${esc(job.title)}</h1>
+          ${job.employment_type?`<span class="jtype">${esc(job.employment_type)}</span>`:''}
+          <div class="job-c">${esc(job.company||'')} · ${esc(job.city)} ${esc(job.zip)} · ${esc(job.shift)} shift</div>
+          <div class="pay big">$${job.pay_min}–${job.pay_max}/hr</div>
+        </div>
+      </div>
+      <p class="descr">${esc(job.descr)}</p>
+      ${rules?`<div class="rules">
+        <div class="rules-h">Local pay & rules · ${esc(rules.stateName)}</div>
+        <div class="rules-grid">
+          <div><span>State minimum wage</span><b>$${rules.minWage.toFixed(2)}/hr</b></div>
+          <div><span>This job pays</span><b class="${belowMin?'r-bad':'r-good'}">$${job.pay_min}–${job.pay_max}/hr</b></div>
+          <div><span>Overtime</span><b>1.5× after 40 hrs/wk</b></div>
+        </div>
+      </div>`:''}
+      <a class="btn full" href="/app/jobs/${job.id}">Apply on Rivet — it's free</a>
+    </div>
+    ${(job.company_about)?`<div class="card">
+      <div class="sec-h" style="margin-top:0">About ${esc(job.company||'the employer')}</div>
+      <p class="descr">${esc(job.company_about)}</p>
+    </div>`:''}
+    <div class="card cta-card">
+      <b>Rivet is the free, verified way to get hired in the trades.</b>
+      <div class="cta-row" style="margin-top:12px"><a class="btn" href="/signup?role=worker">Create your free Work Card</a><a class="btn ghost" href="/">Browse all jobs</a></div>
+    </div>
+  </section>`;
+}
+
 // ---------- worker: applications + saved jobs ----------
 function stageTimeline(current){
   const idx = STAGES.indexOf(current);
@@ -799,6 +837,15 @@ function workerTraining({ have = [] }) {
     <div class="sec-h">${T('Recommended — not on your card yet')}</div>
     <div class="traingrid">${todo.map(k=>trainCard(k,false)).join('') || `<p class="muted">${T('You’ve added every credential we track. Impressive.')}</p>`}</div>
     ${done.length?`<div class="sec-h">${T('Already on your Work Card')}</div><div class="traingrid">${done.map(k=>trainCard(k,true)).join('')}</div>`:''}
+    <div class="sec-h">${T('Students, part-time & work eligibility')}</div>
+    <div class="card">
+      <p class="descr">${T('Lots of part-time and seasonal work on Rivet is a great fit for students and newcomers. Use the “Part-time / Temp” filter on Find Work, and turn on availability for the shifts you can take.')}</p>
+      <p class="muted sm" style="margin-top:8px">${T('Heads up: you must be authorized to work in the U.S., and minors have limited hours/tasks. This is general info, not legal advice — check the official sources:')}</p>
+      <div class="train-links">
+        <a class="nav-link" style="color:var(--brand-d);font-weight:700" href="https://www.uscis.gov/i-9-central" target="_blank" rel="noopener noreferrer">USCIS — Work authorization (Form I-9) ↗</a>
+        <a class="nav-link" style="color:var(--brand-d);font-weight:700" href="https://www.dol.gov/agencies/whd/youthrules" target="_blank" rel="noopener noreferrer">DOL — Youth & student work rules ↗</a>
+      </div>
+    </div>
   </section>`;
 }
 
@@ -1292,4 +1339,4 @@ function ogImage() {
 }
 
 module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, empCompany, workerTraining, pulsePage };
+  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, empCompany, workerTraining, pulsePage, publicJob };
