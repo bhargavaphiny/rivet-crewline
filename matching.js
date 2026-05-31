@@ -310,9 +310,10 @@ function scoreMatch(profile, creds, job) {
   if (profile.trade === job.trade) trade = 45;
   else if ((ADJACENT[job.trade] || []).includes(profile.trade)) trade = 24;
 
-  // pay
+  // pay — quote/"name your price" jobs have no fixed rate, so there's no mismatch to penalize
   let pay = 0;
-  if (job.pay_max >= (profile.pay_floor || 0)) pay = 20;
+  if (job.quotes_ok || !job.pay_max) pay = 20;
+  else if (job.pay_max >= (profile.pay_floor || 0)) pay = 20;
   else pay = clamp(20 - (profile.pay_floor - job.pay_max) * 2, 0, 20);
 
   // location
