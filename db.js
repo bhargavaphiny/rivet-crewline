@@ -677,6 +677,50 @@ async function seedPosts(){
   console.log('[db] community posts seeded');
 }
 
+// ---- local density (Phoenix metro) + gig/ag/food sub-roles (idempotent) ----
+async function seedLocalGig(){
+  if (await metaGet('localgig_v1')) return;
+  const metroZips = [
+    ['85225',33.3062,-111.8413,'Chandler'],['85295',33.2826,-111.7890,'Gilbert'],
+    ['85281',33.4255,-111.9400,'Tempe'],['85201',33.4361,-111.8344,'Mesa'],
+    ['85251',33.4942,-111.9261,'Scottsdale'],['85301',33.5387,-112.1860,'Glendale'],
+    ['85308',33.6539,-112.2010,'Glendale'],['85234',33.3528,-111.7890,'Gilbert'],
+  ];
+  for (const [zip,lat,lon,city] of metroZips){ try { await db.prepare('INSERT OR IGNORE INTO zip_geo(zip,lat,lon,city) VALUES(?,?,?,?)').run(zip,lat,lon,city); } catch(e){} }
+  const pw = hashPassword('demo1234');
+  const insEmp = db.prepare('INSERT INTO users(email,pass,role,name,company,company_city,company_size,company_about) VALUES(?,?,?,?,?,?,?,?)');
+  let eid;
+  try { eid = (await insEmp.run('crew@phxmetrolabor.test',pw,'employer','Rosa Aguilar','Phoenix Metro Labor','Phoenix, AZ','51–200','Local staffing for the Phoenix metro — trades, hospitality, warehouse and gig crews. Same-week starts, daily and weekly pay.')).lastInsertRowid; } catch(e){}
+  if(!eid) { await metaSet('localgig_v1','1'); return; }
+  const insJob = db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type) VALUES(?,?,?,?,?,?,?,?,?,?,?)`);
+  // dense, local Phoenix-metro openings across trades + new sub-roles
+  const J = [
+    ['Residential Electrician','electrician',30,40,'Mesa','85201','Day','license','Service + remodels across the East Valley.','Full-time'],
+    ['HVAC Install Helper','hvac',22,28,'Chandler','85225','Day','','Ride-along installs; will train toward EPA 608.','Full-time'],
+    ['Apprentice Plumber','plumber',20,26,'Gilbert','85295','Day','','Learn the trade with a licensed journeyman.','Apprenticeship'],
+    ['Drywall Finisher','drywall',24,30,'Tempe','85281','Day','','Tract homes; steady year-round work.','Full-time'],
+    ['Concrete Laborer','concrete',20,26,'Glendale','85301','Day','osha10','Flatwork crews; early starts.','Full-time'],
+    ['Landscaper','landscaper',17,22,'Scottsdale','85251','Day','','Commercial grounds maintenance.','Full-time'],
+    ['Handyman (1099)','handyman',28,45,'Phoenix','85004','Any','','Pick your jobs — repairs, installs, mounts. Bring your own tools.','Outcome-based'],
+    ['Junk Removal Crew','junk_removal',18,24,'Mesa','85201','Day','','Lift + haul; tips on top.','Part-time'],
+    ['Pressure Washing Tech','pressure_wash',19,26,'Chandler','85225','Day','','Driveways + storefronts; equipment provided.','Full-time'],
+    ['Pool Service Tech','pool_service',20,27,'Gilbert','85295','Day','','Residential route; truck provided.','Full-time'],
+    ['Gig Courier','gig_courier',18,28,'Phoenix','85008','Any','','Flexible delivery blocks; use your own vehicle.','Outcome-based'],
+    ['Event Setup Crew','event_setup',17,22,'Glendale','85308','Any','','Stadium + convention events; nights/weekends.','Temp'],
+    ['Irrigation Technician','irrigation_tech',22,29,'Scottsdale','85251','Day','','Install + repair drip/sprinkler systems.','Full-time'],
+    ['Packing / Sorting','packing_shed',16,20,'Phoenix','85021','Night','','Produce packing line; overtime available.','Temp'],
+    ['Prep Cook','prep_cook',17,21,'Tempe','85281','Day','food_handler','Scratch kitchen; growth to line cook.','Full-time'],
+    ['Host / Hostess','host',16,18,'Scottsdale','85251','Night','','Front of house; tips shared.','Part-time'],
+    ['Warehouse Associate','warehouse',19,24,'Phoenix','85008','Day','forklift','Pick/pack; forklift a plus.','Full-time'],
+    ['Caregiver (part-time)','caregiver',18,23,'Mesa','85201','Day','hha','In-home senior care; flexible shifts — student-friendly.','Part-time'],
+  ];
+  for (const [title,trade,lo,hi,city,zip,shift,creds,descr,etype] of J){
+    try { await insJob.run(eid,title,trade,lo,hi,city,zip,shift,creds,descr,etype); } catch(e){}
+  }
+  await metaSet('localgig_v1','1');
+  console.log('[db] local metro + gig/ag/food seed applied — +1 employer, +18 local jobs');
+}
+
 async function migrate() {
   // additive column migrations (idempotent — errors swallowed when already applied)
   try { await db.exec('ALTER TABLE users ADD COLUMN phone TEXT'); } catch (e) { /* column exists */ }
@@ -750,6 +794,7 @@ async function init() {
   try { await seedBig(); } catch (e) { console.error('[db] big seed skipped (non-fatal):', e.message); }
   try { await seedCategories(); } catch (e) { console.error('[db] category seed skipped (non-fatal):', e.message); }
   try { await seedPosts(); } catch (e) { console.error('[db] posts seed skipped (non-fatal):', e.message); }
+  try { await seedLocalGig(); } catch (e) { console.error('[db] localgig seed skipped (non-fatal):', e.message); }
   try {
     if(!(await metaGet('xfactor_v1'))){
       // own tools (most trades), reliable transport, bilingual — high-signal flags for recruiters

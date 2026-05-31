@@ -338,7 +338,9 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 /* ---- multi-trade, work history, richer profile ---- */
 .fieldset{margin:14px 0}
 .fs-lbl{font-weight:700;font-size:13px;margin-bottom:8px}
-.tradegrid{display:flex;flex-wrap:wrap;gap:8px;max-height:220px;overflow:auto;padding:2px}
+.tradepick{max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:12px;background:var(--paper-2)}
+.tradecat{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:12px 8px 6px;position:sticky;top:0;background:var(--paper-2);z-index:1}
+.tradegrid{display:flex;flex-wrap:wrap;gap:8px;padding:0 8px 8px}
 .tradechk{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border:1.5px solid var(--line);border-radius:10px;cursor:pointer;font-size:13px;background:var(--paper-2);transition:.12s;line-height:1.1}
 .tradechk:hover{border-color:var(--brand)}
 .tradechk input{flex:none;width:16px;height:16px;min-width:16px;margin:0;padding:0;accent-color:var(--brand)}

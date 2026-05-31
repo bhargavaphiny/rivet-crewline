@@ -3,7 +3,7 @@
  * Rivet x Crewline - server-side HTML views.
  * Plain template-literal rendering. No template engine, no client framework.
  */
-const { TRADES, CRED_KINDS, TRAINING } = require('./matching');
+const { TRADES, CRED_KINDS, TRAINING, CATEGORIES } = require('./matching');
 const US_STATES = require('./us-geo');
 
 // ---- inline SVG icon set (consistent line style; no emoji) ----
@@ -53,6 +53,9 @@ const TRADE_ICON = {
   cook:'utensils',server:'utensils',dishwasher:'utensils',bartender:'utensils',
   warehouse:'box',delivery_driver:'truck',mover:'box',
   janitor:'spray',housekeeper:'spray',security_guard:'shield',pest_control:'spray',appliance_repair:'wrench',
+  irrigation_tech:'droplet',packing_shed:'box',ranch_hand:'leaf',nursery_worker:'leaf',
+  prep_cook:'utensils',busser:'utensils',host:'utensils',barback:'utensils',
+  handyman:'wrench',junk_removal:'truck',pressure_wash:'spray',pool_service:'droplet',gig_courier:'truck',event_setup:'box',
 };
 
 const esc = s => String(s == null ? '' : s)
@@ -246,7 +249,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=38">
+  <link rel="stylesheet" href="/styles.css?v=39">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -395,7 +398,17 @@ function phoneVerify({ phone, demoCode='', error='' }){
 // ---------- worker onboarding ----------
 function tradeCheckboxes(selected = []) {
   const sel = new Set(selected);
-  return Object.entries(TRADES).map(([k,v])=>`<label class="tradechk"><input type="checkbox" name="trades" value="${k}" ${sel.has(k)?'checked':''}><span>${tradeEmoji(k)} ${v}</span></label>`).join('');
+  const chip = k => `<label class="tradechk"><input type="checkbox" name="trades" value="${k}" ${sel.has(k)?'checked':''}><span>${tradeEmoji(k)} ${TRADES[k]||k}</span></label>`;
+  const seen = new Set();
+  let html = '';
+  for(const [cat, keys] of Object.entries(CATEGORIES)){
+    const ks = keys.filter(k=>TRADES[k]); ks.forEach(k=>seen.add(k));
+    if(!ks.length) continue;
+    html += `<div class="tradecat">${T(cat)}</div><div class="tradegrid">${ks.map(chip).join('')}</div>`;
+  }
+  const rest = Object.keys(TRADES).filter(k=>!seen.has(k));
+  if(rest.length) html += `<div class="tradecat">${T('Other')}</div><div class="tradegrid">${rest.map(chip).join('')}</div>`;
+  return html;
 }
 function workerOnboard(error='') {
   return `<section class="wrap narrow"><div class="card">
@@ -406,7 +419,7 @@ function workerOnboard(error='') {
       <label>Headline <input name="headline" maxlength="80" placeholder="e.g. Journeyman electrician — commercial & solar"></label>
       <div class="fieldset">
         <div class="fs-lbl">Your trades <span class="muted">pick all you work</span></div>
-        <div class="tradegrid">${tradeCheckboxes(['electrician'])}</div>
+        <div class="tradepick">${tradeCheckboxes(['electrician'])}</div>
       </div>
       <div class="row2">
         <label>Years experience <input type="number" name="years_exp" min="0" value="3"></label>
@@ -708,7 +721,7 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [] 
         <label>${T('Headline')} <input name="headline" maxlength="80" value="${esc(profile.headline||'')}" placeholder="${T('e.g. Journeyman electrician — commercial & solar')}"></label>
         <div class="fieldset">
           <div class="fs-lbl">${T('Your trades')} <span class="muted">${T('pick all you work')}</span></div>
-          <div class="tradegrid">${tradeCheckboxes(trades)}</div>
+          <div class="tradepick">${tradeCheckboxes(trades)}</div>
         </div>
         <label>${T("Don't see your job? Add it")} <input name="custom_trade" maxlength="60" value="${esc(profile.custom_trade||'')}" placeholder="${T('e.g. Wind turbine technician')}"></label>
         <label>${T('About you')} <textarea name="about" rows="3" maxlength="600" placeholder="${T("Where you've worked, what you're great at, what you're looking for.")}">${esc(profile.about||'')}</textarea></label>

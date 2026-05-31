@@ -64,6 +64,36 @@ const TRADES = {
   security_guard:  'Security Guard',
   pest_control:    'Pest Control Technician',
   appliance_repair:'Appliance Repair Tech',
+  // agriculture sub-roles
+  irrigation_tech: 'Irrigation Technician',
+  packing_shed:    'Packing / Sorting',
+  ranch_hand:      'Ranch Hand',
+  nursery_worker:  'Nursery Worker',
+  // food-service sub-roles
+  prep_cook:       'Prep Cook',
+  busser:          'Busser',
+  host:            'Host / Hostess',
+  barback:         'Barback',
+  // freelance & gig
+  handyman:        'Handyman',
+  junk_removal:    'Junk Removal',
+  pressure_wash:   'Pressure Washing',
+  pool_service:    'Pool Service Tech',
+  gig_courier:     'Courier / Gig Delivery',
+  event_setup:     'Event Setup Crew',
+};
+
+// Two-level navigation: category → trade keys (every trade appears once; rest fall to "Other").
+const CATEGORIES = {
+  'Construction & trades': ['electrician','hvac','plumber','pipefitter','welder','sheet_metal','carpenter','framer','drywall','painter','roofer','mason','concrete','flooring','tile','glazier','insulation','ironworker','boilermaker','controls','solar','low_voltage','fire_sprinkler','elevator_tech','millwright'],
+  'Drivers & logistics': ['cdl_driver','delivery_driver','heavy_equipment','crane_operator','warehouse','mover','gig_courier'],
+  'Mechanical & repair': ['diesel_mechanic','automotive_tech','machinist','appliance_repair','locksmith','facilities'],
+  'Healthcare & care': ['cna','caregiver','medical_assistant','phlebotomist','emt'],
+  'Food service': ['cook','prep_cook','server','busser','host','dishwasher','bartender','barback'],
+  'Agriculture': ['farmworker','fruit_picker','irrigation_tech','packing_shed','ranch_hand','nursery_worker','landscaper'],
+  'Cleaning & facilities': ['janitor','housekeeper','pressure_wash','pool_service'],
+  'Security': ['security_guard','pest_control'],
+  'Freelance & gig': ['handyman','junk_removal','event_setup'],
 };
 
 // Adjacent trades score partial credit (skills transfer).
@@ -121,6 +151,20 @@ const ADJACENT = {
   security_guard:  [],
   pest_control:    ['landscaper'],
   appliance_repair:['facilities', 'hvac'],
+  irrigation_tech: ['landscaper', 'farmworker', 'plumber'],
+  packing_shed:    ['farmworker', 'warehouse'],
+  ranch_hand:      ['farmworker'],
+  nursery_worker:  ['landscaper', 'farmworker'],
+  prep_cook:       ['cook', 'dishwasher'],
+  busser:          ['server', 'dishwasher'],
+  host:            ['server'],
+  barback:         ['bartender', 'busser'],
+  handyman:        ['carpenter', 'facilities', 'painter'],
+  junk_removal:    ['mover', 'landscaper'],
+  pressure_wash:   ['janitor', 'painter'],
+  pool_service:    ['facilities', 'plumber'],
+  gig_courier:     ['delivery_driver'],
+  event_setup:     ['mover', 'janitor'],
 };
 
 // Credential kinds and labels (real trade certs).
@@ -266,4 +310,4 @@ function scoreMatch(profile, creds, job) {
   return { score: total, breakdown: { trade, pay, loc, cred: credScore }, missing };
 }
 
-module.exports = { TRADES, ADJACENT, CRED_KINDS, TRAINING, STATE_MIN_WAGE, STATE_NAME, CITY_STATE, stateForCity, localRules, readiness, scoreMatch, clamp };
+module.exports = { TRADES, ADJACENT, CATEGORIES, CRED_KINDS, TRAINING, STATE_MIN_WAGE, STATE_NAME, CITY_STATE, stateForCity, localRules, readiness, scoreMatch, clamp };
