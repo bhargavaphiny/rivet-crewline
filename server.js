@@ -226,13 +226,39 @@ async function geocodeZip(zip){
   } catch(e){ return null; }
 }
 
+// ---------- i18n: LLM-translated UI strings, cached in DB (English fallback) ----------
+const ES = new Map();
+async function loadTranslations(){
+  try {
+    const rows = await db.prepare("SELECT src,dst FROM translations WHERE lang='es'").all();
+    for(const r of rows) ES.set(r.src, r.dst);
+  } catch(e){}
+  V.setEs(ES);
+}
+let trBusy = false;
+async function fillTranslations(){
+  if(trBusy || !LLM.enabled) return;
+  const misses = V.drainEsMisses();
+  if(!misses.length) return;
+  trBusy = true;
+  try {
+    const map = await LLM.translateBatch(misses, 'Spanish');
+    for(const [src,dst] of Object.entries(map)){
+      ES.set(src, dst);
+      try { await db.prepare("INSERT OR IGNORE INTO translations(lang,src,dst) VALUES('es',?,?)").run(src, dst); } catch(e){}
+    }
+  } catch(e){ /* non-fatal */ } finally { trBusy = false; }
+}
+
 // ---------- router ----------
 const server = http.createServer(async (req,res)=>{
   const url = new URL(req.url, `http://${req.headers.host}`);
   const p = url.pathname, method = req.method;
   const user = await getUser(req);
   if(user) user.mode = p.startsWith('/console') ? 'employer' : (p.startsWith('/app') ? 'worker' : user.role);
-  V.setLang(getCookie(req,'lang')==='es' ? 'es' : 'en');
+  const isEs = getCookie(req,'lang')==='es';
+  V.setLang(isEs ? 'es' : 'en');
+  if(isEs && LLM.enabled) res.on('finish', ()=> setImmediate(fillTranslations));
 
   try {
     setSecurityHeaders(res);
@@ -789,5 +815,6 @@ const server = http.createServer(async (req,res)=>{
 });
 
 init()
+  .then(loadTranslations)
   .then(()=> server.listen(PORT, ()=>console.log(`Rivet × Crewline running → http://localhost:${PORT}`)))
   .catch(err=>{ console.error('init failed', err); process.exit(1); });

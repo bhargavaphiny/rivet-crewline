@@ -103,6 +103,20 @@ const I18N = {
 };
 function t(k){ return (I18N[LANG] && I18N[LANG][k] != null) ? I18N[LANG][k] : (I18N.en[k] != null ? I18N.en[k] : k); }
 
+// Self-keyed translation: T('English text') → Spanish from the LLM cache when
+// LANG==='es', else the English text. Misses are collected for the server to
+// translate in the background (English shows until then). $0 + no hardcoding.
+let ESMAP = null;
+const _esMiss = new Set();
+function setEs(m){ ESMAP = m; }
+function drainEsMisses(){ const a = [..._esMiss]; _esMiss.clear(); return a; }
+function T(s){
+  if(LANG !== 'es' || !s) return s;
+  if(ESMAP && ESMAP.has(s)) return ESMAP.get(s);
+  _esMiss.add(s);
+  return s;
+}
+
 function scoreClass(s){ return s>=85?'s-hi':s>=70?'s-md':'s-lo'; }
 
 // ---------- media (URL / embed based) ----------
@@ -457,23 +471,23 @@ function workerJobs({ matches, filters = {}, jobsGeo = null }) {
   const typeOpts = `<option value="">Any type</option>`+JOB_TYPES.map(t=>`<option value="${t}" ${filters.jtype===t?'selected':''}>${t}</option>`).join('');
   const active = (filters.q||filters.trade||filters.city||filters.minpay||filters.shift||filters.jtype);
   return `<section class="wrap">
-    <div class="sec-h big">Find work <span class="muted">${matches.length} job${matches.length===1?'':'s'}${active?' · filtered':' · ranked by fit'}</span></div>
+    <div class="sec-h big">${T('Find work')} <span class="muted">${matches.length} ${matches.length===1?T('job'):T('jobs')}${active?' · '+T('filtered'):' · '+T('ranked by fit')}</span></div>
     <form class="jobfilters" method="get" action="/app/jobs">
-      <input name="q" value="${esc(filters.q||'')}" placeholder="Search title or company" aria-label="Search">
+      <input name="q" value="${esc(filters.q||'')}" placeholder="${T('Search title or company')}" aria-label="Search">
       <select name="trade" aria-label="Trade">${tradeOpts}</select>
-      <input name="city" value="${esc(filters.city||'')}" placeholder="City" aria-label="City">
-      <input name="minpay" type="number" min="0" inputmode="numeric" value="${filters.minpay||''}" placeholder="Min $/hr" aria-label="Minimum pay">
-      <input name="maxmi" type="number" min="0" inputmode="numeric" value="${filters.maxmi||''}" placeholder="Within mi" aria-label="Within miles">
+      <input name="city" value="${esc(filters.city||'')}" placeholder="${T('City')}" aria-label="City">
+      <input name="minpay" type="number" min="0" inputmode="numeric" value="${filters.minpay||''}" placeholder="${T('Min $/hr')}" aria-label="Minimum pay">
+      <input name="maxmi" type="number" min="0" inputmode="numeric" value="${filters.maxmi||''}" placeholder="${T('Within mi')}" aria-label="Within miles">
       <select name="shift" aria-label="Shift">${shiftOpts}</select>
       <select name="jtype" aria-label="Employment type">${typeOpts}</select>
-      <label class="chk"><input type="checkbox" name="sort" value="distance" ${filters.sort==='distance'?'checked':''}> Nearest first</label>
-      <button class="btn-sm">Search</button>
-      ${active?`<a class="nav-link" style="color:var(--brand-d)" href="/app/jobs">Clear</a>`:''}
+      <label class="chk"><input type="checkbox" name="sort" value="distance" ${filters.sort==='distance'?'checked':''}> ${T('Nearest first')}</label>
+      <button class="btn-sm">${T('Search')}</button>
+      ${active?`<a class="nav-link" style="color:var(--brand-d)" href="/app/jobs">${T('Clear')}</a>`:''}
     </form>
-    ${jobsGeo && jobsGeo.points.length ? usMap(jobsGeo.points, {title:'Where the work is', noun:'job',
-        legend:'<span class="lg"><i class="d-direct"></i> Your trades</span><span class="lg"><i class="d-related"></i> Related trades</span>',
-        emptyMsg:'No mapped openings yet.'}) : ''}
-    <div class="grid3">${matches.map(jobCard).join('') || '<div class="card muted">No jobs match those filters. <a href="/app/jobs">Clear filters</a> to see all open work.</div>'}</div>
+    ${jobsGeo && jobsGeo.points.length ? usMap(jobsGeo.points, {title:T('Where the work is'), noun:T('job'),
+        legend:`<span class="lg"><i class="d-direct"></i> ${T('Your trades')}</span><span class="lg"><i class="d-related"></i> ${T('Related trades')}</span>`,
+        emptyMsg:T('No mapped openings yet.')}) : ''}
+    <div class="grid3">${matches.map(jobCard).join('') || `<div class="card muted">${T('No jobs match those filters.')} <a href="/app/jobs">${T('Clear filters')}</a></div>`}</div>
   </section>`;
 }
 
@@ -525,21 +539,21 @@ function stageTimeline(current){
 }
 function workerApplications({ apps, savedJobs }) {
   return `<section class="wrap">
-    <div class="sec-h big">Your applications</div>
+    <div class="sec-h big">${T('Your applications')}</div>
     ${apps.length ? apps.map(a=>`<div class="card app-card">
       <div class="job-row"><div class="badge">${tradeEmoji(a.trade)}</div>
         <div class="job-main"><h4>${esc(a.title)}</h4>
-          <div class="muted">${esc(a.company||'')} · ${esc(a.city)} · $${a.pay_min}–${a.pay_max}/hr${a.distance!=null?` · <b class="dist">${a.distance} mi away</b>`:''}</div></div>
+          <div class="muted">${esc(a.company||'')} · ${esc(a.city)} · $${a.pay_min}–${a.pay_max}/hr${a.distance!=null?` · <b class="dist">${a.distance} ${T('mi away')}</b>`:''}</div></div>
         <span class="score-tag ${scoreClass(a.score)}">${a.score}</span></div>
       ${stageTimeline(a.stage)}
-    </div>`).join('') : '<div class="card muted">No applications yet. <a href="/app/jobs">Browse matches →</a></div>'}
-    <div class="sec-h big" style="margin-top:26px">Saved jobs</div>
+    </div>`).join('') : `<div class="card muted">${T('No applications yet.')} <a href="/app/jobs">${T('Browse matches →')}</a></div>`}
+    <div class="sec-h big" style="margin-top:26px">${T('Saved jobs')}</div>
     ${savedJobs.length ? savedJobs.map(j=>`<a class="jobline" href="/app/jobs/${j.id}">
         <div class="jl-left"><div class="badge">${tradeEmoji(j.trade)}</div>
-          <div><h4>${esc(j.title)}</h4><div class="muted">${esc(j.company||'')} · ${esc(j.city)} · $${j.pay_min}–${j.pay_max}/hr · ${esc(j.shift)}${j.distance!=null?` · <b class="dist">${j.distance} mi away</b>`:''}</div></div></div>
-        <span class="nav-link" style="color:var(--brand-d)">View →</span>
+          <div><h4>${esc(j.title)}</h4><div class="muted">${esc(j.company||'')} · ${esc(j.city)} · $${j.pay_min}–${j.pay_max}/hr · ${esc(j.shift)}${j.distance!=null?` · <b class="dist">${j.distance} ${T('mi away')}</b>`:''}</div></div></div>
+        <span class="nav-link" style="color:var(--brand-d)">${T('View →')}</span>
       </a>`).join('')
-      : '<div class="card muted">No saved jobs yet. Tap ☆ Save on any job to keep it here.</div>'}
+      : `<div class="card muted">${T('No saved jobs yet. Tap ☆ Save on any job to keep it here.')}</div>`}
   </section>`;
 }
 function bd(label,val,max){const pct=Math.round(val/max*100);return `<div class="bd"><span>${label}</span><div class="bdbar"><i style="width:${pct}%"></i></div><b>${val}/${max}</b></div>`;}
@@ -558,7 +572,7 @@ function workRow(w, editable){
   return `<div class="exp">
     <div class="exp-ic">${tradeEmoji(w.trade)}</div>
     <div class="exp-main">
-      <div class="exp-top"><b>${esc(w.role||'')}</b>${w.current?'<span class="chip sm green">Current</span>':''}</div>
+      <div class="exp-top"><b>${esc(w.role||'')}</b>${w.current?`<span class="chip sm green">${T('Current')}</span>`:''}</div>
       <div class="muted">${esc(w.employer||'')}${w.city?(' · '+esc(w.city)):''}${yrs?(' · '+esc(yrs)):''}</div>
       ${w.description?`<p class="exp-d">${esc(w.description)}</p>`:''}
     </div>
@@ -567,7 +581,7 @@ function workRow(w, editable){
 }
 function workHistoryList(items, editable){
   return items.length ? `<div class="explist">${items.map(w=>workRow(w, editable)).join('')}</div>`
-    : (editable ? '<p class="muted">No past jobs added yet — add the places you’ve worked below. This is what recruiters trust most.</p>' : '');
+    : (editable ? `<p class="muted">${T('No past jobs added yet — add the places you’ve worked below. This is what recruiters trust most.')}</p>` : '');
 }
 function workerProfile({ user, profile, creds, error, portfolio = [], work = [] }) {
   const kinds = Object.entries(CRED_KINDS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
@@ -580,80 +594,80 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [] 
       <div class="chips">${tradeChips(profile)}</div>
       <p class="muted">${esc(profile.city)} · ${profile.years_exp} yrs · floor $${profile.pay_floor}/hr · ${esc(profile.shift)} shift</p>
       <div class="ministats">
-        <div><b>${profile.readiness}</b><span>READINESS</span></div>
-        <div><b>${creds.filter(c=>c.verified).length}</b><span>VERIFIED</span></div>
-        <div><b>${creds.length}</b><span>TOTAL CREDS</span></div>
+        <div><b>${profile.readiness}</b><span>${T('READINESS')}</span></div>
+        <div><b>${creds.filter(c=>c.verified).length}</b><span>${T('VERIFIED')}</span></div>
+        <div><b>${creds.length}</b><span>${T('TOTAL CREDS')}</span></div>
       </div>
       <form method="post" action="/app/available" class="avail-form">
-        <button class="btn-sm ${profile.available?'':'ghost'}">${profile.available?'🟢 Available for work — tap to pause':'⚪ Paused — tap to go available'}</button>
+        <button class="btn-sm ${profile.available?'':'ghost'}">${profile.available?T('🟢 Available for work — tap to pause'):T('⚪ Paused — tap to go available')}</button>
       </form>
       <form method="post" action="/app/work-today" class="avail-form" style="margin-top:8px">
-        <button class="btn-sm ${profile.work_today?'':'ghost'}">${profile.work_today?'⚡ Can work TODAY — tap to clear':'⚡ I can work today'}</button>
+        <button class="btn-sm ${profile.work_today?'':'ghost'}">${profile.work_today?T('⚡ Can work TODAY — tap to clear'):T('⚡ I can work today')}</button>
       </form>
       <form method="post" action="/app/alerts" class="avail-form" style="margin-top:8px">
-        <button class="btn-sm ${profile.alerts?'':'ghost'}">${profile.alerts?'🔔 Job alerts ON — tap to stop':'🔔 Text me new job alerts'}</button>
+        <button class="btn-sm ${profile.alerts?'':'ghost'}">${profile.alerts?T('🔔 Job alerts ON — tap to stop'):T('🔔 Text me new job alerts')}</button>
       </form>
       <form method="post" action="/app/relocate" class="avail-form" style="margin-top:8px">
-        <button class="btn-sm ${profile.relocate?'':'ghost'}">${profile.relocate?'✈️ Open to relocate — tap to clear':'✈️ I’m open to relocating'}</button>
+        <button class="btn-sm ${profile.relocate?'':'ghost'}">${profile.relocate?T('✈️ Open to relocate — tap to clear'):T('✈️ I’m open to relocating')}</button>
       </form>
     </div>
     <div class="card">
-      <div class="sec-h" style="margin-top:0">Trades, headline & about</div>
+      <div class="sec-h" style="margin-top:0">${T('Trades, headline & about')}</div>
       ${error?`<div class="err">${esc(error)}</div>`:''}
       <form method="post" action="/app/profile/details">
-        <label>Headline <input name="headline" maxlength="80" value="${esc(profile.headline||'')}" placeholder="e.g. Journeyman electrician — commercial & solar"></label>
+        <label>${T('Headline')} <input name="headline" maxlength="80" value="${esc(profile.headline||'')}" placeholder="${T('e.g. Journeyman electrician — commercial & solar')}"></label>
         <div class="fieldset">
-          <div class="fs-lbl">Your trades <span class="muted">pick all you work</span></div>
+          <div class="fs-lbl">${T('Your trades')} <span class="muted">${T('pick all you work')}</span></div>
           <div class="tradegrid">${tradeCheckboxes(trades)}</div>
         </div>
-        <label>About you <textarea name="about" rows="3" maxlength="600" placeholder="Where you've worked, what you're great at, what you're looking for.">${esc(profile.about||'')}</textarea></label>
-        <button class="btn-sm">Save details</button>
+        <label>${T('About you')} <textarea name="about" rows="3" maxlength="600" placeholder="${T("Where you've worked, what you're great at, what you're looking for.")}">${esc(profile.about||'')}</textarea></label>
+        <button class="btn-sm">${T('Save details')}</button>
       </form>
       <form method="post" action="/app/profile/suggest-about" style="margin-top:8px">
-        <button class="btn-sm ghost" title="Drafts an About from your trades and work history — free">✨ Draft my About for me</button>
+        <button class="btn-sm ghost" title="Drafts an About from your trades and work history — free">${T('✨ Draft my About for me')}</button>
       </form>
     </div>
     <div class="card">
-      <div class="sec-h" style="margin-top:0">Work history</div>
+      <div class="sec-h" style="margin-top:0">${T('Work history')}</div>
       ${workHistoryList(work, true)}
       <form method="post" action="/app/experience" class="exp-form">
         <div class="row2">
-          <label>Role / title <input name="role" maxlength="80" required placeholder="e.g. Lead Electrician"></label>
-          <label>Employer <input name="employer" maxlength="80" placeholder="e.g. Sun Valley Electric"></label>
+          <label>${T('Role / title')} <input name="role" maxlength="80" required placeholder="${T('e.g. Lead Electrician')}"></label>
+          <label>${T('Employer')} <input name="employer" maxlength="80" placeholder="${T('e.g. Sun Valley Electric')}"></label>
         </div>
         <div class="row2">
-          <label>Trade <select name="trade">${trades.length?trades.map(t=>`<option value="${t}">${TRADES[t]||t}</option>`).join(''):Object.entries(TRADES).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></label>
-          <label>City <input name="city" maxlength="60" placeholder="e.g. Phoenix"></label>
+          <label>${T('Trade')} <select name="trade">${trades.length?trades.map(t=>`<option value="${t}">${TRADES[t]||t}</option>`).join(''):Object.entries(TRADES).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></label>
+          <label>${T('City')} <input name="city" maxlength="60" placeholder="${T('e.g. Phoenix')}"></label>
         </div>
         <div class="row2">
-          <label>From year <input type="number" name="start_year" min="1960" max="2026" placeholder="2019"></label>
-          <label>To year <input type="number" name="end_year" min="1960" max="2026" placeholder="2023 (blank = current)"></label>
+          <label>${T('From year')} <input type="number" name="start_year" min="1960" max="2026" placeholder="2019"></label>
+          <label>${T('To year')} <input type="number" name="end_year" min="1960" max="2026" placeholder="${T('2023 (blank = current)')}"></label>
         </div>
-        <label>What you did <textarea name="description" rows="2" maxlength="400" placeholder="Scope, scale, what you were responsible for."></textarea></label>
-        <button class="btn-sm">Add to work history</button>
+        <label>${T('What you did')} <textarea name="description" rows="2" maxlength="400" placeholder="${T('Scope, scale, what you were responsible for.')}"></textarea></label>
+        <button class="btn-sm">${T('Add to work history')}</button>
       </form>
     </div>
     <div class="card">
-      <div class="sec-h" style="margin-top:0">Credential Wallet</div>
-      ${creds.map(credRow).join('') || '<p class="muted">No credentials yet — add one below.</p>'}
+      <div class="sec-h" style="margin-top:0">${T('Credential Wallet')}</div>
+      ${creds.map(credRow).join('') || `<p class="muted">${T('No credentials yet — add one below.')}</p>`}
     </div>
     <div class="card">
-      <div class="sec-h" style="margin-top:0">Add a credential</div>
+      <div class="sec-h" style="margin-top:0">${T('Add a credential')}</div>
       ${error?`<div class="err">${esc(error)}</div>`:''}
       <form method="post" action="/app/credentials" class="inline-form">
         <select name="kind">${kinds}</select>
-        <input name="expires" placeholder="Expires e.g. 2027-06">
-        <button class="btn">Add credential</button>
+        <input name="expires" placeholder="${T('Expires e.g. 2027-06')}">
+        <button class="btn">${T('Add credential')}</button>
       </form>
     </div>
     <div class="card">
-      <div class="sec-h" style="margin-top:0">Portfolio — your past work <a href="/p/${user.id}" target="_blank" rel="noopener">View public page ↗</a></div>
-      ${mediaGallery(portfolio, {deletable:true, base:'/app/portfolio'}) || '<p class="muted">Add photos or videos of jobs you’ve completed — it builds your shareable portfolio and helps recruiters trust your work.</p>'}
+      <div class="sec-h" style="margin-top:0">${T('Portfolio — your past work')} <a href="/p/${user.id}" target="_blank" rel="noopener">${T('View public page ↗')}</a></div>
+      ${mediaGallery(portfolio, {deletable:true, base:'/app/portfolio'}) || `<p class="muted">${T('Add photos or videos of jobs you’ve completed — it builds your shareable portfolio and helps recruiters trust your work.')}</p>`}
       <form method="post" action="/app/portfolio" class="port-form">
-        <input name="url" placeholder="Image URL or YouTube / Vimeo link" required>
-        <input name="title" placeholder="Title — e.g. Commercial panel upgrade">
-        <input name="caption" placeholder="Short caption (optional)">
-        <button class="btn-sm">Add to portfolio</button>
+        <input name="url" placeholder="${T('Image URL or YouTube / Vimeo link')}" required>
+        <input name="title" placeholder="${T('Title — e.g. Commercial panel upgrade')}">
+        <input name="caption" placeholder="${T('Short caption (optional)')}">
+        <button class="btn-sm">${T('Add to portfolio')}</button>
       </form>
     </div>
   </section>`;
@@ -663,9 +677,9 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [] 
 function trainCard(kind, have){
   const tr = TRAINING[kind]; if(!tr) return '';
   return `<div class="train ${have?'have':''}">
-    <div class="train-h"><b>${esc(CRED_KINDS[kind]||kind)}</b>${have?'<span class="chip sm green">On your card ✓</span>':''}</div>
-    <p>${esc(tr.how)}</p>
-    <a class="nav-link" style="color:var(--brand-d);font-weight:700" href="${esc(tr.url)}" target="_blank" rel="noopener noreferrer">How to earn it ↗</a>
+    <div class="train-h"><b>${esc(CRED_KINDS[kind]||kind)}</b>${have?`<span class="chip sm green">${T('On your card ✓')}</span>`:''}</div>
+    <p>${T(tr.how)}</p>
+    <a class="nav-link" style="color:var(--brand-d);font-weight:700" href="${esc(tr.url)}" target="_blank" rel="noopener noreferrer">${T('How to earn it ↗')}</a>
   </div>`;
 }
 function workerTraining({ have = [] }) {
@@ -674,11 +688,11 @@ function workerTraining({ have = [] }) {
   const todo = all.filter(k=>!haveSet.has(k));
   const done = all.filter(k=>haveSet.has(k));
   return `<section class="wrap">
-    <div class="sec-h big">Learn & get certified <span class="muted">Real credentials open more jobs and raise your readiness score</span></div>
-    <div class="card info-card">Certifications are the fastest way to stand out. Every one you add to your Work Card is verified and boosts how you match to jobs. Below is how to earn each — most can be done online or through a local provider.</div>
-    <div class="sec-h">Recommended — not on your card yet</div>
-    <div class="traingrid">${todo.map(k=>trainCard(k,false)).join('') || '<p class="muted">You’ve added every credential we track. Impressive.</p>'}</div>
-    ${done.length?`<div class="sec-h">Already on your Work Card</div><div class="traingrid">${done.map(k=>trainCard(k,true)).join('')}</div>`:''}
+    <div class="sec-h big">${T('Learn & get certified')} <span class="muted">${T('Real credentials open more jobs and raise your readiness score')}</span></div>
+    <div class="card info-card">${T('Certifications are the fastest way to stand out. Every one you add to your Work Card is verified and boosts how you match to jobs. Below is how to earn each — most can be done online or through a local provider.')}</div>
+    <div class="sec-h">${T('Recommended — not on your card yet')}</div>
+    <div class="traingrid">${todo.map(k=>trainCard(k,false)).join('') || `<p class="muted">${T('You’ve added every credential we track. Impressive.')}</p>`}</div>
+    ${done.length?`<div class="sec-h">${T('Already on your Work Card')}</div><div class="traingrid">${done.map(k=>trainCard(k,true)).join('')}</div>`:''}
   </section>`;
 }
 
@@ -1059,5 +1073,5 @@ function ogImage() {
 </svg>`;
 }
 
-module.exports = { setLang, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
+module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
   jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, empCompany, workerTraining };

@@ -51,4 +51,25 @@ async function workerAbout(d) {
   return ai || templateAbout(d);
 }
 
-module.exports = { enabled, workerAbout };
+// Batch-translate UI strings to a target language. Returns { src: dst } for
+// whatever it could translate; {} when disabled or on failure (caller keeps English).
+async function translateBatch(texts, langName = 'Spanish') {
+  if (!KEY || !texts || !texts.length) return {};
+  const list = texts.slice(0, 60);
+  const numbered = list.map((s, i) => `${i + 1}. ${s.replace(/\n/g, ' ')}`).join('\n');
+  const prompt = `Translate these short UI strings for a US blue-collar hiring app into ${langName}. `
+    + `Keep any leading emoji, keep it concise and natural for tradespeople, do NOT translate brand names "Rivet" or "Crewline". `
+    + `Return ONLY a JSON array of strings in the same order, no commentary.\n\n${numbered}`;
+  const out = await chat(prompt);
+  if (!out) return {};
+  try {
+    const start = out.indexOf('['), end = out.lastIndexOf(']');
+    if (start < 0 || end < 0) return {};
+    const arr = JSON.parse(out.slice(start, end + 1));
+    const map = {};
+    list.forEach((s, i) => { if (typeof arr[i] === 'string' && arr[i].trim()) map[s] = arr[i].trim(); });
+    return map;
+  } catch (e) { return {}; }
+}
+
+module.exports = { enabled, workerAbout, translateBatch };

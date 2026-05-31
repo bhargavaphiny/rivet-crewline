@@ -181,6 +181,10 @@ async function createSchema() {
       created_at TEXT DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_work_history_user ON work_history(user_id);
+    CREATE TABLE IF NOT EXISTS translations (
+      lang TEXT NOT NULL, src TEXT NOT NULL, dst TEXT NOT NULL,
+      PRIMARY KEY (lang, src)
+    );
     CREATE INDEX IF NOT EXISTS idx_messages_to ON messages(to_id, read_at);
     CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_id, to_id);
     CREATE INDEX IF NOT EXISTS idx_applications_worker ON applications(worker_id);
