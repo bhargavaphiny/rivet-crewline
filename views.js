@@ -338,6 +338,8 @@ const BUILTIN_ES = {
   '★ Saved':'★ Guardado','☆ Save to shortlist':'☆ Guardar en lista',
   // safety pulse
   'Site safety':'Seguridad del sitio','Site safety?':'¿Seguridad del sitio?','Safety':'Seguridad','Worker-rated site safety':'Seguridad del sitio calificada por trabajadores',
+  // pay cadence
+  'Pay cadence':'Frecuencia de pago','Daily pay':'Pago diario','Weekly pay':'Pago semanal','Biweekly pay':'Pago quincenal','Monthly pay':'Pago mensual',
 };
 function T(s){
   if(LANG !== 'es' || !s) return s;
@@ -420,7 +422,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=66">
+  <link rel="stylesheet" href="/styles.css?v=67">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -844,6 +846,7 @@ function jobCard(m, bare = false){
       <span class="pay">${j.quotes_ok&&!j.pay_min?T('Name your price'):`$${j.pay_min}–${j.pay_max}<small>/hr</small>`}</span>
       ${j.employment_type?`<span class="jtype">${esc(T(j.employment_type))}</span>`:''}
       ${j.duration?`<span class="jtype dur">${esc(T(j.duration))}</span>`:''}
+      ${cadenceBadge(j.pay_cadence)}
       <span class="js-shift">${esc(T(j.shift))}</span>
       ${isExternal(j)?`<span class="ext-badge">${esc(j.source)} ↗</span>`:''}
       ${sponsorBadge(j)}
@@ -938,7 +941,7 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
         <div class="badge big">${tradeEmoji(job.trade)}</div>
         <div class="job-main">
           <h2>${esc(job.title)}</h2>
-          ${job.employment_type?`<span class="jtype">${esc(T(job.employment_type))}</span>`:''}${job.duration?`<span class="jtype dur">${esc(T(job.duration))}</span>`:''}${job.crew_ok?`<span class="jtype crew">${icon('truck')} ${T('Open to crews')}</span>`:''}${job.quotes_ok?`<span class="jtype quote">${T('Accepting quotes')}</span>`:''}${job.fair_chance?`<span class="jtype fair">${T('Fair-chance')}</span>`:''}${job.veteran_ok?`<span class="jtype vet">${T('Veteran-friendly')}</span>`:''}${job.transport_provided?`<span class="jtype transp">${icon('truck')} ${T('Transport provided')}</span>`:''}
+          ${job.employment_type?`<span class="jtype">${esc(T(job.employment_type))}</span>`:''}${job.duration?`<span class="jtype dur">${esc(T(job.duration))}</span>`:''}${cadenceBadge(job.pay_cadence)}${job.crew_ok?`<span class="jtype crew">${icon('truck')} ${T('Open to crews')}</span>`:''}${job.quotes_ok?`<span class="jtype quote">${T('Accepting quotes')}</span>`:''}${job.fair_chance?`<span class="jtype fair">${T('Fair-chance')}</span>`:''}${job.veteran_ok?`<span class="jtype vet">${T('Veteran-friendly')}</span>`:''}${job.transport_provided?`<span class="jtype transp">${icon('truck')} ${T('Transport provided')}</span>`:''}
           <div class="job-c">${job.poster_kind==='individual'?`${icon('pin')} ${T('Posted by a homeowner / small business')} · `:''}${esc(job.company||'')} · ${esc(job.city)} ${esc(job.zip)} · ${esc(T(job.shift))}${distance!=null?` · <b class="dist">${distance} ${T('mi away')}</b>`:''}</div>
           <div class="pay big">${job.quotes_ok&&!job.pay_min?T('Name your price'):`$${job.pay_min}–${job.pay_max}/hr`}</div>
           ${payFitBadge(payFloor, job, 'worker')}
@@ -1734,6 +1737,8 @@ function empJobs({ jobs }) {
 
 const JOB_TYPES = ['Full-time','Part-time','Contract','Temp','Apprenticeship','Outcome-based'];
 const DURATIONS = ['1 day','This weekend','1–2 weeks','1 month','3 months','6+ months','Ongoing'];
+const CADENCE = { daily:'Daily pay', weekly:'Weekly pay', biweekly:'Biweekly pay', monthly:'Monthly pay' };
+function cadenceBadge(c){ return CADENCE[c] ? `<span class="jtype cad">${T(CADENCE[c])}</span>` : ''; }
 const SPONSORSHIP = { authorized:'Requires U.S. work authorization', h2a:'Offers H-2A (agricultural) visa sponsorship', h2b:'Offers H-2B (seasonal) visa sponsorship' };
 const WORK_AUTH = { '':'Prefer not to say', authorized:'Authorized to work in the U.S.', need_h2a:'Seeking H-2A (agricultural) sponsorship', need_h2b:'Seeking H-2B (seasonal) sponsorship' };
 // Informational sponsorship badge for a job. profile (optional) lets us note a match
@@ -1764,7 +1769,8 @@ function empJobForm(error='', job=null) {
       <label>${T('Title')} <input name="title" required placeholder="${T('e.g. Fix a leaking faucet')}" value="${v('title')}"></label>
       <div class="row2"><label>${T('Trade')} <select name="trade">${opts}</select></label>
         <label>${T('Employment type')} <select name="employment_type">${typeOpts}</select></label></div>
-      <label>${T('Duration')} <select name="duration"><option value="">${T('Not specified')}</option>${DURATIONS.map(d=>`<option value="${d}" ${editing&&job.duration===d?'selected':''}>${T(d)}</option>`).join('')}</select></label>
+      <div class="row2"><label>${T('Duration')} <select name="duration"><option value="">${T('Not specified')}</option>${DURATIONS.map(d=>`<option value="${d}" ${editing&&job.duration===d?'selected':''}>${T(d)}</option>`).join('')}</select></label>
+        <label>${T('Pay cadence')} <select name="pay_cadence"><option value="">${T('Not specified')}</option>${Object.entries(CADENCE).map(([k,v])=>`<option value="${k}" ${editing&&job.pay_cadence===k?'selected':''}>${T(v)}</option>`).join('')}</select></label></div>
       <label class="ck"><input type="checkbox" name="quotes_ok" value="1" ${editing&&job.quotes_ok?'checked':''}> ${T('Let workers send me a price quote (instead of a fixed pay rate)')}</label>
       <div class="row2"><label>${T('Pay min ($/hr)')} <input type="number" name="pay_min" value="${v('pay_min','36')}"></label>
         <label>${T('Pay max ($/hr)')} <input type="number" name="pay_max" value="${v('pay_max','48')}"></label></div>

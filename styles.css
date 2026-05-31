@@ -561,6 +561,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .jtype.transp svg{width:12px;height:12px}
 .incl-badge.transp{background:rgba(43,73,112,.12);color:#2e547e}
 .far-hint{color:#b7322a;font-weight:700;font-size:11px}
+.jtype.cad{background:rgba(31,169,113,.12);color:#157a52}
 /* payscale fit */
 .payfit{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;margin:4px 0}
 .payfit svg{width:11px;height:11px}

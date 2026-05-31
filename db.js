@@ -1035,6 +1035,7 @@ async function migrate() {
   try { await db.exec('ALTER TABLE jobs ADD COLUMN transport_provided INTEGER DEFAULT 0'); } catch (e) { /* employer offers a ride/shuttle */ }
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN commute_mi INTEGER DEFAULT 0'); } catch (e) { /* max miles willing to travel; 0 = no limit */ }
   try { await db.exec('ALTER TABLE reviews ADD COLUMN safety INTEGER'); } catch (e) { /* worker-rated site safety 1-5 */ }
+  try { await db.exec('ALTER TABLE jobs ADD COLUMN pay_cadence TEXT'); } catch (e) { /* daily/weekly/biweekly/monthly */ }
 }
 
 async function seedZips() {
@@ -1096,6 +1097,14 @@ async function init() {
   try { await seedSafety(); } catch (e) { console.error('[db] safety seed skipped (non-fatal):', e.message); }
   try { await seedXfactors(); } catch (e) { console.error('[db] xfactors seed skipped (non-fatal):', e.message); }
   try { await seedHomeowner(); } catch (e) { console.error('[db] homeowner seed skipped (non-fatal):', e.message); }
+  try {
+    if(!(await metaGet('cadence_v1'))){
+      await db.exec("UPDATE jobs SET pay_cadence='weekly' WHERE pay_cadence IS NULL AND trade IN ('electrician','hvac','plumber','welder','pipefitter','carpenter','concrete','warehouse','delivery_driver','landscaper')");
+      await db.exec("UPDATE jobs SET pay_cadence='daily' WHERE pay_cadence IS NULL AND (quotes_ok=1 OR trade IN ('fruit_picker','farmworker','junk_removal','event_setup','mover','gig_courier','packing_shed'))");
+      await db.exec("UPDATE jobs SET pay_cadence='biweekly' WHERE pay_cadence IS NULL");
+      await metaSet('cadence_v1','1');
+    }
+  } catch (e) { console.error('[db] cadence seed skipped (non-fatal):', e.message); }
   try {
     if(!(await metaGet('rehire_v1'))){
       // make one Sun Valley worker a repeat hire so the "rehires its crew" stat shows
