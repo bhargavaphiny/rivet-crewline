@@ -211,6 +211,12 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--orange)}
 .foot-col a:hover{color:var(--amber)}
 .foot-base{border-top:1px solid rgba(255,255,255,.1);margin-top:26px;padding-top:18px;font-size:12.5px;color:#8da0ab}
 
+/* availability */
+.avail-form{margin-top:14px}
+.avail-dot{color:var(--green);font-size:11px;margin-left:6px;vertical-align:middle}
+.avail-badge{display:inline-block;margin-top:10px;font-size:12.5px;font-weight:700;color:var(--green);background:rgba(31,169,113,.12);padding:4px 10px;border-radius:20px}
+.avail-badge.off{color:var(--muted);background:var(--paper)}
+
 /* candidate job search */
 .jobfilters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 18px}
 .jobfilters input,.jobfilters select{margin:0;width:auto;flex:1;min-width:130px}

@@ -42,7 +42,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   } else if ((user.mode || user.role) === 'worker') {
     const L = (h,l,k)=>`<a class="nav-link ${active===k?'on':''}" href="${h}">${l}</a>`;
     const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/app/messages">Messages${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
-    nav = `${L('/app','Home','home')}${L('/app/jobs','Matches','jobs')}${L('/app/profile','Work Card','profile')}${L('/app/applications','Applications','apps')}${msg}
+    nav = `${L('/app','Home','home')}${L('/app/jobs','Find Work','jobs')}${L('/app/profile','Work Card','profile')}${L('/app/applications','Applications','apps')}${msg}
            <a class="nav-link switch" href="/console" title="Switch to hiring">Hiring →</a>
            <span class="who">${initials(user.name)}</span>
            <a class="nav-link" href="/logout">Log out</a>`;
@@ -77,7 +77,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=13">
+  <link rel="stylesheet" href="/styles.css?v=14">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -417,6 +417,9 @@ function workerProfile({ user, profile, creds, error, portfolio = [] }) {
         <div><b>${creds.filter(c=>c.verified).length}</b><span>VERIFIED</span></div>
         <div><b>${creds.length}</b><span>TOTAL CREDS</span></div>
       </div>
+      <form method="post" action="/app/available" class="avail-form">
+        <button class="btn-sm ${profile.available?'':'ghost'}">${profile.available?'🟢 Available for work — tap to pause':'⚪ Paused — tap to go available'}</button>
+      </form>
     </div>
     <div class="card">
       <div class="sec-h" style="margin-top:0">Credential Wallet</div>
@@ -619,10 +622,11 @@ function empSearch({ rows, filters }) {
       <select name="trade" onchange="this.form.submit()">${tradeOpts}</select>
       <label class="chk"><input type="checkbox" name="verified" value="1" ${filters.verified?'checked':''} onchange="this.form.submit()"> Verified only</label>
       <label class="chk"><input type="checkbox" name="ready" value="1" ${filters.ready?'checked':''} onchange="this.form.submit()"> Readiness ≥ 85</label>
+      <label class="chk"><input type="checkbox" name="avail" value="1" ${filters.avail?'checked':''} onchange="this.form.submit()"> 🟢 Available now</label>
     </form>
     <div class="card" style="padding:0">
       <table class="tbl wide"><tr><th>Candidate</th><th>Trade</th><th>Exp</th><th>Credentials</th><th>Readiness</th><th>Pay floor</th></tr>
-      ${rows.map(w=>`<tr><td><a class="cand-link" href="/console/candidates/${w.id}"><span class="av-t">${initials(w.name)}</span> ${esc(w.name)}</a></td>
+      ${rows.map(w=>`<tr><td><a class="cand-link" href="/console/candidates/${w.id}"><span class="av-t">${initials(w.name)}</span> ${esc(w.name)}</a>${w.available?'<span class="avail-dot" title="Available for work">●</span>':''}</td>
         <td>${TRADES[w.trade]||w.trade}</td><td>${w.years_exp} yr</td>
         <td>${w.creds.map(c=>`<span class="cred-chip">${esc(c.name)}</span>`).join('')||'<span class="muted">—</span>'}</td>
         <td><span class="score-tag ${scoreClass(w.readiness)}">${w.readiness}</span></td>
@@ -664,6 +668,7 @@ function empCandidate({ worker, profile, creds, matches, apps, messages, meId, n
       <div class="big-av">${initials(worker.name)}</div>
       <h2>${esc(worker.name)}</h2>
       <p class="muted">${TRADES[profile.trade]||profile.trade} · ${esc(profile.city)} ${esc(profile.zip||'')} · ${profile.years_exp} yrs experience · seeks $${profile.pay_floor}+/hr</p>
+      ${profile.available?'<div class="avail-badge">🟢 Available for work</div>':'<div class="avail-badge off">⚪ Not currently available</div>'}
       <div class="ministats">
         <div><b>${profile.readiness}</b><span>READINESS</span></div>
         <div><b>${creds.filter(c=>c.verified).length}</b><span>VERIFIED</span></div>
@@ -718,7 +723,7 @@ function empShortlist({ rows }) {
     <div class="page-h"><h2>Shortlist</h2><p class="muted">${rows.length} saved candidate${rows.length===1?'':'s'}</p>
       <a class="btn-sm right" href="/console/search">Talent Search</a></div>
     ${rows.length ? `<div class="card" style="padding:0"><table class="tbl wide"><tr><th>Candidate</th><th>Trade</th><th>Exp</th><th>Readiness</th><th>Pay floor</th></tr>
-      ${rows.map(w=>`<tr><td><a class="cand-link" href="/console/candidates/${w.id}"><span class="av-t">${initials(w.name)}</span> ${esc(w.name)}</a></td>
+      ${rows.map(w=>`<tr><td><a class="cand-link" href="/console/candidates/${w.id}"><span class="av-t">${initials(w.name)}</span> ${esc(w.name)}</a>${w.available?'<span class="avail-dot" title="Available for work">●</span>':''}</td>
         <td>${TRADES[w.trade]||w.trade}</td><td>${w.years_exp} yr</td>
         <td><span class="score-tag ${scoreClass(w.readiness)}">${w.readiness}</span></td>
         <td>$${w.pay_floor}/hr</td></tr>`).join('')}

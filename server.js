@@ -361,6 +361,11 @@ const server = http.createServer(async (req,res)=>{
         await db.prepare("DELETE FROM media WHERE id=? AND user_id=? AND target='portfolio'").run(Number(pDel[1]), user.id);
         return redirect(res,'/app/profile');
       }
+      if(p==='/app/available' && method==='POST'){
+        const cur = prof && prof.available ? 1 : 0;
+        await db.prepare('UPDATE worker_profiles SET available=? WHERE user_id=?').run(cur?0:1, user.id);
+        return redirect(res, '/app/profile');
+      }
       if(p==='/app/applications' && method==='GET'){
         const apps = await db.prepare(`SELECT a.*, j.title,j.trade,j.pay_min,j.pay_max,j.city,u.company
           FROM applications a JOIN jobs j ON j.id=a.job_id JOIN users u ON u.id=j.employer_id
@@ -505,12 +510,13 @@ const server = http.createServer(async (req,res)=>{
       }
 
       if(p==='/console/search' && method==='GET'){
-        const filters = {trade:url.searchParams.get('trade')||'', verified:!!url.searchParams.get('verified'), ready:!!url.searchParams.get('ready')};
+        const filters = {trade:url.searchParams.get('trade')||'', verified:!!url.searchParams.get('verified'), ready:!!url.searchParams.get('ready'), avail:!!url.searchParams.get('avail')};
         const rowsRaw = await db.prepare(`SELECT u.id,u.name,p.* FROM users u JOIN worker_profiles p ON p.user_id=u.id`).all();
         let rows = [];
         for(const w of rowsRaw){ const creds=(await getCreds(w.id)).filter(c=>!filters.verified||c.verified); rows.push({...w, creds}); }
         if(filters.trade) rows = rows.filter(w=>w.trade===filters.trade);
         if(filters.ready) rows = rows.filter(w=>w.readiness>=85);
+        if(filters.avail) rows = rows.filter(w=>w.available);
         rows.sort((a,b)=>b.readiness-a.readiness);
         return send(res, V.layout({title:'Talent Search',user,active:'search',body:V.empSearch({rows,filters})}));
       }

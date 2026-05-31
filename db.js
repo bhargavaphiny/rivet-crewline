@@ -380,6 +380,7 @@ async function migrate() {
   // additive column migrations (idempotent — errors swallowed when already applied)
   try { await db.exec('ALTER TABLE users ADD COLUMN phone TEXT'); } catch (e) { /* column exists */ }
   try { await db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone) WHERE phone IS NOT NULL'); } catch (e) {}
+  try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN available INTEGER DEFAULT 1'); } catch (e) { /* column exists */ }
 }
 
 async function init() {
