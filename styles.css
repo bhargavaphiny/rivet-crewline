@@ -488,3 +488,15 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .seg-opt+.seg-opt{border-left:1px solid rgba(255,255,255,.16)}
 .seg-opt.on{background:var(--brand);color:#fff}
 .seg-opt:hover:not(.on){background:rgba(255,255,255,.1);color:#fff}
+
+/* ---- local pay & rules on job detail ---- */
+.rules{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0}
+.rules-h{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:10px}
+.rules-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.rules-grid div{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:9px}
+.rules-grid span{display:block;font-size:10.5px;color:var(--muted);margin-bottom:3px}
+.rules-grid b{font-size:14px;color:var(--ink)}
+.rules-grid b.r-good{color:var(--green)}
+.rules-grid b.r-bad{color:var(--red)}
+.rules-note{font-size:11.5px;color:var(--muted);margin-top:9px;line-height:1.45}
+@media(max-width:480px){.rules-grid{grid-template-columns:1fr}}

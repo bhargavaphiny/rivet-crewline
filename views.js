@@ -32,6 +32,7 @@ const ICONS = {
   zoomin:  { f:0, p:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4M11 8v6M8 11h6"/>' },
   zoomout: { f:0, p:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4M8 11h6"/>' },
   toolbox: { f:0, p:'<path d="M3 9h18v11H3z"/><path d="M8 9V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v3"/><path d="M3 13h18"/>' },
+  building:{ f:0, p:'<path d="M4 21V4a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v17"/><path d="M15 9h4a1 1 0 0 1 1 1v11"/><path d="M8 7h3M8 11h3M8 15h3"/>' },
   globe:   { f:0, p:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>' },
 };
 function icon(name, cls=''){
@@ -243,7 +244,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=33">
+  <link rel="stylesheet" href="/styles.css?v=35">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -559,7 +560,8 @@ function workerJobs({ matches, filters = {}, jobsGeo = null }) {
 }
 
 // ---------- worker: job detail ----------
-function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance = null }) {
+function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance = null, rules = null }) {
+  const belowMin = rules && job.pay_min && job.pay_min < rules.minWage;
   return `<section class="wrap narrow">
     <a class="back" href="/app/jobs">← All matches</a>
     <div class="card">
@@ -568,12 +570,21 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
         <div class="job-main">
           <h2>${esc(job.title)}</h2>
           ${job.employment_type?`<span class="jtype">${esc(job.employment_type)}</span>`:''}
-          <div class="job-c">${esc(job.company||'')} · ${esc(job.city)} ${esc(job.zip)} · ${esc(job.shift)} shift${distance!=null?` · <b class="dist">${distance} mi away</b>`:''}</div>
+          <div class="job-c">${esc(job.company||'')} · ${esc(job.city)} ${esc(job.zip)} · ${esc(job.shift)} shift${distance!=null?` · <b class="dist">${distance} ${T('mi away')}</b>`:''}</div>
           <div class="pay big">$${job.pay_min}–${job.pay_max}/hr</div>
         </div>
         <div class="score-pill ${scoreClass(match.score)}">${match.score}<small>match</small></div>
       </div>
       <p class="descr">${esc(job.descr)}</p>
+      ${rules?`<div class="rules">
+        <div class="rules-h">${T('Local pay & rules')} · ${esc(rules.stateName)}</div>
+        <div class="rules-grid">
+          <div><span>${T('State minimum wage')}</span><b>$${rules.minWage.toFixed(2)}/hr</b></div>
+          <div><span>${T('This job pays')}</span><b class="${belowMin?'r-bad':'r-good'}">$${job.pay_min}–${job.pay_max}/hr</b></div>
+          <div><span>${T('Overtime')}</span><b>${T('1.5× after 40 hrs/wk')}</b></div>
+        </div>
+        <p class="rules-note">${T('Employers must meet the higher of state, county or city minimum wage. Verify local rules before you start.')}</p>
+      </div>`:''}
       ${jobMedia.length?`<div class="sec-h" style="margin-top:4px">The work</div>${mediaGallery(jobMedia)}`:''}
       <div class="breakdown">
         <h4>Why you match</h4>
@@ -627,7 +638,9 @@ function bd(label,val,max){const pct=Math.round(val/max*100);return `<div class=
 
 // ---------- worker: profile / work card ----------
 function tradeChips(profile){
-  return tradesOf(profile).map(t=>`<span class="chip">${tradeEmoji(t)} ${TRADES[t]||t}</span>`).join('');
+  let out = tradesOf(profile).map(t=>`<span class="chip">${tradeEmoji(t)} ${TRADES[t]||t}</span>`).join('');
+  if(profile && profile.custom_trade) out += `<span class="chip">${tradeEmoji('wrench')} ${esc(profile.custom_trade)}</span>`;
+  return out;
 }
 function tradesOf(profile){
   const raw = (profile && (profile.trades || profile.trade)) || '';
@@ -688,6 +701,7 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [] 
           <div class="fs-lbl">${T('Your trades')} <span class="muted">${T('pick all you work')}</span></div>
           <div class="tradegrid">${tradeCheckboxes(trades)}</div>
         </div>
+        <label>${T("Don't see your job? Add it")} <input name="custom_trade" maxlength="60" value="${esc(profile.custom_trade||'')}" placeholder="${T('e.g. Wind turbine technician')}"></label>
         <label>${T('About you')} <textarea name="about" rows="3" maxlength="600" placeholder="${T("Where you've worked, what you're great at, what you're looking for.")}">${esc(profile.about||'')}</textarea></label>
         <button class="btn-sm">${T('Save details')}</button>
       </form>
@@ -773,7 +787,7 @@ const PULSE_NEWS = [
   { tag:'Healthcare', title:'CNAs and home-health aides are among the fastest-growing roles', body:'An aging population is fueling steady, flexible demand for certified nursing assistants and caregivers nationwide.' },
   { tag:'Logistics', title:'Warehouse, delivery and CDL roles stay red-hot', body:'E-commerce and regional distribution keep last-mile drivers, forklift operators and warehouse crews in constant demand.' },
 ];
-function pulsePage({ user, trending, posts, totalOpen }) {
+function pulsePage({ user, trending, posts, totalOpen, companies = [], demandGeo = [] }) {
   const maxN = Math.max(1, ...trending.map(t=>t.n));
   const trendRows = trending.map((t,i)=>`<div class="trend-row">
       <span class="trend-rank">${i+1}</span>
@@ -782,8 +796,15 @@ function pulsePage({ user, trending, posts, totalOpen }) {
         <div class="trend-bar"><i style="width:${Math.round((t.n/maxN)*100)}%"></i></div></div>
       <b class="trend-n">${t.n}</b>
     </div>`).join('');
+  const companyRows = companies.map((c,i)=>`<div class="trend-row">
+      <span class="trend-rank">${i+1}</span>
+      <span class="trend-ic">${icon('building','tic')}</span>
+      <div class="trend-main"><div class="trend-nm">${esc(c.company)}</div><div class="muted sm">${esc(c.company_city||'')}</div></div>
+      <b class="trend-n">${c.n}</b>
+    </div>`).join('');
   return `<section class="wrap">
     <div class="sec-h big">${T('Industry Pulse')} <span class="muted">${T("What's in demand right now")}</span></div>
+    ${demandGeo.length ? usMap(demandGeo, {title:T('Where demand is hottest'), noun:T('job'), cta:T('View')}) : ''}
     <div class="grid2">
       <div class="card">
         <div class="sec-h" style="margin-top:0">${T('Trending trades')} <span class="muted">${totalOpen} ${T('open jobs')}</span></div>
@@ -799,6 +820,10 @@ function pulsePage({ user, trending, posts, totalOpen }) {
         <p class="muted sm" style="margin-top:8px">${T('Trends reflect open jobs on Rivet plus public labor data.')} <a href="https://www.bls.gov/ooh/" target="_blank" rel="noopener noreferrer">BLS ↗</a></p>
       </div>
     </div>
+    ${companies.length?`<div class="card">
+      <div class="sec-h" style="margin-top:0">${T('Top hiring companies')} <span class="muted">${T('most open roles')}</span></div>
+      ${companyRows}
+    </div>`:''}
     <div class="card">
       <div class="sec-h" style="margin-top:0">${T('Community board')} <span class="muted">${T('Tips from the field')}</span></div>
       ${user ? `<form method="post" action="/pulse" class="msg-form" style="margin-bottom:14px">
@@ -881,6 +906,9 @@ function usMap(points = [], opts = {}){
   const py = lat => ((MAXLAT-lat)/(MAXLAT-MINLAT)*VH).toFixed(1);
   const statePaths = US_STATES.map(s=>`<path class="us-state" d="${s.d}"><title>${esc(s.n)}</title></path>`).join('');
   const cityLayer = MAP_CITIES.map(([nm,lo,la])=>`<g class="us-city"><circle cx="${px(lo)}" cy="${py(la)}" r="1.6"/><text x="${(+px(lo)+4).toFixed(1)}" y="${(+py(la)+3).toFixed(1)}">${esc(nm)}</text></g>`).join('');
+  // demand heat: soft amber glow blobs sized by how many openings/candidates cluster there
+  const heatDefs = `<defs><radialGradient id="rvheat"><stop offset="0%" stop-color="#F6A623" stop-opacity=".6"/><stop offset="55%" stop-color="#F6A623" stop-opacity=".18"/><stop offset="100%" stop-color="#F6A623" stop-opacity="0"/></radialGradient></defs>`;
+  const heat = points.map(g=>{ const hr=Math.min(64, 18 + (g.n||1)*9); return `<circle class="heat" cx="${px(g.lon)}" cy="${py(g.lat)}" r="${hr}" fill="url(#rvheat)"/>`; }).join('');
   const total = points.reduce((a,g)=>a+(g.n||0),0);
   const dots = points.map((g,i)=>{
     const r = Math.min(18, 6 + (g.n||1)*2.2);
@@ -898,7 +926,9 @@ function usMap(points = [], opts = {}){
     ${points.length ? `<div class="mapwrap">
       <div class="mapbox">
         <svg class="usmap" id="rvsvg" viewBox="0 0 ${VW} ${VH}" role="img" aria-label="US map">
+          ${heatDefs}
           <g class="us-states">${statePaths}</g>
+          <g class="us-heat">${heat}</g>
           <g class="us-cities">${cityLayer}</g>${dots}
         </svg>
         <div class="mapzoom"><button type="button" onclick="rvZoom(.8)" aria-label="Zoom in">${icon('zoomin')}</button><button type="button" onclick="rvZoom(1.25)" aria-label="Zoom out">${icon('zoomout')}</button></div>

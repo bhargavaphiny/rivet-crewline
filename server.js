@@ -175,6 +175,18 @@ async function candidateGeo(){
   }
   return Object.values(byZip).sort((a,b)=>b.n-a.n);
 }
+// ALL open-job locations (for the Pulse demand heat map)
+async function jobGeoAll(){
+  const rows = await db.prepare(`SELECT j.id, j.title, j.trade, j.pay_min, j.pay_max, j.zip, z.lat, z.lon, z.city, u.company
+    FROM jobs j JOIN zip_geo z ON z.zip=j.zip JOIN users u ON u.id=j.employer_id WHERE j.status='open'`).all();
+  const byZip = {};
+  for(const r of rows){
+    const b = byZip[r.zip] || (byZip[r.zip] = {city:r.city, lat:r.lat, lon:r.lon, n:0, items:[]});
+    b.n++;
+    if(b.items.length<12) b.items.push({ label:`${r.title} · $${r.pay_min}–${r.pay_max}/hr`, sub:`${r.company||''} · ${M.TRADES[r.trade]||r.trade}`, href:`/app/jobs/${r.id}` });
+  }
+  return Object.values(byZip).sort((a,b)=>b.n-a.n);
+}
 // open-job locations relevant to a worker: their trades (direct) + adjacent trades (related)
 async function jobGeoForWorker(prof){
   const trades = profTrades(prof);
@@ -323,7 +335,10 @@ const server = http.createServer(async (req,res)=>{
       const trending = await db.prepare(`SELECT trade, COUNT(*) n FROM jobs WHERE status='open' GROUP BY trade ORDER BY n DESC LIMIT 8`).all();
       const totalOpen = (await db.prepare(`SELECT COUNT(*) c FROM jobs WHERE status='open'`).get()).c;
       const posts = await db.prepare(`SELECT * FROM posts ORDER BY created_at DESC, id DESC LIMIT 40`).all();
-      return send(res, V.layout({title:'Industry Pulse', user, active:'pulse', body:V.pulsePage({user, trending, posts, totalOpen})}));
+      const companies = await db.prepare(`SELECT u.company, u.company_city, COUNT(*) n FROM jobs j JOIN users u ON u.id=j.employer_id
+        WHERE j.status='open' AND u.company IS NOT NULL AND u.company<>'' GROUP BY u.id ORDER BY n DESC LIMIT 8`).all();
+      const demandGeo = await jobGeoAll();
+      return send(res, V.layout({title:'Industry Pulse', user, active:'pulse', body:V.pulsePage({user, trending, posts, totalOpen, companies, demandGeo})}));
     }
     if(p==='/pulse' && method==='POST'){
       if(!user) return redirect(res, '/login');
@@ -552,8 +567,8 @@ const server = http.createServer(async (req,res)=>{
         const trades = normTrades(b.trades);
         const trade = trades[0] || prof.trade;
         const tradesCsv = (trades.length?trades:[trade]).join(',');
-        await db.prepare('UPDATE worker_profiles SET trade=?,trades=?,headline=?,about=? WHERE user_id=?')
-          .run(trade, tradesCsv, String(b.headline||'').slice(0,80), String(b.about||'').slice(0,600), user.id);
+        await db.prepare('UPDATE worker_profiles SET trade=?,trades=?,headline=?,about=?,custom_trade=? WHERE user_id=?')
+          .run(trade, tradesCsv, String(b.headline||'').slice(0,80), String(b.about||'').slice(0,600), String(b.custom_trade||'').slice(0,60), user.id);
         await recomputeReadiness(user.id);
         return redirect(res,'/app/profile');
       }
@@ -645,7 +660,8 @@ const server = http.createServer(async (req,res)=>{
         const saved = !!(await db.prepare('SELECT 1 FROM saved_jobs WHERE worker_id=? AND job_id=?').get(user.id, jid));
         const jobMedia = await db.prepare("SELECT * FROM media WHERE job_id=? AND target='job' ORDER BY created_at DESC, id DESC").all(jid);
         const distance = await workerDistance(prof, job.zip);
-        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied,saved,jobMedia,distance})}));
+        const rules = M.localRules(job.city);
+        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied,saved,jobMedia,distance,rules})}));
       }
       if(jid && p===`/app/jobs/${jid}/apply` && method==='POST'){
         const job = await db.prepare('SELECT * FROM jobs WHERE id=?').get(jid);

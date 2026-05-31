@@ -185,6 +185,33 @@ const TRAINING = {
   guard_card:     { how: 'State security guard license (e.g., a "guard card") — training hours + background check.', url: 'https://www.careeronestop.org/Toolkit/Training/find-certifications.aspx' },
 };
 
+// State minimum wages (approx. 2025 $/hr) + the city→state lookup for seeded metros.
+// Used to show local pay floor + basic labor rules on each job card.
+const STATE_MIN_WAGE = {
+  AZ:14.70, CA:16.50, TX:7.25, CO:14.81, GA:7.25, IL:15.00, NV:12.00, WA:16.66,
+  FL:13.00, TN:7.25, NC:7.25, OH:10.70, MO:13.75, UT:7.25, OR:15.05, MN:11.13, MI:10.56, NY:16.50, PA:7.25,
+};
+const STATE_NAME = {
+  AZ:'Arizona', CA:'California', TX:'Texas', CO:'Colorado', GA:'Georgia', IL:'Illinois', NV:'Nevada',
+  WA:'Washington', FL:'Florida', TN:'Tennessee', NC:'North Carolina', OH:'Ohio', MO:'Missouri',
+  UT:'Utah', OR:'Oregon', MN:'Minnesota', MI:'Michigan', NY:'New York', PA:'Pennsylvania',
+};
+const CITY_STATE = {
+  Phoenix:'AZ', Tempe:'AZ', Mesa:'AZ', Scottsdale:'AZ', Glendale:'AZ', Chandler:'AZ', Gilbert:'AZ',
+  Fresno:'CA', 'Los Angeles':'CA', 'San Francisco':'CA',
+  Houston:'TX', Dallas:'TX', Austin:'TX', 'San Antonio':'TX',
+  Denver:'CO', Atlanta:'GA', Chicago:'IL', 'Las Vegas':'NV', Seattle:'WA',
+  Miami:'FL', Tampa:'FL', Nashville:'TN', Charlotte:'NC', Columbus:'OH',
+  'Kansas City':'MO', 'Salt Lake City':'UT', Portland:'OR', Minneapolis:'MN', Detroit:'MI',
+};
+function stateForCity(city){ return CITY_STATE[String(city||'').trim()] || null; }
+function localRules(city){
+  const st = stateForCity(city);
+  if(!st) return null;
+  return { state: st, stateName: STATE_NAME[st]||st, minWage: STATE_MIN_WAGE[st] || 7.25,
+    overtime: 'Overtime (1.5×) after 40 hrs/week' };
+}
+
 const clamp = (n, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, n));
 
 /**
@@ -239,4 +266,4 @@ function scoreMatch(profile, creds, job) {
   return { score: total, breakdown: { trade, pay, loc, cred: credScore }, missing };
 }
 
-module.exports = { TRADES, ADJACENT, CRED_KINDS, TRAINING, readiness, scoreMatch, clamp };
+module.exports = { TRADES, ADJACENT, CRED_KINDS, TRAINING, STATE_MIN_WAGE, STATE_NAME, CITY_STATE, stateForCity, localRules, readiness, scoreMatch, clamp };
