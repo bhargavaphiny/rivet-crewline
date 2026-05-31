@@ -298,7 +298,7 @@ function workerJobs({ matches }) {
 }
 
 // ---------- worker: job detail ----------
-function jobDetail({ job, match, applied, saved = false }) {
+function jobDetail({ job, match, applied, saved = false, jobMedia = [] }) {
   return `<section class="wrap narrow">
     <a class="back" href="/app/jobs">← All matches</a>
     <div class="card">
@@ -312,6 +312,7 @@ function jobDetail({ job, match, applied, saved = false }) {
         <div class="score-pill ${scoreClass(match.score)}">${match.score}<small>match</small></div>
       </div>
       <p class="descr">${esc(job.descr)}</p>
+      ${jobMedia.length?`<div class="sec-h" style="margin-top:4px">The work</div>${mediaGallery(jobMedia)}`:''}
       <div class="breakdown">
         <h4>Why you match</h4>
         ${bd('Trade fit',match.breakdown.trade,45)}
@@ -521,7 +522,7 @@ function empJobForm(error='') {
 }
 
 const STAGES = ['Sourced','Screened','Interview','Offer','Hired'];
-function empPipeline({ job, columns, candidates }) {
+function empPipeline({ job, columns, candidates, jobMedia = [] }) {
   const cols = STAGES.map(st=>`<div class="col"><div class="col-h">${st} <span>${(columns[st]||[]).length}</span></div>
     ${(columns[st]||[]).map(a=>`<div class="pcard">
         <a class="pc-nm cand-link" href="/console/candidates/${a.worker_id}"><span class="av-t">${initials(a.name)}</span>${esc(a.name)}</a>
@@ -535,6 +536,16 @@ function empPipeline({ job, columns, candidates }) {
   return `<section class="wrap">
     <a class="back" href="/console/jobs">← All jobs</a>
     <div class="page-h"><h2>${esc(job.title)}</h2><p class="muted">$${job.pay_min}–${job.pay_max}/hr · ${esc(job.city)}</p></div>
+    <div class="card">
+      <div class="sec-h" style="margin-top:0">Photos of the work <span class="muted sm">candidates see these on the job</span></div>
+      ${mediaGallery(jobMedia, {deletable:true, base:`/console/jobs/${job.id}/media`}) || '<p class="muted sm">Add photos or a video of the site / work to be done — it helps candidates self-qualify.</p>'}
+      <form method="post" action="/console/jobs/${job.id}/media" class="port-form">
+        <input name="url" placeholder="Image URL or YouTube / Vimeo link" required>
+        <input name="title" placeholder="Title — e.g. Rooftop unit replacement">
+        <input name="caption" placeholder="Short caption (optional)">
+        <button class="btn-sm">Add photo / video</button>
+      </form>
+    </div>
     <div class="kanban">${cols}</div>
     <div class="card" style="margin-top:18px">
       <div class="sec-h" style="margin-top:0">Recommended candidates (not yet in pipeline)</div>

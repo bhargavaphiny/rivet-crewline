@@ -338,11 +338,43 @@ async function seedRealism(){
   console.log('[db] realism pass applied — backdated pipeline activity + sample conversation');
 }
 
+// ---- demo media: portfolio pieces + job photos (idempotent) ----
+async function seedMedia(){
+  if (await metaGet('media_v1')) return;
+  const wId = async (email) => { const u = await db.prepare('SELECT id FROM users WHERE email=?').get(email); return u && u.id; };
+  const img = (seed) => `https://picsum.photos/seed/${seed}/640/420`;
+  const portfolio = [
+    ['marcus@rivet.test','rivet-panel','Commercial panel upgrade','480V service, downtown Phoenix fit-out'],
+    ['marcus@rivet.test','rivet-conduit','Conduit run — warehouse','EMT runs + lighting circuits'],
+    ['andre@rivet.test','rivet-rtu','Rooftop RTU replacement','5-ton unit swap, light commercial'],
+    ['kim@rivet.test','rivet-switchgear','Switchgear install','Tenant improvement project'],
+  ];
+  for (const [email, seed, title, caption] of portfolio){
+    const uid = await wId(email); if(!uid) continue;
+    try { await db.prepare("INSERT INTO media(user_id,target,kind,url,title,caption) VALUES(?,'portfolio','image',?,?,?)").run(uid, img(seed), title, caption); } catch(e){}
+  }
+  const emp = await db.prepare("SELECT id FROM users WHERE email='ops@sunvalley.test'").get();
+  if (emp){
+    const jobPhotos = [
+      ['Commercial Electrician','crew-panelroom','Panel room — scope','Existing gear to be replaced'],
+      ['HVAC Service Technician','crew-rooftop','Rooftop units','3 RTUs needing service'],
+    ];
+    for (const [title, seed, mt, mc] of jobPhotos){
+      const job = await db.prepare('SELECT id FROM jobs WHERE employer_id=? AND title=?').get(emp.id, title);
+      if(!job) continue;
+      try { await db.prepare("INSERT INTO media(user_id,target,job_id,kind,url,title,caption) VALUES(?,'job',?,'image',?,?,?)").run(emp.id, job.id, img(seed), mt, mc); } catch(e){}
+    }
+  }
+  await metaSet('media_v1','1');
+  console.log('[db] demo media seeded — portfolio pieces + job photos');
+}
+
 async function init() {
   await createSchema();
   await seed();
   try { await enrichDemo(); } catch (e) { console.error('[db] enrich skipped (non-fatal):', e.message); }
   try { await seedRealism(); } catch (e) { console.error('[db] realism skipped (non-fatal):', e.message); }
+  try { await seedMedia(); } catch (e) { console.error('[db] media seed skipped (non-fatal):', e.message); }
 }
 
 module.exports = { db, init, hashPassword, verifyPassword, recomputeReadiness };

@@ -314,7 +314,8 @@ const server = http.createServer(async (req,res)=>{
         const match = M.scoreMatch(prof, await getCreds(user.id), job);
         const applied = !!(await db.prepare('SELECT 1 FROM applications WHERE job_id=? AND worker_id=?').get(jid,user.id));
         const saved = !!(await db.prepare('SELECT 1 FROM saved_jobs WHERE worker_id=? AND job_id=?').get(user.id, jid));
-        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied,saved})}));
+        const jobMedia = await db.prepare("SELECT * FROM media WHERE job_id=? AND target='job' ORDER BY created_at DESC, id DESC").all(jid);
+        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied,saved,jobMedia})}));
       }
       if(jid && p===`/app/jobs/${jid}/apply` && method==='POST'){
         const job = await db.prepare('SELECT * FROM jobs WHERE id=?').get(jid);
@@ -397,6 +398,30 @@ const server = http.createServer(async (req,res)=>{
         return redirect(res, `/console/jobs/${jobId}`);
       }
 
+      const jMedia = p.match(/^\/console\/jobs\/(\d+)\/media$/);
+      if(jMedia && method==='POST'){
+        const jobId=Number(jMedia[1]);
+        const job = await db.prepare('SELECT id FROM jobs WHERE id=? AND employer_id=?').get(jobId, user.id);
+        if(job){
+          const b = await readBody(req);
+          const url = String(b.url||'').trim().slice(0,1000);
+          const title = String(b.title||'').trim().slice(0,140);
+          const caption = String(b.caption||'').trim().slice(0,300);
+          if(/^https?:\/\//i.test(url)){
+            const kind = /youtube|youtu\.be|vimeo/i.test(url) ? 'video' : 'image';
+            await db.prepare("INSERT INTO media(user_id,target,job_id,kind,url,title,caption) VALUES(?,'job',?,?,?,?,?)").run(user.id, jobId, kind, url, title, caption);
+          }
+        }
+        return redirect(res, `/console/jobs/${jobId}`);
+      }
+      const jMediaDel = p.match(/^\/console\/jobs\/(\d+)\/media\/(\d+)\/delete$/);
+      if(jMediaDel && method==='POST'){
+        const jobId=Number(jMediaDel[1]), mid=Number(jMediaDel[2]);
+        const job = await db.prepare('SELECT id FROM jobs WHERE id=? AND employer_id=?').get(jobId, user.id);
+        if(job) await db.prepare("DELETE FROM media WHERE id=? AND job_id=? AND target='job'").run(mid, jobId);
+        return redirect(res, `/console/jobs/${jobId}`);
+      }
+
       const jid = qid(p);
       if(jid && p===`/console/jobs/${jid}` && method==='GET'){
         const job = await db.prepare('SELECT * FROM jobs WHERE id=? AND employer_id=?').get(jid,user.id);
@@ -406,7 +431,8 @@ const server = http.createServer(async (req,res)=>{
         const columns = {}; for(const st of V.STAGES) columns[st]=[];
         const inPipe = new Set(); for(const a of apps){ (columns[a.stage]=columns[a.stage]||[]).push(a); inPipe.add(a.name); }
         const candidates = (await rankWorkersForJob(job)).filter(w=>!inPipe.has(w.name)).slice(0,5);
-        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.empPipeline({job,columns,candidates})}));
+        const jobMedia = await db.prepare("SELECT * FROM media WHERE job_id=? AND target='job' ORDER BY created_at DESC, id DESC").all(jid);
+        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.empPipeline({job,columns,candidates,jobMedia})}));
       }
 
       if(p==='/console/search' && method==='GET'){
