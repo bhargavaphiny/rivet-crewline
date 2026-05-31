@@ -26,6 +26,15 @@ services:
         sync: false
       - key: GOOGLE_CLIENT_SECRET
         sync: false
+      # SMS via Twilio (free trial works). Set all three in the Render dashboard.
+      # Until set, OTP login + job alerts run in demo mode (code shown on screen,
+      # alerts are no-ops). TWILIO_FROM is your Twilio number, e.g. +15005550006.
+      - key: TWILIO_SID
+        sync: false
+      - key: TWILIO_TOKEN
+        sync: false
+      - key: TWILIO_FROM
+        sync: false
     # ---- Persistent data (PAID plan only) ----
     # To keep data permanently: upgrade `plan` above to `starter`, uncomment
     # the disk block below, and change RIVET_DATA_DIR above to /var/data.

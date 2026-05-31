@@ -157,7 +157,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=20">
+  <link rel="stylesheet" href="/styles.css?v=21">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -440,7 +440,7 @@ function workerJobs({ matches, filters = {} }) {
 }
 
 // ---------- worker: job detail ----------
-function jobDetail({ job, match, applied, saved = false, jobMedia = [] }) {
+function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance = null }) {
   return `<section class="wrap narrow">
     <a class="back" href="/app/jobs">← All matches</a>
     <div class="card">
@@ -449,7 +449,7 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [] }) {
         <div class="job-main">
           <h2>${esc(job.title)}</h2>
           ${job.employment_type?`<span class="jtype">${esc(job.employment_type)}</span>`:''}
-          <div class="job-c">${esc(job.company||'')} · ${esc(job.city)} ${esc(job.zip)} · ${esc(job.shift)} shift</div>
+          <div class="job-c">${esc(job.company||'')} · ${esc(job.city)} ${esc(job.zip)} · ${esc(job.shift)} shift${distance!=null?` · <b class="dist">${distance} mi away</b>`:''}</div>
           <div class="pay big">$${job.pay_min}–${job.pay_max}/hr</div>
         </div>
         <div class="score-pill ${scoreClass(match.score)}">${match.score}<small>match</small></div>
@@ -483,14 +483,14 @@ function workerApplications({ apps, savedJobs }) {
     ${apps.length ? apps.map(a=>`<div class="card app-card">
       <div class="job-row"><div class="badge">${tradeEmoji(a.trade)}</div>
         <div class="job-main"><h4>${esc(a.title)}</h4>
-          <div class="muted">${esc(a.company||'')} · ${esc(a.city)} · $${a.pay_min}–${a.pay_max}/hr</div></div>
+          <div class="muted">${esc(a.company||'')} · ${esc(a.city)} · $${a.pay_min}–${a.pay_max}/hr${a.distance!=null?` · <b class="dist">${a.distance} mi away</b>`:''}</div></div>
         <span class="score-tag ${scoreClass(a.score)}">${a.score}</span></div>
       ${stageTimeline(a.stage)}
     </div>`).join('') : '<div class="card muted">No applications yet. <a href="/app/jobs">Browse matches →</a></div>'}
     <div class="sec-h big" style="margin-top:26px">Saved jobs</div>
     ${savedJobs.length ? savedJobs.map(j=>`<a class="jobline" href="/app/jobs/${j.id}">
         <div class="jl-left"><div class="badge">${tradeEmoji(j.trade)}</div>
-          <div><h4>${esc(j.title)}</h4><div class="muted">${esc(j.company||'')} · ${esc(j.city)} · $${j.pay_min}–${j.pay_max}/hr · ${esc(j.shift)}</div></div></div>
+          <div><h4>${esc(j.title)}</h4><div class="muted">${esc(j.company||'')} · ${esc(j.city)} · $${j.pay_min}–${j.pay_max}/hr · ${esc(j.shift)}${j.distance!=null?` · <b class="dist">${j.distance} mi away</b>`:''}</div></div></div>
         <span class="nav-link" style="color:var(--brand-d)">View →</span>
       </a>`).join('')
       : '<div class="card muted">No saved jobs yet. Tap ☆ Save on any job to keep it here.</div>'}
@@ -546,6 +546,9 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [] 
       </form>
       <form method="post" action="/app/alerts" class="avail-form" style="margin-top:8px">
         <button class="btn-sm ${profile.alerts?'':'ghost'}">${profile.alerts?'🔔 Job alerts ON — tap to stop':'🔔 Text me new job alerts'}</button>
+      </form>
+      <form method="post" action="/app/relocate" class="avail-form" style="margin-top:8px">
+        <button class="btn-sm ${profile.relocate?'':'ghost'}">${profile.relocate?'✈️ Open to relocate — tap to clear':'✈️ I’m open to relocating'}</button>
       </form>
     </div>
     <div class="card">
@@ -654,7 +657,37 @@ function timeAgo(sqlTs){
   const d=Math.floor(h/24); if(d<30) return `${d}d ago`;
   const mo=Math.floor(d/30); return `${mo}mo ago`;
 }
-function empOverview({ user, kpis, funnel, recent, hot, alerts, fillRate }) {
+// ---------- US candidate map (SVG, projection shared by outline + dots) ----------
+const US_OUTLINE = [
+  [-124.7,48.4],[-123.9,46.2],[-124.2,43.5],[-124.4,40.4],[-122.4,37.8],[-120.6,34.5],
+  [-117.1,32.5],[-114.7,32.7],[-111.0,31.3],[-108.2,31.3],[-106.5,31.8],[-103.0,29.0],
+  [-101.5,29.8],[-99.5,27.5],[-97.1,25.9],[-95.0,29.0],[-91.0,29.2],[-89.0,29.2],
+  [-87.5,30.3],[-84.0,30.0],[-82.0,24.6],[-80.4,27.0],[-80.6,31.0],[-79.0,33.5],
+  [-76.0,36.5],[-75.0,38.5],[-74.0,40.5],[-71.0,41.5],[-70.0,43.5],[-67.0,44.5],
+  [-69.2,47.5],[-71.5,45.0],[-76.0,43.5],[-79.0,43.3],[-82.5,41.7],[-83.0,42.3],
+  [-82.5,45.0],[-84.7,45.8],[-87.0,45.4],[-87.8,47.5],[-90.0,46.7],[-92.0,46.8],
+  [-95.0,49.0],[-104.0,49.0],[-117.0,49.0],[-122.8,49.0]
+];
+function usMap(geo = []){
+  const MINLON=-125, MAXLON=-66, MINLAT=24, MAXLAT=50, VW=620, VH=350;
+  const px = lon => ((lon-MINLON)/(MAXLON-MINLON)*VW).toFixed(1);
+  const py = lat => ((MAXLAT-lat)/(MAXLAT-MINLAT)*VH).toFixed(1);
+  const path = US_OUTLINE.map(([lo,la],i)=>`${i?'L':'M'}${px(lo)} ${py(la)}`).join(' ')+' Z';
+  const total = geo.reduce((a,g)=>a+(g.n||0),0);
+  const dots = geo.map(g=>{
+    const r = Math.min(20, 5 + (g.n||1)*2.5);
+    return `<g class="mdot"><circle cx="${px(g.lon)}" cy="${py(g.lat)}" r="${r}"><title>${esc(g.city||'')}: ${g.n} candidate${g.n===1?'':'s'}</title></circle>${g.n>1?`<text x="${px(g.lon)}" y="${(+py(g.lat)+3.5).toFixed(1)}" text-anchor="middle">${g.n}</text>`:''}</g>`;
+  }).join('');
+  const top = geo.slice(0,6).map(g=>`<li><span>${esc(g.city||'—')}</span><b>${g.n}</b></li>`).join('');
+  return `<div class="card">
+    <div class="sec-h" style="margin-top:0">Where your talent is <span class="muted">${total} candidate${total===1?'':'s'} mapped</span></div>
+    ${geo.length ? `<div class="mapwrap"><svg class="usmap" viewBox="0 0 ${VW} ${VH}" role="img" aria-label="US map of candidate locations">
+        <path class="us-out" d="${path}"/>${dots}</svg>
+      <ul class="maplist">${top}</ul></div>`
+      : '<p class="muted">No mapped candidate locations yet. Locations appear as workers add a ZIP to their Work Card.</p>'}
+  </div>`;
+}
+function empOverview({ user, kpis, funnel, recent, hot, alerts, fillRate, geo = [] }) {
   const maxF = Math.max(1, ...STAGES.map(s=>funnel[s]||0));
   const funnelBars = STAGES.map(s=>`<div class="fn-row">
       <span class="fn-lbl">${s}</span>
@@ -685,6 +718,7 @@ function empOverview({ user, kpis, funnel, recent, hot, alerts, fillRate }) {
         </div>`).join('') : '<p class="muted">No recent activity yet.</p>'}
       </div>
     </div>
+    ${usMap(geo)}
     <div class="grid2">
       <div class="card">
         <div class="sec-h" style="margin-top:0">Hot candidates — ready now <a href="/console/search">Search all</a></div>
@@ -791,10 +825,11 @@ function empSearch({ rows, filters }) {
       <label class="chk"><input type="checkbox" name="ready" value="1" ${filters.ready?'checked':''} onchange="this.form.submit()"> Readiness ≥ 85</label>
       <label class="chk"><input type="checkbox" name="avail" value="1" ${filters.avail?'checked':''} onchange="this.form.submit()"> 🟢 Available now</label>
       <label class="chk"><input type="checkbox" name="today" value="1" ${filters.today?'checked':''} onchange="this.form.submit()"> ⚡ Work today</label>
+      <label class="chk"><input type="checkbox" name="relocate" value="1" ${filters.relocate?'checked':''} onchange="this.form.submit()"> ✈️ Open to relocate</label>
     </form>
     <div class="card" style="padding:0">
       <table class="tbl wide"><tr><th>Candidate</th><th>Trade</th><th>Exp</th><th>Credentials</th><th>Readiness</th><th>Pay floor</th></tr>
-      ${rows.map(w=>`<tr><td><a class="cand-link" href="/console/candidates/${w.id}"><span class="av-t">${initials(w.name)}</span> ${esc(w.name)}</a>${w.available?'<span class="avail-dot" title="Available for work">●</span>':''}${w.work_today?'<span class="today-chip" title="Can work today">⚡</span>':''}</td>
+      ${rows.map(w=>`<tr><td><a class="cand-link" href="/console/candidates/${w.id}"><span class="av-t">${initials(w.name)}</span> ${esc(w.name)}</a>${w.available?'<span class="avail-dot" title="Available for work">●</span>':''}${w.work_today?'<span class="today-chip" title="Can work today">⚡</span>':''}${w.relocate?'<span class="today-chip" title="Open to relocate">✈️</span>':''}</td>
         <td>${TRADES[w.trade]||w.trade}</td><td>${w.years_exp} yr</td>
         <td>${w.creds.map(c=>`<span class="cred-chip">${esc(c.name)}</span>`).join('')||'<span class="muted">—</span>'}</td>
         <td><span class="score-tag ${scoreClass(w.readiness)}">${w.readiness}</span></td>
@@ -838,7 +873,7 @@ function empCandidate({ worker, profile, creds, matches, apps, messages, meId, n
       ${profile.headline?`<p class="headline">${esc(profile.headline)}</p>`:''}
       <div class="chips">${tradeChips(profile)}</div>
       <p class="muted">${esc(profile.city)} ${esc(profile.zip||'')} · ${profile.years_exp} yrs experience · seeks $${profile.pay_floor}+/hr</p>
-      ${profile.available?'<div class="avail-badge">🟢 Available for work</div>':'<div class="avail-badge off">⚪ Not currently available</div>'}${profile.work_today?'<div class="avail-badge today">⚡ Can work today</div>':''}
+      ${profile.available?'<div class="avail-badge">🟢 Available for work</div>':'<div class="avail-badge off">⚪ Not currently available</div>'}${profile.work_today?'<div class="avail-badge today">⚡ Can work today</div>':''}${profile.relocate?'<div class="avail-badge relo">✈️ Open to relocate</div>':''}
       <div class="ministats">
         <div><b>${profile.readiness}</b><span>READINESS</span></div>
         <div><b>${creds.filter(c=>c.verified).length}</b><span>VERIFIED</span></div>
@@ -894,7 +929,7 @@ function empShortlist({ rows }) {
     <div class="page-h"><h2>Shortlist</h2><p class="muted">${rows.length} saved candidate${rows.length===1?'':'s'}</p>
       <a class="btn-sm right" href="/console/search">Talent Search</a></div>
     ${rows.length ? `<div class="card" style="padding:0"><table class="tbl wide"><tr><th>Candidate</th><th>Trade</th><th>Exp</th><th>Readiness</th><th>Pay floor</th></tr>
-      ${rows.map(w=>`<tr><td><a class="cand-link" href="/console/candidates/${w.id}"><span class="av-t">${initials(w.name)}</span> ${esc(w.name)}</a>${w.available?'<span class="avail-dot" title="Available for work">●</span>':''}${w.work_today?'<span class="today-chip" title="Can work today">⚡</span>':''}</td>
+      ${rows.map(w=>`<tr><td><a class="cand-link" href="/console/candidates/${w.id}"><span class="av-t">${initials(w.name)}</span> ${esc(w.name)}</a>${w.available?'<span class="avail-dot" title="Available for work">●</span>':''}${w.work_today?'<span class="today-chip" title="Can work today">⚡</span>':''}${w.relocate?'<span class="today-chip" title="Open to relocate">✈️</span>':''}</td>
         <td>${TRADES[w.trade]||w.trade}</td><td>${w.years_exp} yr</td>
         <td><span class="score-tag ${scoreClass(w.readiness)}">${w.readiness}</span></td>
         <td>$${w.pay_floor}/hr</td></tr>`).join('')}

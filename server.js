@@ -143,8 +143,29 @@ function bestMatch(prof, creds, job){
 async function rankJobsForWorker(uid){
   const prof = await getProfile(uid); const creds = await getCreds(uid);
   const jobs = await openJobs();
-  return jobs.map(j=>{ const r=bestMatch(prof,creds,j); return {job:j, score:r.score, missing:r.missing}; })
-    .sort((a,b)=>b.score-a.score);
+  const home = prof ? await geocodeZip(prof.zip) : null;
+  const zc = {};
+  const out = [];
+  for(const j of jobs){
+    const r = bestMatch(prof, creds, j);
+    let distance = null;
+    if(home && j.zip){ if(!(j.zip in zc)) zc[j.zip] = await geocodeZip(j.zip); distance = zc[j.zip] ? haversineMi(home, zc[j.zip]) : null; }
+    out.push({job:j, score:r.score, missing:r.missing, distance});
+  }
+  return out.sort((a,b)=>b.score-a.score);
+}
+// distance in miles between a worker's home ZIP and an arbitrary ZIP (cached; null if unknown)
+async function workerDistance(prof, zip){
+  if(!prof || !zip) return null;
+  const home = await geocodeZip(prof.zip); if(!home) return null;
+  const dest = await geocodeZip(zip); if(!dest) return null;
+  return haversineMi(home, dest);
+}
+// aggregated candidate locations for the recruiter US map
+function candidateGeo(){
+  return db.prepare(`SELECT p.city, z.lat, z.lon, COUNT(*) n
+    FROM worker_profiles p JOIN zip_geo z ON z.zip=p.zip
+    GROUP BY p.zip ORDER BY n DESC`).all();
 }
 async function rankWorkersForJob(job){
   const workers = await db.prepare(`SELECT u.id user_id,u.name,p.* FROM users u JOIN worker_profiles p ON p.user_id=u.id`).all();
@@ -398,16 +419,7 @@ const server = http.createServer(async (req,res)=>{
         if(f.minpay) matches=matches.filter(m=>(m.job.pay_max||0)>=f.minpay);
         if(f.shift) matches=matches.filter(m=>m.job.shift===f.shift);
         if(f.jtype) matches=matches.filter(m=>(m.job.employment_type||'Full-time')===f.jtype);
-        // distance from the worker's ZIP (cached; graceful if geo unavailable)
-        const home = await geocodeZip(prof.zip);
-        if(home){
-          const zc = {};
-          for(const m of matches){
-            const z = m.job.zip;
-            if(z && !(z in zc)) zc[z] = await geocodeZip(z);
-            m.distance = (z && zc[z]) ? haversineMi(home, zc[z]) : null;
-          }
-        }
+        // distance is precomputed in rankJobsForWorker (cached; null when geo unavailable)
         if(f.maxmi) matches = matches.filter(m=> m.distance!=null && m.distance<=f.maxmi);
         if(f.sort==='distance') matches.sort((a,b)=> (a.distance==null?1e9:a.distance)-(b.distance==null?1e9:b.distance));
         return send(res, V.layout({title:'Find work',user,active:'jobs',body:V.workerJobs({matches, filters:f})}));
@@ -482,13 +494,23 @@ const server = http.createServer(async (req,res)=>{
         await db.prepare('UPDATE worker_profiles SET alerts=? WHERE user_id=?').run(cur?0:1, user.id);
         return redirect(res, '/app/profile');
       }
+      if(p==='/app/relocate' && method==='POST'){
+        const cur = prof && prof.relocate ? 1 : 0;
+        await db.prepare('UPDATE worker_profiles SET relocate=? WHERE user_id=?').run(cur?0:1, user.id);
+        return redirect(res, '/app/profile');
+      }
       if(p==='/app/applications' && method==='GET'){
-        const apps = await db.prepare(`SELECT a.*, j.title,j.trade,j.pay_min,j.pay_max,j.city,u.company
+        const apps = await db.prepare(`SELECT a.*, j.title,j.trade,j.pay_min,j.pay_max,j.city,j.zip,u.company
           FROM applications a JOIN jobs j ON j.id=a.job_id JOIN users u ON u.id=j.employer_id
           WHERE a.worker_id=? ORDER BY a.created_at DESC`).all(user.id);
         const savedJobs = await db.prepare(`SELECT j.*, u.company FROM saved_jobs s
           JOIN jobs j ON j.id=s.job_id JOIN users u ON u.id=j.employer_id
           WHERE s.worker_id=? ORDER BY s.created_at DESC`).all(user.id);
+        const home = await geocodeZip(prof.zip);
+        const zc = {};
+        const dist = async z => { if(!home||!z) return null; if(!(z in zc)) zc[z]=await geocodeZip(z); return zc[z]?haversineMi(home,zc[z]):null; };
+        for(const a of apps) a.distance = await dist(a.zip);
+        for(const j of savedJobs) j.distance = await dist(j.zip);
         return send(res, V.layout({title:'Applications',user,active:'apps',body:V.workerApplications({apps, savedJobs})}));
       }
       const jid = qid(p);
@@ -505,7 +527,8 @@ const server = http.createServer(async (req,res)=>{
         const applied = !!(await db.prepare('SELECT 1 FROM applications WHERE job_id=? AND worker_id=?').get(jid,user.id));
         const saved = !!(await db.prepare('SELECT 1 FROM saved_jobs WHERE worker_id=? AND job_id=?').get(user.id, jid));
         const jobMedia = await db.prepare("SELECT * FROM media WHERE job_id=? AND target='job' ORDER BY created_at DESC, id DESC").all(jid);
-        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied,saved,jobMedia})}));
+        const distance = await workerDistance(prof, job.zip);
+        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied,saved,jobMedia,distance})}));
       }
       if(jid && p===`/app/jobs/${jid}/apply` && method==='POST'){
         const job = await db.prepare('SELECT * FROM jobs WHERE id=?').get(jid);
@@ -545,8 +568,9 @@ const server = http.createServer(async (req,res)=>{
         if(expiring) alerts.push({lvl:'warn',text:`⚠️ ${expiring} credential(s) in the pool expiring within 60 days.`});
         if(pipeline) alerts.push({lvl:'info',text:`⏳ ${pipeline} candidate(s) advancing in your pipeline.`});
         alerts.push({lvl:'ok',text:`✅ ${pool} verified workers available to match right now.`});
+        const geo = await candidateGeo();
         return send(res, V.layout({title:'Overview',user,active:'ov',body:V.empOverview({user,
-          kpis:{openJobs:jobs.filter(j=>j.status==='open').length, pool, applicants, pipeline, hired}, funnel, recent, hot, alerts, fillRate})}));
+          kpis:{openJobs:jobs.filter(j=>j.status==='open').length, pool, applicants, pipeline, hired}, funnel, recent, hot, alerts, fillRate, geo})}));
       }
 
       if(p==='/console/jobs' && method==='GET'){
@@ -642,7 +666,7 @@ const server = http.createServer(async (req,res)=>{
       }
 
       if(p==='/console/search' && method==='GET'){
-        const filters = {trade:url.searchParams.get('trade')||'', verified:!!url.searchParams.get('verified'), ready:!!url.searchParams.get('ready'), avail:!!url.searchParams.get('avail'), today:!!url.searchParams.get('today')};
+        const filters = {trade:url.searchParams.get('trade')||'', verified:!!url.searchParams.get('verified'), ready:!!url.searchParams.get('ready'), avail:!!url.searchParams.get('avail'), today:!!url.searchParams.get('today'), relocate:!!url.searchParams.get('relocate')};
         const rowsRaw = await db.prepare(`SELECT u.id,u.name,p.* FROM users u JOIN worker_profiles p ON p.user_id=u.id`).all();
         let rows = [];
         for(const w of rowsRaw){ const creds=(await getCreds(w.id)).filter(c=>!filters.verified||c.verified); rows.push({...w, creds}); }
@@ -650,6 +674,7 @@ const server = http.createServer(async (req,res)=>{
         if(filters.ready) rows = rows.filter(w=>w.readiness>=85);
         if(filters.avail) rows = rows.filter(w=>w.available);
         if(filters.today) rows = rows.filter(w=>w.work_today);
+        if(filters.relocate) rows = rows.filter(w=>w.relocate);
         rows.sort((a,b)=>b.readiness-a.readiness);
         return send(res, V.layout({title:'Talent Search',user,active:'search',body:V.empSearch({rows,filters})}));
       }

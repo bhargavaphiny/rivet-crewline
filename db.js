@@ -457,6 +457,7 @@ async function migrate() {
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN headline TEXT'); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN about TEXT'); } catch (e) { /* column exists */ }
   try { await db.exec("ALTER TABLE jobs ADD COLUMN employment_type TEXT DEFAULT 'Full-time'"); } catch (e) { /* column exists */ }
+  try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN relocate INTEGER DEFAULT 0'); } catch (e) { /* column exists */ }
 }
 
 async function seedZips() {
@@ -505,6 +506,15 @@ async function init() {
   try { await seedMedia(); } catch (e) { console.error('[db] media seed skipped (non-fatal):', e.message); }
   try { await seedExperience(); } catch (e) { console.error('[db] experience seed skipped (non-fatal):', e.message); }
   try { await seedJobTypes(); } catch (e) { console.error('[db] job-types seed skipped (non-fatal):', e.message); }
+  try {
+    if(!(await metaGet('relocate_v1'))){
+      for(const email of ['omar@rivet.test','will@rivet.test','sam@rivet.test']){
+        const u = await db.prepare('SELECT id FROM users WHERE email=?').get(email);
+        if(u) await db.prepare('UPDATE worker_profiles SET relocate=1 WHERE user_id=?').run(u.id);
+      }
+      await metaSet('relocate_v1','1');
+    }
+  } catch (e) { console.error('[db] relocate seed skipped (non-fatal):', e.message); }
 }
 
 module.exports = { db, init, hashPassword, verifyPassword, recomputeReadiness };

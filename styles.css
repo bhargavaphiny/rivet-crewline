@@ -219,6 +219,7 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--brand)}
 .avail-badge{display:inline-block;margin-top:10px;font-size:12.5px;font-weight:700;color:var(--green);background:rgba(31,169,113,.12);padding:4px 10px;border-radius:20px}
 .avail-badge.off{color:var(--muted);background:var(--paper)}
 .avail-badge.today{color:var(--brand-d);background:rgba(255,106,26,.12);margin-left:6px}
+.avail-badge.relo{color:var(--brand-d);background:rgba(23,99,166,.12);margin-left:6px}
 .today-chip{margin-left:5px;font-size:11px}
 
 /* candidate job search */
@@ -352,3 +353,15 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 
 /* ---- employment type badge ---- */
 .jtype{display:inline-block;margin:2px 0 4px;padding:2px 9px;border-radius:6px;background:var(--steel);color:#fff;font-size:11px;font-weight:700;letter-spacing:.02em;text-transform:uppercase}
+
+/* ---- US candidate map ---- */
+.mapwrap{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.usmap{flex:1;min-width:280px;max-width:640px;background:var(--paper);border-radius:12px;border:1px solid var(--line)}
+.us-out{fill:#E3EAF1;stroke:var(--brand);stroke-width:1.2;stroke-linejoin:round}
+.mdot circle{fill:var(--amber);fill-opacity:.82;stroke:#fff;stroke-width:1.5}
+.mdot text{fill:var(--steel);font-size:11px;font-weight:800}
+.maplist{list-style:none;margin:0;padding:0;min-width:150px;flex:none}
+.maplist li{display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
+.maplist li:last-child{border-bottom:none}
+.maplist b{color:var(--brand-d)}
+@media(max-width:560px){.maplist{width:100%}}
