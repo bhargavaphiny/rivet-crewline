@@ -1,14 +1,14 @@
 :root{
-  /* blue-collar palette: workwear navy + hi-vis amber on warm cream/canvas */
-  --brand:#1763A6;--brand-d:#0F4C82;--amber:#F6A623;--amber-d:#E08A12;--steel:#16242E;--steel-2:#1E323F;
-  --slate:#3A4550;--ink:#1B2127;--paper:#F2EADB;--paper-2:#FBF6EC;--card:#FFFDF8;--line:#E6DCC9;
-  --muted:#6B6354;--green:#1FA971;--red:#E2453B;--blue:#2E6FB7;
-  --shadow:0 16px 40px rgba(58,44,18,.14);--shadow-sm:0 3px 12px rgba(58,44,18,.08);
+  /* earthy-industrial palette: kraft/tan canvas, oxidized-rust primary, ochre + slate-steel */
+  --brand:#B4471F;--brand-d:#8F3415;--amber:#D98A1E;--amber-d:#B06F12;--steel:#2B3338;--steel-2:#3A464D;
+  --slate:#4A453D;--ink:#241D16;--paper:#EADFCB;--paper-2:#F4EEE0;--card:#FCF8F0;--line:#DBCFB8;
+  --muted:#736857;--green:#3E8E5A;--red:#C23B2E;--blue:#3A6A7A;
+  --shadow:0 16px 40px rgba(58,40,18,.16);--shadow-sm:0 3px 12px rgba(58,40,18,.09);
   --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Inter,sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--font);background:var(--paper);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased;
-  background-image:radial-gradient(1100px 460px at 50% -160px,rgba(255,255,255,.7),transparent 70%),radial-gradient(900px 500px at 100% 0,rgba(246,166,35,.06),transparent 60%);
+  background-image:radial-gradient(1100px 460px at 50% -160px,rgba(255,255,255,.55),transparent 70%),radial-gradient(900px 500px at 100% 0,rgba(180,71,31,.06),transparent 60%);
   background-attachment:fixed}
 a{color:inherit;text-decoration:none}
 main{min-height:70vh}
@@ -124,7 +124,7 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--brand)}
 .mtag.fit{background:rgba(31,169,113,.13);border-color:transparent;color:#157a52}
 .mtag.warn{background:rgba(226,69,59,.1);border-color:transparent;color:#b7322a}
 .matchbar{height:6px;border-radius:6px;background:#EAE0CD;margin-top:11px;overflow:hidden}
-.matchbar i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--brand),#3E8FCC)}
+.matchbar i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--brand),var(--amber))}
 .descr{font-size:14px;color:var(--slate);margin:14px 0}
 .breakdown{background:var(--paper);border-radius:11px;padding:14px;margin:8px 0}
 .breakdown h4{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px}
@@ -369,11 +369,11 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 /* ---- US candidate map ---- */
 .mapwrap{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
 .mapbox{position:relative;flex:1;min-width:300px;max-width:680px}
-.usmap{width:100%;background:radial-gradient(120% 120% at 50% 0,#1E3346,#13212E 70%);border-radius:16px;border:1px solid #0C1822;padding:8px;display:block;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
-.us-states .us-state{fill:#27435A;stroke:rgba(125,178,224,.28);stroke-width:.7;stroke-linejoin:round;transition:fill .12s}
-.us-states .us-state:hover{fill:#33566F}
-.us-cities circle{fill:rgba(255,255,255,.5)}
-.us-cities text{fill:rgba(214,228,240,.62);font-size:7.5px;font-weight:600;letter-spacing:.02em}
+.usmap{width:100%;background:radial-gradient(120% 120% at 50% 0,#34302A,#221F1B 70%);border-radius:16px;border:1px solid #17140F;padding:8px;display:block;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+.us-states .us-state{fill:#44403A;stroke:rgba(217,138,30,.22);stroke-width:.7;stroke-linejoin:round;transition:fill .12s}
+.us-states .us-state:hover{fill:#544E45}
+.us-cities circle{fill:rgba(255,255,255,.45)}
+.us-cities text{fill:rgba(232,222,205,.6);font-size:7.5px;font-weight:600;letter-spacing:.02em}
 .mapzoom{position:absolute;top:12px;right:12px;display:flex;flex-direction:column;gap:6px}
 .mapzoom button{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:rgba(255,255,255,.92);color:var(--steel);cursor:pointer;display:grid;place-items:center;box-shadow:var(--shadow-sm)}
 .mapzoom button:hover{background:#fff;border-color:var(--brand)}
@@ -392,11 +392,11 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .maplist li:hover{color:var(--brand-d)}
 @media(max-width:680px){.mapside{width:100%}}
 .mdot{cursor:pointer}
-.mdot circle{fill:var(--amber);stroke:#fff;stroke-width:1.5;filter:drop-shadow(0 0 5px rgba(246,166,35,.55));transition:transform .1s}
+.mdot circle{fill:var(--amber);stroke:#fff;stroke-width:1.5;filter:drop-shadow(0 0 6px rgba(217,138,30,.7));transition:transform .1s}
 .mdot:hover circle,.mdot:focus circle{transform:scale(1.12);transform-box:fill-box;transform-origin:center}
-.mdot text{fill:var(--steel);font-size:11px;font-weight:800;pointer-events:none}
-.mdot.related circle{fill:#7FB2E0;filter:none;stroke:rgba(255,255,255,.85)}
-.mdot.related text{fill:#10212E}
+.mdot text{fill:#241D16;font-size:11px;font-weight:800;pointer-events:none}
+.mdot.related circle{fill:#C9B79A;filter:none;stroke:rgba(255,255,255,.8)}
+.mdot.related text{fill:#241D16}
 .maplist{list-style:none;margin:0;padding:0;min-width:150px;flex:none}
 .maplist li{display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
 .maplist li:last-child{border-bottom:none}
@@ -409,7 +409,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .maplegend .lg{display:inline-flex;align-items:center;gap:6px}
 .maplegend i{width:13px;height:13px;border-radius:50%;display:inline-block}
 .maplegend i.d-direct{background:var(--amber)}
-.maplegend i.d-related{background:#7FB2E0}
+.maplegend i.d-related{background:#C9B79A}
 
 /* ---- training & certifications ---- */
 .info-card{background:rgba(23,99,166,.06);border:1px solid rgba(23,99,166,.18);color:var(--slate);font-size:14px}

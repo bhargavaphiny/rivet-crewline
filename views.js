@@ -244,7 +244,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=35">
+  <link rel="stylesheet" href="/styles.css?v=36">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -907,7 +907,7 @@ function usMap(points = [], opts = {}){
   const statePaths = US_STATES.map(s=>`<path class="us-state" d="${s.d}"><title>${esc(s.n)}</title></path>`).join('');
   const cityLayer = MAP_CITIES.map(([nm,lo,la])=>`<g class="us-city"><circle cx="${px(lo)}" cy="${py(la)}" r="1.6"/><text x="${(+px(lo)+4).toFixed(1)}" y="${(+py(la)+3).toFixed(1)}">${esc(nm)}</text></g>`).join('');
   // demand heat: soft amber glow blobs sized by how many openings/candidates cluster there
-  const heatDefs = `<defs><radialGradient id="rvheat"><stop offset="0%" stop-color="#F6A623" stop-opacity=".6"/><stop offset="55%" stop-color="#F6A623" stop-opacity=".18"/><stop offset="100%" stop-color="#F6A623" stop-opacity="0"/></radialGradient></defs>`;
+  const heatDefs = `<defs><radialGradient id="rvheat"><stop offset="0%" stop-color="#E89A2E" stop-opacity=".66"/><stop offset="55%" stop-color="#D9701E" stop-opacity=".2"/><stop offset="100%" stop-color="#B4471F" stop-opacity="0"/></radialGradient></defs>`;
   const heat = points.map(g=>{ const hr=Math.min(64, 18 + (g.n||1)*9); return `<circle class="heat" cx="${px(g.lon)}" cy="${py(g.lat)}" r="${hr}" fill="url(#rvheat)"/>`; }).join('');
   const total = points.reduce((a,g)=>a+(g.n||0),0);
   const dots = points.map((g,i)=>{
