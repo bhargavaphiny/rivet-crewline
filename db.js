@@ -488,6 +488,106 @@ async function seedCompanies(){
   console.log('[db] demo company profiles seeded');
 }
 
+// ---- BIG realistic seed: many workers + jobs across US cities so it looks populated (idempotent) ----
+async function seedBig(){
+  if (await metaGet('bigseed_v1')) return;
+  const { CRED_KINDS } = require('./matching');
+  const pw = hashPassword('demo1234');
+
+  // city zips with coordinates so maps + distance work nationwide
+  const cities = [
+    ['77002',29.7589,-95.3677,'Houston'],['75201',32.7876,-96.7990,'Dallas'],['78701',30.2711,-97.7437,'Austin'],
+    ['78205',29.4252,-98.4946,'San Antonio'],['80202',39.7525,-104.9995,'Denver'],['30303',33.7525,-84.3896,'Atlanta'],
+    ['60601',41.8855,-87.6221,'Chicago'],['89101',36.1716,-115.1391,'Las Vegas'],['90012',34.0614,-118.2385,'Los Angeles'],
+    ['98101',47.6109,-122.3340,'Seattle'],['33130',25.7677,-80.1976,'Miami'],['37203',36.1512,-86.7905,'Nashville'],
+    ['28202',35.2271,-80.8431,'Charlotte'],['78216',29.5180,-98.4920,'San Antonio'],['43215',39.9612,-82.9988,'Columbus'],
+    ['64106',39.1010,-94.5780,'Kansas City'],['84101',40.7608,-111.8910,'Salt Lake City'],['97204',45.5183,-122.6750,'Portland'],
+    ['33602',27.9506,-82.4572,'Tampa'],['55401',44.9850,-93.2690,'Minneapolis'],['48226',42.3314,-83.0458,'Detroit'],
+  ];
+  for (const [zip,lat,lon,city] of cities){
+    try { await db.prepare('INSERT OR IGNORE INTO zip_geo(zip,lat,lon,city) VALUES(?,?,?,?)').run(zip,lat,lon,city); } catch(e){}
+  }
+
+  // a few more employers in different metros, each with a company profile
+  const insEmp = db.prepare('INSERT INTO users(email,pass,role,name,company,company_city,company_size,company_about) VALUES(?,?,?,?,?,?,?,?)');
+  const employers = [
+    ['hr@lonestarmech.test','Bianca Reyes','Lone Star Mechanical','Houston, TX','201–500','Industrial mechanical and process-piping contractor across the Gulf Coast. Per-diem on travel jobs, weekly pay.'],
+    ['ops@summitelectric.test','Grant Holloway','Summit Electric','Denver, CO','51–200','Commercial electrical and solar across the Front Range. Strong apprenticeship program and year-round work.'],
+    ['talent@peachstatebuild.test','Dana Wills','Peach State Builders','Atlanta, GA','500+','Ground-up commercial GC in the Southeast. Multiple active sites, real advancement, safety-first culture.'],
+    ['crew@pacifictrades.test','Hiro Tanaka','Pacific Trades Group','Seattle, WA','51–200','Mechanical and sheet-metal specialists for data centers and hospitals. Premium pay for certified techs.'],
+  ];
+  const empIds = {};
+  for (const [email,name,co,city,size,about] of employers){
+    try { empIds[email] = (await insEmp.run(email,pw,'employer',name,co,city,size,about)).lastInsertRowid; } catch(e){}
+  }
+
+  // jobs across metros
+  const insJob = db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type) VALUES(?,?,?,?,?,?,?,?,?,?,?)`);
+  const jobs = [
+    ['hr@lonestarmech.test','Industrial Pipefitter','pipefitter',38,48,'Houston','77002','Day','osha30','Refinery turnaround — process piping, some travel.','Contract'],
+    ['hr@lonestarmech.test','Structural Welder','welder',40,52,'Houston','77002','4x10','aws_welding','6G certified welders for vessel work.','Contract'],
+    ['hr@lonestarmech.test','Millwright','millwright',36,46,'Houston','77002','Day','osha10','Rotating equipment install + alignment.','Full-time'],
+    ['ops@summitelectric.test','Commercial Electrician','electrician',34,46,'Denver','80202','Day','license','TI and ground-up commercial. Journeyman card required.','Full-time'],
+    ['ops@summitelectric.test','Solar Installer','solar',28,38,'Denver','80202','Day','osha10','Rooftop + ground-mount PV across the Front Range.','Full-time'],
+    ['ops@summitelectric.test','Low-Voltage Tech','low_voltage',26,34,'Denver','80202','Day','','Structured cabling, access control, AV.','Full-time'],
+    ['talent@peachstatebuild.test','Concrete Finisher','concrete',26,34,'Atlanta','30303','Day','osha10','Flatwork and tilt-up on commercial sites.','Full-time'],
+    ['talent@peachstatebuild.test','Carpenter','carpenter',28,38,'Atlanta','30303','Day','','Form work and rough framing, ground-up.','Full-time'],
+    ['talent@peachstatebuild.test','Heavy Equipment Operator','heavy_equipment',30,42,'Atlanta','30303','Day','','Excavator and dozer on sitework.','Full-time'],
+    ['crew@pacifictrades.test','HVAC Installer','hvac',34,46,'Seattle','98101','Day','epa608','Data-center mechanical installs.','Full-time'],
+    ['crew@pacifictrades.test','Sheet Metal Worker','sheet_metal',32,44,'Seattle','98101','Day','osha10','Duct fabrication and install.','Full-time'],
+    ['crew@pacifictrades.test','Controls Technician','controls',38,50,'Seattle','98101','Day','','Building automation + controls commissioning.','Full-time'],
+  ];
+  for (const [email,title,trade,lo,hi,city,zip,shift,creds,descr,etype] of jobs){
+    const eid = empIds[email]; if(!eid) continue;
+    try { await insJob.run(eid,title,trade,lo,hi,city,zip,shift,creds,descr,etype); } catch(e){}
+  }
+
+  // many workers across metros (multi-trade where natural)
+  const insUser = db.prepare('INSERT INTO users(email,pass,role,name,phone) VALUES(?,?,?,?,?)');
+  const insProf = db.prepare(`INSERT INTO worker_profiles(user_id,trade,trades,headline,about,years_exp,city,zip,pay_floor,shift,available,work_today,relocate,alerts) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+  const insCred = db.prepare('INSERT INTO credentials(user_id,kind,name,verified,expires) VALUES(?,?,?,?,?)');
+  const insWH   = db.prepare(`INSERT INTO work_history(user_id,employer,role,trade,city,start_year,end_year,current,description) VALUES(?,?,?,?,?,?,?,?,?)`);
+  // [name, tradesCsv, yrs, city, zip, floor, shift, avail, today, relo, creds[[k,exp]], headline]
+  const W = [
+    ['Marisol Vega','electrician,solar',8,'Houston','77002',36,'Day',1,0,1,[['license','2027-05'],['osha30','2027-01']],'Journeyman electrician — commercial & solar'],
+    ['DeShawn Carter','welder,pipefitter',11,'Houston','77002',42,'4x10',1,1,1,[['aws_welding','2028-03'],['osha30','2027-08']],'6G pipe & structural welder'],
+    ['Tony Marchetti','pipefitter',14,'Houston','77002',44,'Day',1,0,0,[['osha30','2027-02']],'Industrial pipefitter — refinery turnarounds'],
+    ['Priya Nair','hvac,controls',7,'Dallas','75201',34,'Day',1,0,1,[['epa608','2027-06'],['nate','2027-06']],'HVAC + building controls technician'],
+    ['Cody Burnett','carpenter,framer',9,'Dallas','75201',30,'Day',1,1,0,[['osha10','2026-12']],'Commercial carpenter & framer'],
+    ['Aaliyah Brooks','electrician',6,'Austin','78701',33,'Day',1,0,1,[['license','2028-01']],'Commercial electrician'],
+    ['Mateo Guerra','concrete,mason',12,'San Antonio','78205',28,'Day',1,1,0,[['osha10','2027-04']],'Concrete finisher & mason'],
+    ['Hannah Lunderberg','solar,low_voltage',5,'Denver','80202',30,'Day',1,0,1,[['osha10','2027-09']],'Solar + low-voltage installer'],
+    ['Grady Olsen','electrician,low_voltage',10,'Denver','80202',38,'Day',1,0,0,[['license','2027-07'],['nfpa70e','2027-07']],'Master electrician — controls & power'],
+    ['Tasha Greenwood','hvac',4,'Atlanta','30303',29,'Day',1,1,1,[['epa608','2028-02']],'HVAC service tech'],
+    ['Marcus Bell','heavy_equipment,cdl_driver',13,'Atlanta','30303',32,'Day',1,0,0,[['cdl','2028-06']],'Operator & CDL driver'],
+    ['Lena Kowalski','carpenter',8,'Chicago','60601',31,'Day',1,0,1,[['osha30','2027-03']],'Finish & commercial carpenter'],
+    ['Reggie Daniels','ironworker,welder',15,'Chicago','60601',40,'4x10',1,0,0,[['aws_welding','2027-11'],['osha30','2027-11']],'Structural ironworker'],
+    ['Sofia Reyes','plumber,pipefitter',9,'Las Vegas','89101',35,'Day',1,1,1,[['license','2027-10']],'Commercial plumber'],
+    ['Brandon Pike','sheet_metal,hvac',7,'Las Vegas','89101',33,'Day',1,0,0,[['osha10','2027-05']],'Sheet metal & HVAC'],
+    ['Yusuf Ahmed','electrician',6,'Los Angeles','90012',37,'Day',1,0,1,[['license','2028-04']],'Commercial electrician'],
+    ['Camila Torres','painter,drywall',5,'Los Angeles','90012',26,'Day',1,1,0,[['osha10','2026-11']],'Drywall finisher & painter'],
+    ['Erik Nyland','hvac,controls',12,'Seattle','98101',40,'Day',1,0,1,[['epa608','2027-12'],['nate','2027-12']],'Senior HVAC + controls tech'],
+    ['Nadia Petrov','sheet_metal',8,'Seattle','98101',35,'Day',1,0,0,[['osha10','2027-06']],'Sheet metal journeyman'],
+    ['Caleb Foster','welder',6,'Nashville','37203',34,'4x10',1,1,1,[['aws_welding','2027-09']],'Structural welder'],
+    ['Imani Wright','electrician,solar',9,'Charlotte','28202',36,'Day',1,0,1,[['license','2027-08'],['osha10','2027-08']],'Electrician — commercial & PV'],
+    ['Diego Salazar','plumber',11,'Tampa','33602',34,'Day',1,0,0,[['license','2027-03'],['backflow','2027-03']],'Master plumber'],
+    ['Holly Bergstrom','carpenter,framer',7,'Minneapolis','55401',31,'Day',1,1,1,[['osha10','2027-07']],'Carpenter & framer'],
+    ['Andre Lewis','diesel_mechanic,heavy_equipment',10,'Detroit','48226',33,'Day',1,0,0,[['ase','2028-01']],'Diesel mechanic & operator'],
+  ];
+  for (const [name,trades,yrs,city,zip,floor,shift,avail,today,relo,creds,headline] of W){
+    const email = name.toLowerCase().replace(/[^a-z]+/g,'.')+'@rivet.test';
+    let uid; try { uid = (await insUser.run(email,pw,'worker',name,null)).lastInsertRowid; } catch(e){ continue; }
+    const first = trades.split(',')[0];
+    const about = `${yrs}-year ${first.replace(/_/g,' ')} based in ${city}. Reliable, safety-first, and ready to start.`;
+    try { await insProf.run(uid,first,trades,headline,about,yrs,city,zip,floor,shift,avail,today,relo,1); } catch(e){ continue; }
+    for (const [k,exp] of creds){ try { await insCred.run(uid,k,CRED_KINDS[k]||k,1,exp); } catch(e){} }
+    try { await insWH.run(uid,`${city} Trades Co.`,headline.split('—')[0].trim(),first,city,2026-Math.min(yrs,12),null,1,`Lead ${first.replace(/_/g,' ')} work across ${city}.`); } catch(e){}
+    try { await recomputeReadiness(uid); } catch(e){}
+  }
+  await metaSet('bigseed_v1','1');
+  console.log('[db] BIG seed applied — +4 employers, +12 jobs, +24 workers across US metros');
+}
+
 async function migrate() {
   // additive column migrations (idempotent — errors swallowed when already applied)
   try { await db.exec('ALTER TABLE users ADD COLUMN phone TEXT'); } catch (e) { /* column exists */ }
@@ -554,6 +654,7 @@ async function init() {
   try { await seedExperience(); } catch (e) { console.error('[db] experience seed skipped (non-fatal):', e.message); }
   try { await seedJobTypes(); } catch (e) { console.error('[db] job-types seed skipped (non-fatal):', e.message); }
   try { await seedCompanies(); } catch (e) { console.error('[db] company seed skipped (non-fatal):', e.message); }
+  try { await seedBig(); } catch (e) { console.error('[db] big seed skipped (non-fatal):', e.message); }
   try {
     if(!(await metaGet('relocate_v1'))){
       for(const email of ['omar@rivet.test','will@rivet.test','sam@rivet.test']){
