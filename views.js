@@ -271,7 +271,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=41">
+  <link rel="stylesheet" href="/styles.css?v=42">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1014,25 +1014,26 @@ function usMap(points = [], opts = {}){
   const cityLayer = MAP_CITIES.map(([nm,lo,la])=>`<g class="us-city"><circle cx="${px(lo)}" cy="${py(la)}" r="1.6"/><text x="${(+px(lo)+4).toFixed(1)}" y="${(+py(la)+3).toFixed(1)}">${esc(nm)}</text></g>`).join('');
   // demand heat: soft amber glow blobs sized by how many openings/candidates cluster there
   const heatDefs = `<defs><radialGradient id="rvheat"><stop offset="0%" stop-color="#E89A2E" stop-opacity=".66"/><stop offset="55%" stop-color="#D9701E" stop-opacity=".2"/><stop offset="100%" stop-color="#B4471F" stop-opacity="0"/></radialGradient></defs>`;
-  const heat = points.map(g=>{ const hr=Math.min(64, 18 + (g.n||1)*9); return `<circle class="heat" cx="${px(g.lon)}" cy="${py(g.lat)}" r="${hr}" fill="url(#rvheat)"/>`; }).join('');
+  const nfmt = n => n>=10000 ? Math.round(n/1000)+'k' : (n>=1000 ? (n/1000).toFixed(1).replace(/\.0$/,'')+'k' : String(n));
+  const heat = points.map(g=>{ const hr=Math.max(16, Math.min(60, 14 + Math.sqrt(g.n||1)*0.7)); return `<circle class="heat" cx="${px(g.lon)}" cy="${py(g.lat)}" r="${hr.toFixed(1)}" fill="url(#rvheat)"/>`; }).join('');
   // physical-geography layers
   const forests = MAP_FORESTS.map(([lo,la,r])=>`<circle class="geo-forest" cx="${px(lo)}" cy="${py(la)}" r="${r}"/>`).join('');
   const rivers = MAP_RIVERS.map(r=>`<polyline class="geo-river" points="${r.map(([lo,la])=>`${px(lo)},${py(la)}`).join(' ')}"/>`).join('');
   const mtns = MAP_MTNS.map(([lo,la])=>{ const x=+px(lo), y=+py(la); return `<path class="geo-mtn" d="M${(x-3.4).toFixed(1)} ${(y+2.6).toFixed(1)} L${x.toFixed(1)} ${(y-3).toFixed(1)} L${(x+3.4).toFixed(1)} ${(y+2.6).toFixed(1)} Z"/>`; }).join('');
   const total = points.reduce((a,g)=>a+(g.n||0),0);
   const dots = points.map((g,i)=>{
-    const r = Math.min(18, 6 + (g.n||1)*2.2);
+    const r = Math.min(21, 8 + Math.sqrt(g.n||1)*0.2);
     const cls = g.kind==='related' ? 'mdot related' : 'mdot';
-    const lbl = `${g.city||''}: ${g.n} ${noun}${g.n===1?'':'s'}`;
+    const lbl = `${g.city||''}: ${(g.n||0).toLocaleString()} ${noun}${g.n===1?'':'s'}`;
     return `<g class="${cls}" tabindex="0" role="button" onclick="rvMapShow(${i})" onkeydown="if(event.key==='Enter')rvMapShow(${i})">
-      <circle cx="${px(g.lon)}" cy="${py(g.lat)}" r="${r}"><title>${esc(lbl)}</title></circle>
-      <text x="${px(g.lon)}" y="${(+py(g.lat)+3.6).toFixed(1)}" text-anchor="middle">${g.n}</text></g>`;
+      <circle cx="${px(g.lon)}" cy="${py(g.lat)}" r="${r.toFixed(1)}"><title>${esc(lbl)}</title></circle>
+      <text x="${px(g.lon)}" y="${(+py(g.lat)+3.4).toFixed(1)}" text-anchor="middle">${nfmt(g.n||0)}</text></g>`;
   }).join('');
-  const top = points.slice(0,7).map((g,i)=>`<li onclick="rvMapShow(${i})"><span>${esc(g.city||'—')}</span><b>${g.n}</b></li>`).join('');
+  const top = points.slice(0,7).map((g,i)=>`<li onclick="rvMapShow(${i})"><span>${esc(g.city||'—')}</span><b>${(g.n||0).toLocaleString()}</b></li>`).join('');
   // escaped per-point payload for the click panel (esc() makes it HTML- and </script>-safe)
-  const data = points.map(g=>({ c: esc(g.city||''), items: (g.items||[]).slice(0,12).map(it=>({l:esc(it.label||''),s:esc(it.sub||''),h:esc(it.href||'#')})) }));
+  const data = points.map(g=>({ c: esc(g.city||''), n:(g.n||0), items: (g.items||[]).slice(0,12).map(it=>({l:esc(it.label||''),s:esc(it.sub||''),h:esc(it.href||'#')})) }));
   return `<div class="card">
-    <div class="sec-h" style="margin-top:0">${esc(title)} <span class="muted">${total} ${noun}${total===1?'':'s'} mapped</span></div>
+    <div class="sec-h" style="margin-top:0">${esc(title)} <span class="muted">${total.toLocaleString()} ${noun}${total===1?'':'s'}</span></div>
     ${points.length ? `<div class="mapwrap">
       <div class="mapbox">
         <svg class="usmap" id="rvsvg" viewBox="0 0 ${VW} ${VH}" role="img" aria-label="US map">
@@ -1054,15 +1055,21 @@ function usMap(points = [], opts = {}){
       window.__RVD=${JSON.stringify(data)};window.__RVC=${JSON.stringify(esc(cta))};
       if(window.__rvmapInit)return;window.__rvmapInit=1;
       window.rvMapShow=function(i){var d=(window.__RVD||[])[i];var p=document.getElementById('rvpanel');if(!d||!p)return;
-        if(!d.items.length){p.innerHTML='<div class="mp-h">'+d.c+'</div><p class="muted sm">'+(window.__RVC==='Apply'?'No matching openings here yet.':'No items here.')+'</p>';return;}
-        p.innerHTML='<div class="mp-h">'+d.c+'</div>'+d.items.map(function(it){return '<div class="mp-row"><div class="mp-info"><b>'+it.l+'</b><span>'+it.s+'</span></div><a class="mp-cta" href="'+it.h+'">'+window.__RVC+'</a></div>';}).join('');};
+        var hdr='<div class="mp-h">'+d.c+(d.n?' <span class="mp-n">'+d.n.toLocaleString()+' open</span>':'')+'</div>';
+        if(!d.items.length){p.innerHTML=hdr+'<p class="muted sm">No sample roles loaded.</p>';return;}
+        p.innerHTML=hdr+d.items.map(function(it){return '<div class="mp-row"><div class="mp-info"><b>'+it.l+'</b><span>'+it.s+'</span></div><a class="mp-cta" href="'+it.h+'">'+window.__RVC+'</a></div>';}).join('')+(d.n>d.items.length?'<p class="muted sm" style="margin-top:8px">+ '+(d.n-d.items.length).toLocaleString()+' more in '+d.c+'</p>':'');};
       window.rvZoom=function(f){var s=document.getElementById('rvsvg');if(!s)return;var vb=(s.getAttribute('viewBox')||'0 0 620 350').split(' ').map(Number);var cx=vb[0]+vb[2]/2,cy=vb[1]+vb[3]/2,nw=Math.max(150,Math.min(620,vb[2]*f)),nh=Math.max(85,Math.min(350,vb[3]*f));s.setAttribute('viewBox',(cx-nw/2).toFixed(1)+' '+(cy-nh/2).toFixed(1)+' '+nw.toFixed(1)+' '+nh.toFixed(1));};
     })();</script>`
       : `<p class="muted">${esc(emptyMsg)}</p>`}
   </div>`;
 }
-function empOverview({ user, kpis, funnel, recent, hot, alerts, fillRate, geo = [] }) {
+function empOverview({ user, kpis, funnel, recent, hot, alerts, fillRate, geo = [], isNew = false, talentTotal = 0 }) {
   const maxF = Math.max(1, ...STAGES.map(s=>funnel[s]||0));
+  const welcome = isNew ? `<div class="card welcome">
+      <div class="welcome-h">${T('Welcome to Crewline')}, ${esc((user.name||'').split(' ')[0])} 👋</div>
+      <p>${T('There are')} <b>${talentTotal.toLocaleString()}</b> ${T('verified blue-collar workers ready across the U.S. Post your first job and we’ll match you instantly — see who’s available on the map below.')}</p>
+      <a class="btn" href="/console/jobs/new">${T('Post your first job')}</a>
+    </div>` : '';
   const funnelBars = STAGES.map(s=>`<div class="fn-row">
       <span class="fn-lbl">${s}</span>
       <div class="fn-bar"><i class="fn-${s.toLowerCase()}" style="width:${Math.round(((funnel[s]||0)/maxF)*100)}%"></i></div>
@@ -1071,9 +1078,10 @@ function empOverview({ user, kpis, funnel, recent, hot, alerts, fillRate, geo = 
   return `<section class="wrap">
     <div class="page-h"><h2>${T('Overview')}</h2><p class="muted">${esc(user.company||user.name)}</p>
       <a class="btn-sm right" href="/console/jobs/new">${T('+ Post a job')}</a></div>
+    ${welcome}
     <div class="kpis">
       ${kpi(T('Open jobs'),kpis.openJobs)}
-      ${kpi(T('Verified talent pool'),kpis.pool)}
+      ${kpi(T('Verified talent pool'), (talentTotal||kpis.pool).toLocaleString())}
       ${kpi(T('In pipeline'),kpis.pipeline)}
       ${kpi(T('Hired'),kpis.hired)}
       ${kpi(T('Fill rate'),fillRate+'%')}

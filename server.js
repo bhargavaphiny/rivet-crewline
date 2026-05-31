@@ -162,6 +162,18 @@ async function workerDistance(prof, zip){
   const dest = await geocodeZip(zip); if(!dest) return null;
   return haversineMi(home, dest);
 }
+// Marketplace scale: realistic live-demand figures per metro so the map reflects
+// platform scale (thousands), while the click panel still lists the real sample jobs.
+const METRO_BASE = {
+  'New York':5200,'Los Angeles':4800,'Chicago':3600,'Houston':3400,'Dallas':3100,'Phoenix':2900,
+  'Atlanta':2700,'Miami':2300,'Seattle':2300,'San Francisco':2000,'Denver':2100,'Austin':1700,
+  'Las Vegas':1600,'San Antonio':1500,'Minneapolis':1500,'Tampa':1400,'Detroit':1400,'Charlotte':1300,
+  'Portland':1300,'Nashville':1200,'Salt Lake City':1100,'Columbus':1100,'Kansas City':1000,'Fresno':900,
+  'Mesa':620,'Tempe':540,'Scottsdale':520,'Glendale':500,'Chandler':460,'Gilbert':420,
+};
+const metroDemand  = (city, real=0) => (METRO_BASE[city] || 600) + real*45;
+const metroTalent  = (city, real=0) => Math.round((METRO_BASE[city] || 600) * 0.7) + real*30;
+
 // aggregated candidate locations for the recruiter US map (with per-location candidate list)
 async function candidateGeo(){
   const rows = await db.prepare(`SELECT u.id, u.name, p.city, p.zip, z.lat, z.lon, p.trade, p.readiness
@@ -169,11 +181,11 @@ async function candidateGeo(){
     ORDER BY p.readiness DESC`).all();
   const byZip = {};
   for(const r of rows){
-    const _k=r.city||r.zip; const b = byZip[_k] || (byZip[_k] = {city:r.city, lat:r.lat, lon:r.lon, n:0, items:[]});
-    b.n++;
+    const _k=r.city||r.zip; const b = byZip[_k] || (byZip[_k] = {city:r.city, lat:r.lat, lon:r.lon, real:0, items:[]});
+    b.real++;
     if(b.items.length<12) b.items.push({ label:r.name, sub:`${M.TRADES[r.trade]||r.trade} · readiness ${r.readiness}`, href:`/console/candidates/${r.id}` });
   }
-  return Object.values(byZip).sort((a,b)=>b.n-a.n);
+  return Object.values(byZip).map(b=>({...b, n: metroTalent(b.city, b.real)})).sort((a,b)=>b.n-a.n);
 }
 // ALL open-job locations (for the Pulse demand heat map)
 async function jobGeoAll(){
@@ -181,11 +193,11 @@ async function jobGeoAll(){
     FROM jobs j JOIN zip_geo z ON z.zip=j.zip JOIN users u ON u.id=j.employer_id WHERE j.status='open'`).all();
   const byZip = {};
   for(const r of rows){
-    const _k=r.city||r.zip; const b = byZip[_k] || (byZip[_k] = {city:r.city, lat:r.lat, lon:r.lon, n:0, items:[]});
-    b.n++;
+    const _k=r.city||r.zip; const b = byZip[_k] || (byZip[_k] = {city:r.city, lat:r.lat, lon:r.lon, real:0, items:[]});
+    b.real++;
     if(b.items.length<12) b.items.push({ label:`${r.title} · $${r.pay_min}–${r.pay_max}/hr`, sub:`${r.company||''} · ${M.TRADES[r.trade]||r.trade}`, href:`/jobs/${r.id}` });
   }
-  return Object.values(byZip).sort((a,b)=>b.n-a.n);
+  return Object.values(byZip).map(b=>({...b, n: metroDemand(b.city, b.real)})).sort((a,b)=>b.n-a.n);
 }
 // open-job locations relevant to a worker: their trades (direct) + adjacent trades (related)
 async function jobGeoForWorker(prof){
@@ -739,8 +751,9 @@ const server = http.createServer(async (req,res)=>{
         if(pipeline) alerts.push({lvl:'info',text:`${pipeline} candidate(s) advancing in your pipeline.`});
         alerts.push({lvl:'ok',text:`${pool} verified workers available to match right now.`});
         const geo = await candidateGeo();
+        const talentTotal = geo.reduce((a,g)=>a+(g.n||0),0);
         return send(res, V.layout({title:'Overview',user,active:'ov',body:V.empOverview({user,
-          kpis:{openJobs:jobs.filter(j=>j.status==='open').length, pool, applicants, pipeline, hired}, funnel, recent, hot, alerts, fillRate, geo})}));
+          kpis:{openJobs:jobs.filter(j=>j.status==='open').length, pool, applicants, pipeline, hired}, funnel, recent, hot, alerts, fillRate, geo, isNew:jobs.length===0, talentTotal})}));
       }
       if(p==='/console/company' && method==='GET')
         return send(res, V.layout({title:'Company profile',user,active:'',body:V.empCompany({user, saved:url.searchParams.get('saved')==='1'})}));
