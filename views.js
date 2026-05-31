@@ -316,6 +316,8 @@ const BUILTIN_ES = {
   'Your price':'Tu precio','for the job':'por el trabajo','Add a note (when you can start, what’s included)':'Agrega una nota (cuándo puedes empezar, qué incluye)','Send my price quote':'Enviar mi cotización',
   'Price quotes':'Cotizaciones','quote':'cotización','quotes':'cotizaciones','No quotes yet — they’ll appear here as workers bid.':'Aún no hay cotizaciones — aparecerán aquí cuando los trabajadores oferten.',
   'Accept quote':'Aceptar cotización','Accepted':'Aceptada','Not selected':'No seleccionada','Photos of the work':'Fotos del trabajo','candidates see these on the job':'los candidatos las ven en el empleo','your quote':'tu cotización',
+  // job duration
+  'Duration':'Duración','Not specified':'Sin especificar','1 day':'1 día','This weekend':'Este fin de semana','1–2 weeks':'1–2 semanas','1 month':'1 mes','3 months':'3 meses','6+ months':'6+ meses','Ongoing':'Continuo','2 weeks':'2 semanas',
 };
 function T(s){
   if(LANG !== 'es' || !s) return s;
@@ -398,7 +400,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=58">
+  <link rel="stylesheet" href="/styles.css?v=59">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -808,6 +810,7 @@ function jobCard(m, bare = false){
     <div class="job-foot">
       <span class="pay">${j.quotes_ok&&!j.pay_min?T('Name your price'):`$${j.pay_min}–${j.pay_max}<small>/hr</small>`}</span>
       ${j.employment_type?`<span class="jtype">${esc(T(j.employment_type))}</span>`:''}
+      ${j.duration?`<span class="jtype dur">${esc(T(j.duration))}</span>`:''}
       <span class="js-shift">${esc(T(j.shift))}</span>
       ${isExternal(j)?`<span class="ext-badge">${esc(j.source)} ↗</span>`:''}
       ${sponsorBadge(j)}
@@ -899,7 +902,7 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
         <div class="badge big">${tradeEmoji(job.trade)}</div>
         <div class="job-main">
           <h2>${esc(job.title)}</h2>
-          ${job.employment_type?`<span class="jtype">${esc(T(job.employment_type))}</span>`:''}${job.crew_ok?`<span class="jtype crew">${icon('truck')} ${T('Open to crews')}</span>`:''}${job.quotes_ok?`<span class="jtype quote">${T('Accepting quotes')}</span>`:''}
+          ${job.employment_type?`<span class="jtype">${esc(T(job.employment_type))}</span>`:''}${job.duration?`<span class="jtype dur">${esc(T(job.duration))}</span>`:''}${job.crew_ok?`<span class="jtype crew">${icon('truck')} ${T('Open to crews')}</span>`:''}${job.quotes_ok?`<span class="jtype quote">${T('Accepting quotes')}</span>`:''}
           <div class="job-c">${job.poster_kind==='individual'?`${icon('pin')} ${T('Posted by a homeowner / small business')} · `:''}${esc(job.company||'')} · ${esc(job.city)} ${esc(job.zip)} · ${esc(T(job.shift))}${distance!=null?` · <b class="dist">${distance} ${T('mi away')}</b>`:''}</div>
           <div class="pay big">${job.quotes_ok&&!job.pay_min?T('Name your price'):`$${job.pay_min}–${job.pay_max}/hr`}</div>
         </div>
@@ -1664,6 +1667,7 @@ function empJobs({ jobs }) {
 }
 
 const JOB_TYPES = ['Full-time','Part-time','Contract','Temp','Apprenticeship','Outcome-based'];
+const DURATIONS = ['1 day','This weekend','1–2 weeks','1 month','3 months','6+ months','Ongoing'];
 const SPONSORSHIP = { authorized:'Requires U.S. work authorization', h2a:'Offers H-2A (agricultural) visa sponsorship', h2b:'Offers H-2B (seasonal) visa sponsorship' };
 const WORK_AUTH = { '':'Prefer not to say', authorized:'Authorized to work in the U.S.', need_h2a:'Seeking H-2A (agricultural) sponsorship', need_h2b:'Seeking H-2B (seasonal) sponsorship' };
 // Informational sponsorship badge for a job. profile (optional) lets us note a match
@@ -1694,6 +1698,7 @@ function empJobForm(error='', job=null) {
       <label>${T('Title')} <input name="title" required placeholder="${T('e.g. Fix a leaking faucet')}" value="${v('title')}"></label>
       <div class="row2"><label>${T('Trade')} <select name="trade">${opts}</select></label>
         <label>${T('Employment type')} <select name="employment_type">${typeOpts}</select></label></div>
+      <label>${T('Duration')} <select name="duration"><option value="">${T('Not specified')}</option>${DURATIONS.map(d=>`<option value="${d}" ${editing&&job.duration===d?'selected':''}>${T(d)}</option>`).join('')}</select></label>
       <label class="ck"><input type="checkbox" name="quotes_ok" value="1" ${editing&&job.quotes_ok?'checked':''}> ${T('Let workers send me a price quote (instead of a fixed pay rate)')}</label>
       <div class="row2"><label>${T('Pay min ($/hr)')} <input type="number" name="pay_min" value="${v('pay_min','36')}"></label>
         <label>${T('Pay max ($/hr)')} <input type="number" name="pay_max" value="${v('pay_max','48')}"></label></div>
@@ -1938,4 +1943,4 @@ function ogImage() {
 }
 
 module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP };
+  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP };

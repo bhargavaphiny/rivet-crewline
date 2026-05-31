@@ -1130,8 +1130,9 @@ const server = http.createServer(async (req,res)=>{
         const crewOk = b.crew_ok ? 1 : 0;
         const posterKind = b.poster_kind==='individual' ? 'individual' : 'company';
         const quotesOk = b.quotes_ok ? 1 : 0;
-        const info = await db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type,sponsorship,crew_ok,poster_kind,quotes_ok)
-          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(user.id,b.title,b.trade,Number(b.pay_min)||0,Number(b.pay_max)||0,b.city||'',b.zip||'',b.shift||'Day',reqCreds,b.descr||'',empType,spon,crewOk,posterKind,quotesOk);
+        const dur = V.DURATIONS.includes(b.duration) ? b.duration : null;
+        const info = await db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type,sponsorship,crew_ok,poster_kind,quotes_ok,duration)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(user.id,b.title,b.trade,Number(b.pay_min)||0,Number(b.pay_max)||0,b.city||'',b.zip||'',b.shift||'Day',reqCreds,b.descr||'',empType,spon,crewOk,posterKind,quotesOk,dur);
         const jobId = info.lastInsertRowid;
         try { await geocodeZip(b.zip); } catch(e){} // pin new job on the demand map immediately
         // SMS job alerts to matching, opted-in, available workers who have a phone
@@ -1250,8 +1251,9 @@ const server = http.createServer(async (req,res)=>{
         const crewOk = b.crew_ok ? 1 : 0;
         const posterKind = b.poster_kind==='individual' ? 'individual' : 'company';
         const quotesOk = b.quotes_ok ? 1 : 0;
-        await db.prepare(`UPDATE jobs SET title=?,trade=?,pay_min=?,pay_max=?,city=?,zip=?,shift=?,req_creds=?,descr=?,employment_type=?,sponsorship=?,crew_ok=?,poster_kind=?,quotes_ok=? WHERE id=? AND employer_id=?`)
-          .run(String(b.title).slice(0,120), b.trade||job.trade, Number(b.pay_min)||0, Number(b.pay_max)||0, b.city||'', b.zip||'', b.shift||'Day', reqCreds, String(b.descr||'').slice(0,2000), empType, spon, crewOk, posterKind, quotesOk, jobId, user.id);
+        const dur = V.DURATIONS.includes(b.duration) ? b.duration : null;
+        await db.prepare(`UPDATE jobs SET title=?,trade=?,pay_min=?,pay_max=?,city=?,zip=?,shift=?,req_creds=?,descr=?,employment_type=?,sponsorship=?,crew_ok=?,poster_kind=?,quotes_ok=?,duration=? WHERE id=? AND employer_id=?`)
+          .run(String(b.title).slice(0,120), b.trade||job.trade, Number(b.pay_min)||0, Number(b.pay_max)||0, b.city||'', b.zip||'', b.shift||'Day', reqCreds, String(b.descr||'').slice(0,2000), empType, spon, crewOk, posterKind, quotesOk, dur, jobId, user.id);
         return redirect(res, `/console/jobs/${jobId}`);
       }
 

@@ -1021,6 +1021,7 @@ async function migrate() {
   try { await db.exec('ALTER TABLE jobs ADD COLUMN crew_ok INTEGER DEFAULT 0'); } catch (e) { /* column exists */ }
   try { await db.exec("ALTER TABLE jobs ADD COLUMN poster_kind TEXT DEFAULT 'company'"); } catch (e) { /* company|individual */ }
   try { await db.exec('ALTER TABLE jobs ADD COLUMN quotes_ok INTEGER DEFAULT 0'); } catch (e) { /* accepts price quotes */ }
+  try { await db.exec('ALTER TABLE jobs ADD COLUMN duration TEXT'); } catch (e) { /* e.g. 2 weeks, 3 months, ongoing */ }
 }
 
 async function seedZips() {
@@ -1081,6 +1082,16 @@ async function init() {
   try { await seedReviews(); } catch (e) { console.error('[db] reviews seed skipped (non-fatal):', e.message); }
   try { await seedXfactors(); } catch (e) { console.error('[db] xfactors seed skipped (non-fatal):', e.message); }
   try { await seedHomeowner(); } catch (e) { console.error('[db] homeowner seed skipped (non-fatal):', e.message); }
+  try {
+    if(!(await metaGet('duration_v1'))){
+      await db.exec("UPDATE jobs SET duration='3 months' WHERE employment_type='Contract' AND duration IS NULL");
+      await db.exec("UPDATE jobs SET duration='2 weeks' WHERE employment_type='Temp' AND duration IS NULL");
+      await db.exec("UPDATE jobs SET duration='Ongoing' WHERE employment_type IN ('Full-time','Part-time') AND duration IS NULL");
+      await db.exec("UPDATE jobs SET duration='1–2 weeks' WHERE employment_type='Outcome-based' AND quotes_ok=0 AND duration IS NULL");
+      await db.exec("UPDATE jobs SET duration='1 day' WHERE quotes_ok=1 AND duration IS NULL");
+      await metaSet('duration_v1','1');
+    }
+  } catch (e) { console.error('[db] duration seed skipped (non-fatal):', e.message); }
   try {
     if(!(await metaGet('sponsorship_v2'))){
       // Recompute cleanly by trade (no employment_type sweep, which mis-tagged Temp jobs).
