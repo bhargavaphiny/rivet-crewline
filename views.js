@@ -171,12 +171,34 @@ let ESMAP = null;
 const _esMiss = new Set();
 function setEs(m){ ESMAP = m; }
 function drainEsMisses(){ const a = [..._esMiss]; _esMiss.clear(); return a; }
+// Hand-translated bounded sets (trades, job types, shifts) — perfect + instant, no API key needed.
+const BUILTIN_ES = {
+  'Electrician':'Electricista','HVAC Technician':'Técnico HVAC','Plumber':'Plomero','Pipefitter':'Tubero (pipefitter)','Welder':'Soldador',
+  'Sheet Metal Worker':'Hojalatero','Carpenter':'Carpintero','Framer':'Encuadrador','Drywall / Finisher':'Instalador de tablaroca','Painter':'Pintor',
+  'Roofer':'Techador','Mason / Bricklayer':'Albañil','Concrete Finisher':'Acabador de concreto','Flooring Installer':'Instalador de pisos','Tile Setter':'Azulejero',
+  'Glazier':'Vidriero','Insulation Installer':'Instalador de aislamiento','Ironworker':'Herrero estructural','Millwright':'Mecánico industrial','Boilermaker':'Calderero',
+  'Controls Technician':'Técnico de controles','Solar Installer':'Instalador solar','Low-Voltage / Telecom':'Bajo voltaje / Telecom','Fire Sprinkler Fitter':'Instalador de rociadores',
+  'Elevator Technician':'Técnico de elevadores','Heavy Equipment Operator':'Operador de maquinaria pesada','Crane Operator':'Operador de grúa','CDL Driver':'Conductor CDL',
+  'Diesel Mechanic':'Mecánico diésel','Automotive Technician':'Técnico automotriz','Machinist / CNC':'Maquinista / CNC','Landscaper / Groundskeeper':'Jardinero','Locksmith':'Cerrajero',
+  'Facilities Maintenance':'Mantenimiento de instalaciones','CNA / Nursing Assistant':'Asistente de enfermería (CNA)','Caregiver / Home Health Aide':'Cuidador / Asistente en casa',
+  'Medical Assistant':'Asistente médico','Phlebotomist':'Flebotomista','EMT / Paramedic':'Paramédico / EMT','Farmworker / Ag Laborer':'Trabajador agrícola','Fruit / Crop Picker':'Recolector de fruta',
+  'Cook / Line Cook':'Cocinero','Server / Waiter':'Mesero / Camarero','Dishwasher':'Lavaplatos','Bartender':'Cantinero','Warehouse Associate':'Almacenista','Delivery Driver':'Repartidor',
+  'Mover / Furniture':'Mudancero','Janitor / Custodian':'Conserje','Housekeeper':'Ama de llaves','Security Guard':'Guardia de seguridad','Pest Control Technician':'Técnico de control de plagas',
+  'Appliance Repair Tech':'Técnico de electrodomésticos','Irrigation Technician':'Técnico de riego','Packing / Sorting':'Empaque / Clasificación','Ranch Hand':'Peón de rancho',
+  'Nursery Worker':'Trabajador de vivero','Prep Cook':'Cocinero de preparación','Busser':'Garrotero','Host / Hostess':'Anfitrión','Barback':'Ayudante de bar','Handyman':'Manitas / Reparaciones',
+  'Junk Removal':'Retiro de escombros','Pressure Washing':'Lavado a presión','Pool Service Tech':'Técnico de piscinas','Courier / Gig Delivery':'Mensajero / Repartidor','Event Setup Crew':'Montaje de eventos',
+  'Full-time':'Tiempo completo','Part-time':'Medio tiempo','Contract':'Contrato','Temp':'Temporal','Apprenticeship':'Aprendizaje','Outcome-based':'Por resultados',
+  'Day':'Día','Night':'Noche','Any':'Cualquiera','mi away':'mi de distancia','Apply':'Aplicar','View':'Ver',
+};
 function T(s){
   if(LANG !== 'es' || !s) return s;
   if(ESMAP && ESMAP.has(s)) return ESMAP.get(s);
+  if(BUILTIN_ES[s]) return BUILTIN_ES[s];
   _esMiss.add(s);
   return s;
 }
+// translate a trade key's label
+function tl(k){ return T(TRADES[k] || k); }
 
 function scoreClass(s){ return s>=85?'s-hi':s>=70?'s-md':'s-lo'; }
 
@@ -249,7 +271,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=40">
+  <link rel="stylesheet" href="/styles.css?v=41">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -526,15 +548,15 @@ function jobCard(m, bare = false){
     <div class="job-row">
       <div class="badge">${tradeEmoji(j.trade)}</div>
       <div class="job-main">
-        <div class="job-t">${esc(j.title)}</div>
+        <div class="job-t">${esc(T(j.title))}</div>
         <div class="job-c">${esc(j.company||'')} · ${esc(j.city)}${m.distance!=null?` · <b class="dist">${m.distance} ${T('mi away')}</b>`:''}</div>
       </div>
-      ${bare?`<span class="mtag fit" style="margin-left:auto">${TRADES[j.trade]||j.trade}</span>`:`<span class="score-chip ${scoreClass(m.score)}">${m.score}</span>`}
+      ${bare?`<span class="mtag fit" style="margin-left:auto">${esc(tl(j.trade))}</span>`:`<span class="score-chip ${scoreClass(m.score)}">${m.score}</span>`}
     </div>
     <div class="job-foot">
       <span class="pay">$${j.pay_min}–${j.pay_max}<small>/hr</small></span>
-      ${j.employment_type?`<span class="jtype">${esc(j.employment_type)}</span>`:''}
-      <span class="js-shift">${esc(j.shift)}</span>
+      ${j.employment_type?`<span class="jtype">${esc(T(j.employment_type))}</span>`:''}
+      <span class="js-shift">${esc(T(j.shift))}</span>
       ${bare?'':fit}
     </div>
     ${bare?'':`<div class="matchbar"><i style="width:${m.score}%"></i></div>`}
@@ -555,10 +577,10 @@ function credRow(c){
 
 // ---------- worker: all matches ----------
 function workerJobs({ matches, filters = {}, jobsGeo = null }) {
-  const tradeOpts = `<option value="">All trades</option>`+Object.entries(TRADES).map(([k,v])=>`<option value="${k}" ${filters.trade===k?'selected':''}>${v}</option>`).join('');
+  const tradeOpts = `<option value="">${T('All trades')}</option>`+Object.entries(TRADES).map(([k,v])=>`<option value="${k}" ${filters.trade===k?'selected':''}>${esc(T(v))}</option>`).join('');
   const shifts = ['Day','Night','4x10','Any'];
-  const shiftOpts = `<option value="">Any shift</option>`+shifts.map(s=>`<option value="${s}" ${filters.shift===s?'selected':''}>${s}</option>`).join('');
-  const typeOpts = `<option value="">Any type</option>`+JOB_TYPES.map(t=>`<option value="${t}" ${filters.jtype===t?'selected':''}>${t}</option>`).join('');
+  const shiftOpts = `<option value="">${T('Any shift')}</option>`+shifts.map(s=>`<option value="${s}" ${filters.shift===s?'selected':''}>${esc(T(s))}</option>`).join('');
+  const typeOpts = `<option value="">${T('Any type')}</option>`+JOB_TYPES.map(t=>`<option value="${t}" ${filters.jtype===t?'selected':''}>${esc(T(t))}</option>`).join('');
   const active = (filters.q||filters.trade||filters.city||filters.minpay||filters.shift||filters.jtype);
   return `<section class="wrap">
     <div class="sec-h big">${T('Find work')} <span class="muted">${matches.length} ${matches.length===1?T('job'):T('jobs')}${active?' · '+T('filtered'):' · '+T('ranked by fit')}</span></div>
@@ -590,14 +612,14 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
       <div class="job-row">
         <div class="badge big">${tradeEmoji(job.trade)}</div>
         <div class="job-main">
-          <h2>${esc(job.title)}</h2>
-          ${job.employment_type?`<span class="jtype">${esc(job.employment_type)}</span>`:''}
-          <div class="job-c">${esc(job.company||'')} · ${esc(job.city)} ${esc(job.zip)} · ${esc(job.shift)} shift${distance!=null?` · <b class="dist">${distance} ${T('mi away')}</b>`:''}</div>
+          <h2>${esc(T(job.title))}</h2>
+          ${job.employment_type?`<span class="jtype">${esc(T(job.employment_type))}</span>`:''}
+          <div class="job-c">${esc(job.company||'')} · ${esc(job.city)} ${esc(job.zip)} · ${esc(T(job.shift))}${distance!=null?` · <b class="dist">${distance} ${T('mi away')}</b>`:''}</div>
           <div class="pay big">$${job.pay_min}–${job.pay_max}/hr</div>
         </div>
         <div class="score-pill ${scoreClass(match.score)}">${match.score}<small>match</small></div>
       </div>
-      <p class="descr">${esc(job.descr)}</p>
+      <p class="descr">${esc(T(job.descr))}</p>
       ${rules?`<div class="rules">
         <div class="rules-h">${T('Local pay & rules')} · ${esc(rules.stateName)}</div>
         <div class="rules-grid">
@@ -698,7 +720,7 @@ function bd(label,val,max){const pct=Math.round(val/max*100);return `<div class=
 
 // ---------- worker: profile / work card ----------
 function tradeChips(profile){
-  let out = tradesOf(profile).map(t=>`<span class="chip">${tradeEmoji(t)} ${TRADES[t]||t}</span>`).join('');
+  let out = tradesOf(profile).map(t=>`<span class="chip">${tradeEmoji(t)} ${esc(tl(t))}</span>`).join('');
   if(profile && profile.custom_trade) out += `<span class="chip">${tradeEmoji('wrench')} ${esc(profile.custom_trade)}</span>`;
   return out;
 }
@@ -1195,7 +1217,7 @@ function empPipeline({ job, columns, candidates, jobMedia = [], alerted = 0 }) {
 }
 
 function empSearch({ rows, filters }) {
-  const tradeOpts = `<option value="">All trades</option>`+Object.entries(TRADES).map(([k,v])=>`<option value="${k}" ${filters.trade===k?'selected':''}>${v}</option>`).join('');
+  const tradeOpts = `<option value="">${T('All trades')}</option>`+Object.entries(TRADES).map(([k,v])=>`<option value="${k}" ${filters.trade===k?'selected':''}>${esc(T(v))}</option>`).join('');
   return `<section class="wrap">
     <div class="page-h"><h2>${T('Talent Search')}</h2><p class="muted">${rows.length} ${T('verified candidates')}</p>
       <a class="btn-sm right ghost" href="/console/shortlist">★ Shortlist</a></div>
