@@ -257,6 +257,9 @@ const BUILTIN_ES = {
   'Verified':'Verificado','Expiring':'Por vencer','In review':'En revisión','Self-reported':'Auto-reportado','proof ↗':'prueba ↗',
   'Link to proof (card photo, license #, URL)':'Enlace de prueba (foto de la tarjeta, n.º de licencia, URL)',
   'Request verification':'Solicitar verificación','Update':'Actualizar',
+  // map legend
+  'Tap a circle to see openings there':'Toca un círculo para ver las vacantes ahí','bigger circle = more':'círculo más grande = más',
+  'hiring demand':'demanda de contratación','Tap any circle to see them':'Toca cualquier círculo para verlos',
 };
 function T(s){
   if(LANG !== 'es' || !s) return s;
@@ -339,7 +342,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=50">
+  <link rel="stylesheet" href="/styles.css?v=51">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1305,9 +1308,15 @@ function usMap(points = [], opts = {}){
       </div>
       <div class="mapside">
         <ul class="maplist">${top}</ul>
-        <div class="mappanel" id="rvpanel"><p class="muted sm">${T('Tap a dot to see openings there')}</p></div>
+        <div class="mappanel" id="rvpanel"><p class="muted sm">${T('Tap a circle to see openings there')}</p></div>
       </div>
-    </div>${legend?`<div class="maplegend">${legend}</div>`:''}
+    </div>
+    <div class="maplegend">
+      <span class="lg"><i class="lg-dot"></i> ${esc(noun)}s <span class="lg-sub">— ${T('bigger circle = more')}</span></span>
+      <span class="lg"><i class="lg-heat"></i> ${T('hiring demand')}</span>
+      ${legend||''}
+      <span class="lg muted">${T('Tap any circle to see them')}</span>
+    </div>
     <script>(function(){
       window.__RVD=${JSON.stringify(data)};window.__RVC=${JSON.stringify(esc(cta))};
       if(window.__rvmapInit)return;window.__rvmapInit=1;

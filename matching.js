@@ -231,22 +231,26 @@ const TRAINING = {
 
 // State minimum wages (approx. 2025 $/hr) + the city→state lookup for seeded metros.
 // Used to show local pay floor + basic labor rules on each job card.
+const FEDERAL_MIN_WAGE = 7.25;
 const STATE_MIN_WAGE = {
   AZ:14.70, CA:16.50, TX:7.25, CO:14.81, GA:7.25, IL:15.00, NV:12.00, WA:16.66,
   FL:13.00, TN:7.25, NC:7.25, OH:10.70, MO:13.75, UT:7.25, OR:15.05, MN:11.13, MI:10.56, NY:16.50, PA:7.25,
+  VA:12.41, HI:14.00, DC:17.50, MA:15.00,
 };
 const STATE_NAME = {
   AZ:'Arizona', CA:'California', TX:'Texas', CO:'Colorado', GA:'Georgia', IL:'Illinois', NV:'Nevada',
   WA:'Washington', FL:'Florida', TN:'Tennessee', NC:'North Carolina', OH:'Ohio', MO:'Missouri',
   UT:'Utah', OR:'Oregon', MN:'Minnesota', MI:'Michigan', NY:'New York', PA:'Pennsylvania',
+  VA:'Virginia', HI:'Hawaii', DC:'Washington, D.C.', MA:'Massachusetts',
 };
 const CITY_STATE = {
-  Phoenix:'AZ', Tempe:'AZ', Mesa:'AZ', Scottsdale:'AZ', Glendale:'AZ', Chandler:'AZ', Gilbert:'AZ',
-  Fresno:'CA', 'Los Angeles':'CA', 'San Francisco':'CA',
+  Phoenix:'AZ', Tempe:'AZ', Mesa:'AZ', Scottsdale:'AZ', Glendale:'AZ', Chandler:'AZ', Gilbert:'AZ', Aurora:'CO',
+  Fresno:'CA', 'Los Angeles':'CA', 'San Francisco':'CA', 'San Diego':'CA',
   Houston:'TX', Dallas:'TX', Austin:'TX', 'San Antonio':'TX',
   Denver:'CO', Atlanta:'GA', Chicago:'IL', 'Las Vegas':'NV', Seattle:'WA',
   Miami:'FL', Tampa:'FL', Nashville:'TN', Charlotte:'NC', Columbus:'OH',
   'Kansas City':'MO', 'Salt Lake City':'UT', Portland:'OR', Minneapolis:'MN', Detroit:'MI',
+  Washington:'DC', Norfolk:'VA', Honolulu:'HI', Boston:'MA',
 };
 // City / metro minimum wages that exceed their state floor (approx. 2025 $/hr).
 const CITY_MIN_WAGE = {
@@ -254,17 +258,26 @@ const CITY_MIN_WAGE = {
   'New York':16.50, Flagstaff:17.85, Tucson:14.25, Portland:15.95, Minneapolis:15.97, Tempe:15.00,
 };
 function stateForCity(city){ return CITY_STATE[String(city||'').trim()] || null; }
+// Always returns a rules object: known city → state/city wage; unknown → federal floor.
 function localRules(city){
-  const st = stateForCity(city);
-  if(!st) return null;
-  const stateWage = STATE_MIN_WAGE[st] || 7.25;
-  const cityWage = CITY_MIN_WAGE[String(city||'').trim()] || 0;
+  const name = String(city||'').trim();
+  const st = stateForCity(name);
+  if(!st){
+    return {
+      state: null, stateName: 'U.S.', city: name,
+      stateWage: FEDERAL_MIN_WAGE, cityWage: 0, minWage: FEDERAL_MIN_WAGE,
+      level: 'Federal floor', cityApplies: false, federal: true,
+      overtime: 'Overtime (1.5×) after 40 hrs/week',
+    };
+  }
+  const stateWage = STATE_MIN_WAGE[st] || FEDERAL_MIN_WAGE;
+  const cityWage = CITY_MIN_WAGE[name] || 0;
   const cityApplies = cityWage > stateWage;
   return {
-    state: st, stateName: STATE_NAME[st]||st, city: String(city||'').trim(),
+    state: st, stateName: STATE_NAME[st]||st, city: name,
     stateWage, cityWage, minWage: cityApplies ? cityWage : stateWage,
-    level: cityApplies ? `${String(city||'').trim()} (city)` : `${STATE_NAME[st]||st} (state)`,
-    cityApplies, overtime: 'Overtime (1.5×) after 40 hrs/week',
+    level: cityApplies ? `${name} (city)` : `${STATE_NAME[st]||st} (state)`,
+    cityApplies, federal: false, overtime: 'Overtime (1.5×) after 40 hrs/week',
   };
 }
 
