@@ -49,6 +49,13 @@ const I18N = {
     phone_h:'Sign in with your phone', phone_sub:'We’ll text you a 6-digit code — no password to remember.',
     phone_number:'Mobile number', phone_yourname:'Your name', phone_textme:'Text me a code',
     phone_prefer:'Prefer email?',
+    home_readiness:'Job-Readiness Score', home_hireready:'Hire-ready ⚡', home_almost:'Almost there', home_build:'Build your card',
+    home_credentials:'credentials', home_top:'Top matches near you', home_seeall:'See all', home_nomatch:'No matches yet — check back soon.',
+    home_boost:'Boost your card', step_cred:'Add a credential', step_about:'Write your About', step_work:'Add work history', step_port:'Add portfolio photos',
+    home_wallet:'Credential Wallet', home_manage:'Manage', home_quick:'Quick stats',
+    st_readiness:'READINESS', st_verified:'VERIFIED', st_years:'YEARS',
+    x_avail_on:'🟢 Available for work', x_avail_off:'⚪ Tap: Available', x_today_on:'⚡ Can work today', x_today_off:'⚡ Tap: Work today',
+    x_relo_on:'✈️ Open to relocate', x_relo_off:'✈️ Tap: Relocate', x_alert_on:'🔔 Job alerts on', x_alert_off:'🔔 Tap: Job alerts',
   },
   es: {
     nav_login:'Entrar', nav_get_started:'Empezar', nav_home:'Inicio', nav_find_work:'Empleos',
@@ -85,6 +92,13 @@ const I18N = {
     phone_h:'Entra con tu teléfono', phone_sub:'Te enviaremos un código de 6 dígitos — sin contraseña que recordar.',
     phone_number:'Número de celular', phone_yourname:'Tu nombre', phone_textme:'Envíame un código',
     phone_prefer:'¿Prefieres correo?',
+    home_readiness:'Puntaje de preparación', home_hireready:'Listo para contratar ⚡', home_almost:'Casi listo', home_build:'Completa tu perfil',
+    home_credentials:'credenciales', home_top:'Mejores empleos cerca de ti', home_seeall:'Ver todos', home_nomatch:'Aún no hay coincidencias — vuelve pronto.',
+    home_boost:'Mejora tu perfil', step_cred:'Agrega una credencial', step_about:'Escribe tu perfil', step_work:'Agrega tu experiencia', step_port:'Agrega fotos de tu trabajo',
+    home_wallet:'Cartera de credenciales', home_manage:'Gestionar', home_quick:'Resumen',
+    st_readiness:'PREPARACIÓN', st_verified:'VERIFICADAS', st_years:'AÑOS',
+    x_avail_on:'🟢 Disponible para trabajar', x_avail_off:'⚪ Toca: Disponible', x_today_on:'⚡ Puedo trabajar hoy', x_today_off:'⚡ Toca: Trabajar hoy',
+    x_relo_on:'✈️ Dispuesto a mudarme', x_relo_off:'✈️ Toca: Mudarme', x_alert_on:'🔔 Alertas activadas', x_alert_off:'🔔 Toca: Alertas de empleo',
   },
 };
 function t(k){ return (I18N[LANG] && I18N[LANG][k] != null) ? I18N[LANG][k] : (I18N.en[k] != null ? I18N.en[k] : k); }
@@ -344,48 +358,48 @@ function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 
   const top = matches.slice(0,3).map(m=>jobCard(m)).join('');
   const expiring = creds.filter(c=>c.expires && c.expires < '2026-08').length;
   const steps = [
-    { done: creds.length>0, label:'Add a credential', href:'/app/profile' },
-    { done: !!profile.about, label:'Write your About', href:'/app/profile' },
-    { done: workCount>0, label:'Add work history', href:'/app/profile' },
-    { done: portCount>0, label:'Add portfolio photos', href:'/app/profile' },
+    { done: creds.length>0, label:t('step_cred'), href:'/app/profile' },
+    { done: !!profile.about, label:t('step_about'), href:'/app/profile' },
+    { done: workCount>0, label:t('step_work'), href:'/app/profile' },
+    { done: portCount>0, label:t('step_port'), href:'/app/profile' },
   ];
   const doneN = steps.filter(s=>s.done).length;
   return `<section class="wrap">
     <div class="xbar">
-      ${xToggle('/app/available', profile.available, '🟢 Available for work', '⚪ Tap: Available', '/app')}
-      ${xToggle('/app/work-today', profile.work_today, '⚡ Can work today', '⚡ Tap: Work today', '/app')}
-      ${xToggle('/app/relocate', profile.relocate, '✈️ Open to relocate', '✈️ Tap: Relocate', '/app')}
-      ${xToggle('/app/alerts', profile.alerts, '🔔 Job alerts on', '🔔 Tap: Job alerts', '/app')}
+      ${xToggle('/app/available', profile.available, t('x_avail_on'), t('x_avail_off'), '/app')}
+      ${xToggle('/app/work-today', profile.work_today, t('x_today_on'), t('x_today_off'), '/app')}
+      ${xToggle('/app/relocate', profile.relocate, t('x_relo_on'), t('x_relo_off'), '/app')}
+      ${xToggle('/app/alerts', profile.alerts, t('x_alert_on'), t('x_alert_off'), '/app')}
     </div>
     <div class="dash-grid">
       <div>
         <div class="readiness card">
           <div class="ring">${ring(profile.readiness)}</div>
           <div>
-            <div class="r-lbl">Job-Readiness Score</div>
-            <div class="r-big">${profile.readiness>=85?'Hire-ready ⚡':profile.readiness>=70?'Almost there':'Build your card'}</div>
-            <p>${creds.length} credentials · ${tradesOf(profile).map(t=>TRADES[t]||t).join(', ')} · ${esc(profile.city)}</p>
+            <div class="r-lbl">${t('home_readiness')}</div>
+            <div class="r-big">${profile.readiness>=85?t('home_hireready'):profile.readiness>=70?t('home_almost'):t('home_build')}</div>
+            <p>${creds.length} ${t('home_credentials')} · ${tradesOf(profile).map(t=>TRADES[t]||t).join(', ')} · ${esc(profile.city)}</p>
           </div>
         </div>
-        <div class="sec-h">Top matches near you <a href="/app/jobs">See all</a></div>
-        ${top || `<div class="card muted">No matches yet — <a href="/console/jobs">employers post jobs here</a>.</div>`}
+        <div class="sec-h">${t('home_top')} <a href="/app/jobs">${t('home_seeall')}</a></div>
+        ${top || `<div class="card muted">${t('home_nomatch')}</div>`}
       </div>
       <aside>
         ${doneN<4?`<div class="card">
-          <div class="sec-h" style="margin-top:0">Boost your card <span class="muted">${doneN}/4</span></div>
+          <div class="sec-h" style="margin-top:0">${t('home_boost')} <span class="muted">${doneN}/4</span></div>
           <div class="checklist">${steps.map(s=>`<a class="chk-step ${s.done?'done':''}" href="${s.href}"><span class="cb">${s.done?'✓':''}</span>${s.label}</a>`).join('')}</div>
         </div>`:''}
         <div class="card">
-          <div class="sec-h" style="margin-top:0">Credential Wallet <a href="/app/profile">Manage</a></div>
-          ${creds.slice(0,4).map(credRow).join('') || '<p class="muted">No credentials yet.</p>'}
+          <div class="sec-h" style="margin-top:0">${t('home_wallet')} <a href="/app/profile">${t('home_manage')}</a></div>
+          ${creds.slice(0,4).map(credRow).join('') || `<p class="muted">${t('step_cred')}</p>`}
         </div>
-        ${expiring?`<div class="card warn-card">⚠️ ${expiring} credential(s) expiring soon. <a href="/app/profile">Renew</a></div>`:''}
+        ${expiring?`<div class="card warn-card">⚠️ ${expiring} · <a href="/app/profile">${t('home_manage')}</a></div>`:''}
         <div class="card">
-          <div class="sec-h" style="margin-top:0">Quick stats</div>
+          <div class="sec-h" style="margin-top:0">${t('home_quick')}</div>
           <div class="ministats">
-            <div><b>${profile.readiness}</b><span>READINESS</span></div>
-            <div><b>${creds.filter(c=>c.verified).length}</b><span>VERIFIED</span></div>
-            <div><b>${profile.years_exp}</b><span>YEARS</span></div>
+            <div><b>${profile.readiness}</b><span>${t('st_readiness')}</span></div>
+            <div><b>${creds.filter(c=>c.verified).length}</b><span>${t('st_verified')}</span></div>
+            <div><b>${profile.years_exp}</b><span>${t('st_years')}</span></div>
           </div>
         </div>
       </aside>
