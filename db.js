@@ -148,6 +148,7 @@ async function createSchema() {
       created_at TEXT DEFAULT (datetime('now')),
       PRIMARY KEY(employer_id, worker_id)
     );
+    CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
     CREATE INDEX IF NOT EXISTS idx_messages_to ON messages(to_id, read_at);
     CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_id, to_id);
     CREATE INDEX IF NOT EXISTS idx_applications_worker ON applications(worker_id);
@@ -273,10 +274,63 @@ async function enrichDemo() {
   console.log('[db] enriched demo data — +1 employer, +5 jobs, +5 workers across more trades');
 }
 
+async function metaGet(k){ const r = await db.prepare('SELECT v FROM meta WHERE k=?').get(k); return r ? r.v : null; }
+async function metaSet(k,v){ await db.prepare('INSERT INTO meta(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v').run(k, String(v)); }
+
+// ---- realism pass: backdated pipeline activity + a live conversation (idempotent via meta flag) ----
+async function seedRealism(){
+  if (await metaGet('realism_v1')) return;
+  const { scoreMatch } = require('./matching');
+  const emp = await db.prepare("SELECT id FROM users WHERE email='ops@sunvalley.test'").get();
+  if (!emp) { await metaSet('realism_v1','1'); return; }
+  const jobByTitle = {};
+  for (const j of await db.prepare('SELECT * FROM jobs WHERE employer_id=?').all(emp.id)) jobByTitle[j.title] = j;
+  const wId = async (email) => { const u = await db.prepare('SELECT id FROM users WHERE email=?').get(email); return u && u.id; };
+
+  // backdated applications across stages so the funnel + activity look alive
+  const appsToAdd = [
+    ['Andre Cole','andre@rivet.test','HVAC Service Technician','Hired','-7 days'],
+    ['Diego Vega','diego@rivet.test','HVAC Service Technician','Offer','-3 days'],
+    ['Lupe Flores','lupe@rivet.test','Maintenance Technician','Screened','-30 hours'],
+    ['Andre Cole','andre@rivet.test','Maintenance Technician','Sourced','-5 hours'],
+  ];
+  for (const [, email, title, stage, when] of appsToAdd){
+    const job = jobByTitle[title]; const uid = await wId(email);
+    if (!job || !uid) continue;
+    const prof = await db.prepare('SELECT * FROM worker_profiles WHERE user_id=?').get(uid);
+    const creds = await db.prepare('SELECT * FROM credentials WHERE user_id=?').all(uid);
+    const { score } = scoreMatch(prof, creds, job);
+    try {
+      await db.prepare(`INSERT INTO applications(job_id,worker_id,stage,score,created_at)
+        VALUES(?,?,?,?,datetime('now',?))`).run(job.id, uid, stage, score, when);
+    } catch(e){}
+  }
+
+  // a pre-seeded conversation so the inbox isn't empty in the demo (marked read)
+  const andre = await wId('andre@rivet.test');
+  if (andre){
+    const convo = [
+      [emp.id, andre, 'Hi Andre — your HVAC card looks strong. Are you open to a light-commercial service role?', '-2 days'],
+      [andre, emp.id, 'Yes! I hold EPA 608 and OSHA 10. Days work best for me — what does it pay?', '-44 hours'],
+      [emp.id, andre, 'Great fit. $36–44/hr DOE. I just moved you to the pipeline — let’s set up a call.', '-40 hours'],
+    ];
+    for (const [from, to, body, when] of convo){
+      try {
+        await db.prepare(`INSERT INTO messages(from_id,to_id,body,read_at,created_at)
+          VALUES(?,?,?,datetime('now',?),datetime('now',?))`).run(from, to, body, when, when);
+      } catch(e){}
+    }
+  }
+
+  await metaSet('realism_v1','1');
+  console.log('[db] realism pass applied — backdated pipeline activity + sample conversation');
+}
+
 async function init() {
   await createSchema();
   await seed();
   try { await enrichDemo(); } catch (e) { console.error('[db] enrich skipped (non-fatal):', e.message); }
+  try { await seedRealism(); } catch (e) { console.error('[db] realism skipped (non-fatal):', e.message); }
 }
 
 module.exports = { db, init, hashPassword, verifyPassword, recomputeReadiness };
