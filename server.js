@@ -851,6 +851,20 @@ const server = http.createServer(async (req,res)=>{
         await db.prepare('UPDATE jobs SET status=? WHERE id=? AND employer_id=?').run(status, jobId, user.id);
         return redirect(res, url.searchParams.get('from')==='list' ? '/console/jobs' : `/console/jobs/${jobId}`);
       }
+      const jEdit = p.match(/^\/console\/jobs\/(\d+)\/edit$/);
+      if(jEdit){
+        const jobId = Number(jEdit[1]);
+        const job = await db.prepare('SELECT * FROM jobs WHERE id=? AND employer_id=?').get(jobId, user.id);
+        if(!job) return send(res, V.layout({title:'Not found',user,body:'<section class="wrap"><div class="card">Job not found.</div></section>'}),404);
+        if(method==='GET') return send(res, V.layout({title:'Edit job',user,active:'jobs',body:V.empJobForm('', job)}));
+        const b = await readBody(req);
+        if(!b.title) return send(res, V.layout({title:'Edit job',user,active:'jobs',body:V.empJobForm('Title is required.', {...job, ...b, req_creds:[].concat(b.req_creds||[]).join(',')})}));
+        const reqCreds = [].concat(b.req_creds||[]).filter(Boolean).join(',');
+        const empType = V.JOB_TYPES.includes(b.employment_type) ? b.employment_type : (job.employment_type||'Full-time');
+        await db.prepare(`UPDATE jobs SET title=?,trade=?,pay_min=?,pay_max=?,city=?,zip=?,shift=?,req_creds=?,descr=?,employment_type=? WHERE id=? AND employer_id=?`)
+          .run(String(b.title).slice(0,120), b.trade||job.trade, Number(b.pay_min)||0, Number(b.pay_max)||0, b.city||'', b.zip||'', b.shift||'Day', reqCreds, String(b.descr||'').slice(0,2000), empType, jobId, user.id);
+        return redirect(res, `/console/jobs/${jobId}`);
+      }
 
       const jid = qid(p);
       if(jid && p===`/console/jobs/${jid}` && method==='GET'){

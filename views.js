@@ -1188,25 +1188,29 @@ function empJobs({ jobs }) {
 }
 
 const JOB_TYPES = ['Full-time','Part-time','Contract','Temp','Apprenticeship','Outcome-based'];
-function empJobForm(error='') {
-  const opts = tradeOptionsGrouped();
-  const cred = Object.entries(CRED_KINDS).map(([k,v])=>`<label class="ck"><input type="checkbox" name="req_creds" value="${k}"> ${v}</label>`).join('');
-  const typeOpts = JOB_TYPES.map(t=>`<option>${t}</option>`).join('');
+function empJobForm(error='', job=null) {
+  const editing = !!job;
+  const opts = tradeOptionsGrouped(editing ? job.trade : '');
+  const reqSet = new Set(String(editing ? (job.req_creds||'') : '').split(',').map(s=>s.trim()).filter(Boolean));
+  const cred = Object.entries(CRED_KINDS).map(([k,v])=>`<label class="ck"><input type="checkbox" name="req_creds" value="${k}" ${reqSet.has(k)?'checked':''}> ${v}</label>`).join('');
+  const typeOpts = JOB_TYPES.map(t=>`<option ${editing&&job.employment_type===t?'selected':''}>${t}</option>`).join('');
+  const shiftOpts = ['Day','Night','4x10','Any'].map(s=>`<option ${editing&&job.shift===s?'selected':''}>${s}</option>`).join('');
+  const v = (k, dflt='') => editing && job[k]!=null ? esc(job[k]) : dflt;
   return `<section class="wrap narrow"><div class="card">
-    <h2>${T('Post a job')}</h2><p class="muted">${T("It's matched against the verified talent pool instantly.")}</p>
+    <h2>${editing?T('Edit job'):T('Post a job')}</h2><p class="muted">${editing?T('Changes update matching and the live posting instantly.'):T("It's matched against the verified talent pool instantly.")}</p>
     ${error?`<div class="err">${esc(error)}</div>`:''}
-    <form method="post" action="/console/jobs/new">
-      <label>Title <input name="title" required placeholder="Commercial Electrician"></label>
-      <div class="row2"><label>Trade <select name="trade">${opts}</select></label>
-        <label>Employment type <select name="employment_type">${typeOpts}</select></label></div>
-      <div class="row2"><label>Pay min ($/hr) <input type="number" name="pay_min" value="36"></label>
-        <label>Pay max ($/hr) <input type="number" name="pay_max" value="48"></label></div>
-      <div class="row2"><label>City <input name="city" value="Phoenix"></label>
-        <label>ZIP <input name="zip" value="85004"></label></div>
-      <label>Shift <select name="shift"><option>Day</option><option>Night</option><option>4x10</option></select></label>
-      <label>Required credentials</label><div class="ckrow">${cred}</div>
-      <label>Description <textarea name="descr" rows="3"></textarea></label>
-      <button class="btn full">Post & match</button>
+    <form method="post" action="${editing?`/console/jobs/${job.id}/edit`:'/console/jobs/new'}">
+      <label>${T('Title')} <input name="title" required placeholder="Commercial Electrician" value="${v('title')}"></label>
+      <div class="row2"><label>${T('Trade')} <select name="trade">${opts}</select></label>
+        <label>${T('Employment type')} <select name="employment_type">${typeOpts}</select></label></div>
+      <div class="row2"><label>${T('Pay min ($/hr)')} <input type="number" name="pay_min" value="${v('pay_min','36')}"></label>
+        <label>${T('Pay max ($/hr)')} <input type="number" name="pay_max" value="${v('pay_max','48')}"></label></div>
+      <div class="row2"><label>${T('City')} <input name="city" value="${v('city','Phoenix')}"></label>
+        <label>${T('ZIP')} <input name="zip" value="${v('zip','85004')}"></label></div>
+      <label>${T('Shift')} <select name="shift">${shiftOpts}</select></label>
+      <label>${T('Required credentials')}</label><div class="ckrow">${cred}</div>
+      <label>${T('Description')} <textarea name="descr" rows="3">${v('descr')}</textarea></label>
+      <button class="btn full">${editing?T('Save changes'):T('Post & match')}</button>
     </form>
   </div></section>`;
 }
@@ -1227,7 +1231,8 @@ function empPipeline({ job, columns, candidates, jobMedia = [], alerted = 0 }) {
     <a class="back" href="/console/jobs">← All jobs</a>
     <div class="page-h"><h2>${esc(T(job.title))} ${job.status==='closed'?`<span class="closed-tag">${T('Closed')}</span>`:''}</h2>
       <p class="muted">$${job.pay_min}–${job.pay_max}/hr · ${esc(job.city)}</p>
-      <form method="post" action="/console/jobs/${job.id}/${job.status==='closed'?'reopen':'close'}" class="right"><button class="btn-sm ${job.status==='closed'?'':'ghost'}">${job.status==='closed'?T('Reopen job'):T('Close job')}</button></form></div>
+      <a class="btn-sm ghost right" href="/console/jobs/${job.id}/edit">${T('Edit')}</a>
+      <form method="post" action="/console/jobs/${job.id}/${job.status==='closed'?'reopen':'close'}"><button class="btn-sm ${job.status==='closed'?'':'ghost'}">${job.status==='closed'?T('Reopen job'):T('Close job')}</button></form></div>
     ${job.status==='closed'?`<div class="card warn-card">${T('This job is closed — it’s hidden from worker search and the map. Reopen it to keep matching.')}</div>`:''}
     ${alerted>0?`<div class="ok-card">${icon('bell','xic')} ${alerted} matching worker${alerted===1?'':'s'} with alerts on ${alerted===1?'was':'were'} notified about this job.</div>`:''}
     <div class="card">
