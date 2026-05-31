@@ -154,7 +154,10 @@ async function rankJobsForWorker(uid){
     if(home && j.zip){ if(!(j.zip in zc)) zc[j.zip] = await geocodeZip(j.zip); distance = zc[j.zip] ? haversineMi(home, zc[j.zip]) : null; }
     out.push({job:j, score:r.score, missing:r.missing, distance, needZip});
   }
-  return out.sort((a,b)=>b.score-a.score);
+  // Default ranking blends fit with proximity so intra-metro work surfaces first
+  // (without hiding strong far matches). Pure fit/distance sorts still available via filters.
+  const locBonus = d => d==null ? 0 : (d<=15 ? 14 : d<=40 ? 7 : d<=120 ? 0 : -12);
+  return out.sort((a,b)=> (b.score+locBonus(b.distance)) - (a.score+locBonus(a.distance)) || (a.distance??1e9)-(b.distance??1e9));
 }
 // distance in miles between a worker's home ZIP and an arbitrary ZIP (cached; null if unknown)
 async function workerDistance(prof, zip){
@@ -707,6 +710,8 @@ const server = http.createServer(async (req,res)=>{
         const needZip = matches.length ? !!matches[0].needZip : false;
         return send(res, V.layout({title:'Home',user,active:'home',body:V.workerHome({user,profile:prof,creds,matches,workCount,portCount,jobsGeo,isNew:isNewWorker,coach,needZip})}));
       }
+      if(p==='/app/agents' && method==='GET')
+        return send(res, V.layout({title:'Agents',user,active:'agents',body:V.agentsHub({mode:'worker'})}));
       if(p==='/app/coach' && method==='GET'){
         const reco = await coachReco(user.id);
         let line = '';
@@ -805,9 +810,18 @@ const server = http.createServer(async (req,res)=>{
       }
       if(p==='/app/credentials' && method==='POST'){
         const b = await readBody(req);
-        if(b.kind) await db.prepare('INSERT INTO credentials(user_id,kind,name,verified,expires) VALUES(?,?,?,1,?)')
+        // self-reported on add (unverified) — honest until proof is submitted & reviewed
+        if(b.kind) await db.prepare("INSERT INTO credentials(user_id,kind,name,verified,expires,verify_status) VALUES(?,?,?,0,?,'unverified')")
           .run(user.id, b.kind, M.CRED_KINDS[b.kind]||b.kind, b.expires||null);
         await recomputeReadiness(user.id);
+        return redirect(res,'/app/profile');
+      }
+      const credVerify = p.match(/^\/app\/credentials\/(\d+)\/verify$/);
+      if(credVerify && method==='POST'){
+        const cid = Number(credVerify[1]); const b = await readBody(req);
+        let proof = String(b.proof_url||'').trim().slice(0,500);
+        if(proof && !/^https?:\/\//i.test(proof)) proof = 'https://'+proof;
+        await db.prepare("UPDATE credentials SET proof_url=?, verify_status='review' WHERE id=? AND user_id=? AND verify_status!='verified'").run(proof||null, cid, user.id);
         return redirect(res,'/app/profile');
       }
       if(p==='/app/portfolio' && method==='POST'){
@@ -953,6 +967,8 @@ const server = http.createServer(async (req,res)=>{
         return send(res, V.layout({title:'Overview',user,active:'ov',body:V.empOverview({user,
           kpis:{openJobs:jobs.filter(j=>j.status==='open').length, pool, applicants, pipeline, hired}, funnel, recent, hot, alerts, fillRate, geo, isNew:jobs.length===0, talentTotal})}));
       }
+      if(p==='/console/agents' && method==='GET')
+        return send(res, V.layout({title:'Agents',user,active:'agents',body:V.agentsHub({mode:'employer'})}));
       if(p==='/console/analytics' && method==='GET'){
         const jobs = await db.prepare('SELECT * FROM jobs WHERE employer_id=?').all(user.id);
         const jobIds = jobs.map(j=>j.id);

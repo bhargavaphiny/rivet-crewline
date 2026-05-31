@@ -72,7 +72,7 @@ const I18N = {
     nav_login:'Log in', nav_get_started:'Get started', nav_home:'Home', nav_find_work:'Jobs',
     nav_work_card:'Work Card', nav_applications:'Applications', nav_training:'Learn', nav_pulse:'Pulse', nav_messages:'Messages',
     nav_hiring:'Hiring →', nav_working:'Working →', nav_logout:'Log out', mode_work:'Work', mode_hire:'Hire',
-    nav_overview:'Overview', nav_talent:'Talent', nav_jobs:'Jobs', nav_analytics:'Analytics',
+    nav_overview:'Overview', nav_talent:'Talent', nav_jobs:'Jobs', nav_analytics:'Analytics', nav_agents:'Agents',
     hero_tag:'The blue-collar hiring platform · U.S.',
     hero_h1a:"America can't ", hero_build:'build', hero_h1b:' what it can\'t ', hero_staff:'staff.',
     hero_lead:'Rivet prepares skilled-trade workers to get hired and certified. Crewline gives employers verified, job-ready crews — fast.',
@@ -119,7 +119,7 @@ const I18N = {
     nav_login:'Entrar', nav_get_started:'Empezar', nav_home:'Inicio', nav_find_work:'Empleos',
     nav_work_card:'Mi perfil', nav_applications:'Solicitudes', nav_training:'Aprender', nav_pulse:'Pulso', nav_messages:'Mensajes',
     nav_hiring:'Contratar →', nav_working:'Trabajar →', nav_logout:'Salir', mode_work:'Trabajo', mode_hire:'Contratar',
-    nav_overview:'Resumen', nav_talent:'Talento', nav_jobs:'Empleos', nav_analytics:'Analíticas',
+    nav_overview:'Resumen', nav_talent:'Talento', nav_jobs:'Empleos', nav_analytics:'Analíticas', nav_agents:'Agentes',
     hero_tag:'La plataforma de empleo para oficios · EE. UU.',
     hero_h1a:'Estados Unidos no puede ', hero_build:'construir', hero_h1b:' lo que no puede ', hero_staff:'dotar de personal.',
     hero_lead:'Rivet prepara a trabajadores de oficios para ser contratados y certificados. Crewline da a las empresas cuadrillas verificadas y listas para trabajar — rápido.',
@@ -243,6 +243,20 @@ const BUILTIN_ES = {
   'Build my card by chat':'Crea mi tarjeta por chat',
   'add ZIP for distance':'agrega tu código postal para ver distancia',
   'Add your ZIP to your Work Card to see how far each job is.':'Agrega tu código postal a tu tarjeta de trabajo para ver a qué distancia está cada empleo.',
+  // agents hub
+  'Agents':'Agentes','AI that works for you — grounded in real data, explainable, free.':'IA que trabaja para ti — basada en datos reales, explicable y gratis.',
+  'Finds the one credential that unlocks the most jobs and pay for you, and how to earn it.':'Encuentra la credencial que te desbloquea más empleos y mejor pago, y cómo obtenerla.',
+  'Auto-applies you to the best-fit, closest open jobs — your verified Work Card attached.':'Te postula automáticamente a los empleos más afines y cercanos — con tu tarjeta de trabajo verificada.',
+  'Builds your Work Card by chat — just answer in your own words, English or Spanish.':'Construye tu tarjeta de trabajo por chat — responde con tus palabras, en inglés o español.',
+  'Open Coach':'Abrir asesor','Start chat':'Iniciar chat',
+  'Scans every verified worker and auto-adds the strongest matches to a job’s pipeline.':'Escanea a cada trabajador verificado y agrega las mejores coincidencias al proceso de un empleo.',
+  'Generates tailored pre-qualifying questions and a fit summary for any candidate.':'Genera preguntas de pre-calificación a la medida y un resumen de idoneidad para cualquier candidato.',
+  'Proposes interview times to a shortlisted candidate in one click.':'Propone horarios de entrevista a un candidato preseleccionado con un clic.',
+  'Pick a job →':'Elige un empleo →','Open a candidate →':'Abre un candidato →',
+  // credential verification
+  'Verified':'Verificado','Expiring':'Por vencer','In review':'En revisión','Self-reported':'Auto-reportado','proof ↗':'prueba ↗',
+  'Link to proof (card photo, license #, URL)':'Enlace de prueba (foto de la tarjeta, n.º de licencia, URL)',
+  'Request verification':'Solicitar verificación','Update':'Actualizar',
 };
 function T(s){
   if(LANG !== 'es' || !s) return s;
@@ -290,14 +304,14 @@ function layout({ title, user, body, active = '', flash = '' }) {
   } else if ((user.mode || user.role) === 'worker') {
     const L = (h,l,k)=>`<a class="nav-link ${active===k?'on':''}" href="${h}">${l}</a>`;
     const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/app/messages">${t('nav_messages')}${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
-    nav = `${L('/app',t('nav_home'),'home')}${L('/app/jobs',t('nav_find_work'),'jobs')}${L('/app/profile',t('nav_work_card'),'profile')}${L('/app/applications',t('nav_applications'),'apps')}${L('/app/training',t('nav_training'),'training')}${L('/pulse',t('nav_pulse'),'pulse')}${msg}
+    nav = `${L('/app',t('nav_home'),'home')}${L('/app/jobs',t('nav_find_work'),'jobs')}${L('/app/agents',t('nav_agents'),'agents')}${L('/app/profile',t('nav_work_card'),'profile')}${L('/app/applications',t('nav_applications'),'apps')}${L('/app/training',t('nav_training'),'training')}${L('/pulse',t('nav_pulse'),'pulse')}${msg}
            ${modeTg('work')}
            <span class="who">${initials(user.name)}</span>
            <a class="nav-link" href="/logout">${t('nav_logout')}</a>${langTg}`;
   } else {
     const L = (h,l,k)=>`<a class="nav-link ${active===k?'on':''}" href="${h}">${l}</a>`;
     const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/console/messages">${t('nav_messages')}${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
-    nav = `${L('/console',t('nav_overview'),'ov')}${L('/console/search',t('nav_talent'),'search')}${L('/console/jobs',t('nav_jobs'),'jobs')}${L('/console/analytics',t('nav_analytics'),'analytics')}${L('/pulse',t('nav_pulse'),'pulse')}${msg}
+    nav = `${L('/console',t('nav_overview'),'ov')}${L('/console/search',t('nav_talent'),'search')}${L('/console/jobs',t('nav_jobs'),'jobs')}${L('/console/agents',t('nav_agents'),'agents')}${L('/console/analytics',t('nav_analytics'),'analytics')}${L('/pulse',t('nav_pulse'),'pulse')}${msg}
            ${modeTg('hire')}
            <a class="who" href="/console/company" title="Company profile">${initials(user.company||user.name)}</a>
            <a class="nav-link" href="/logout">${t('nav_logout')}</a>${langTg}`;
@@ -325,7 +339,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=49">
+  <link rel="stylesheet" href="/styles.css?v=50">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -575,7 +589,7 @@ function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 
         </div>`:''}
         <div class="card">
           <div class="sec-h" style="margin-top:0">${t('home_wallet')} <a href="/app/profile">${t('home_manage')}</a></div>
-          ${creds.slice(0,4).map(credRow).join('') || `<p class="muted">${t('step_cred')}</p>`}
+          ${creds.slice(0,4).map(c=>credRow(c)).join('') || `<p class="muted">${t('step_cred')}</p>`}
         </div>
         ${expiring?`<div class="card warn-card">${icon('warn','xic')} <span>${expiring} ${expiring===1?t('cred_expiring_one'):t('cred_expiring_many')}</span> · <a href="/app/profile">${t('home_manage')}</a></div>`:''}
         <div class="card">
@@ -662,6 +676,31 @@ function onboardChat({ question = '', placeholder = '', transcript = [], done = 
   </section>`;
 }
 
+// ---------- agents hub (discoverability, both sides) ----------
+function agentsHub({ mode }){
+  const worker = [
+    { title:T('Career Coach'), desc:T('Finds the one credential that unlocks the most jobs and pay for you, and how to earn it.'), action:`<a class="btn-sm" href="/app/coach">${T('Open Coach')}</a>` },
+    { title:T('Apply Agent'), desc:T('Auto-applies you to the best-fit, closest open jobs — your verified Work Card attached.'), action:`<form method="post" action="/app/agent/apply">${' '}<button class="btn-sm">${T('Apply for me')}</button></form>` },
+    { title:T('Onboarding Agent'), desc:T('Builds your Work Card by chat — just answer in your own words, English or Spanish.'), action:`<a class="btn-sm" href="/app/onboard/chat">${T('Start chat')}</a>` },
+  ];
+  const recruiter = [
+    { title:T('Sourcing Agent'), desc:T('Scans every verified worker and auto-adds the strongest matches to a job’s pipeline.'), action:`<a class="btn-sm" href="/console/jobs">${T('Pick a job →')}</a>` },
+    { title:T('Screening Agent'), desc:T('Generates tailored pre-qualifying questions and a fit summary for any candidate.'), action:`<a class="btn-sm" href="/console/search">${T('Open a candidate →')}</a>` },
+    { title:T('Scheduling Agent'), desc:T('Proposes interview times to a shortlisted candidate in one click.'), action:`<a class="btn-sm" href="/console/search">${T('Open a candidate →')}</a>` },
+  ];
+  const items = mode==='employer' ? recruiter : worker;
+  return `<section class="wrap">
+    <div class="page-h"><h2>${icon('spark','xic')} ${T('Agents')}</h2><p class="muted">${T('AI that works for you — grounded in real data, explainable, free.')}</p></div>
+    <div class="grid2">
+      ${items.map(a=>`<div class="card agent-card">
+        <div class="agent-h">${icon('spark','xic')} ${esc(a.title)}</div>
+        <p class="agent-line">${esc(a.desc)}</p>
+        <div class="agent-act">${a.action}</div>
+      </div>`).join('')}
+    </div>
+  </section>`;
+}
+
 function jobCard(m, bare = false){
   const j = m.job;
   const fit = (m.missing && m.missing.length)
@@ -703,13 +742,21 @@ function tradeOptionsGrouped(sel=''){
   return html;
 }
 
-function credRow(c){
-  const verified = c.verified;
-  const soon = c.expires && c.expires < '2026-08';
+function credRow(c, editable = false){
+  const st = c.verify_status || (c.verified ? 'verified' : 'unverified');
+  const soon = c.verified && c.expires && c.expires < '2026-08';
+  const ic = st==='verified' ? '✅' : (st==='review' ? '⏳' : '⬜');
+  const badge = st==='verified'
+    ? `<span class="v ${soon?'soon':'ok'}">${soon?T('Expiring'):T('Verified')}</span>`
+    : (st==='review' ? `<span class="v review">${T('In review')}</span>` : `<span class="v pending">${T('Self-reported')}</span>`);
+  const reqForm = (editable && st!=='verified') ? `<form method="post" action="/app/credentials/${c.id}/verify" class="cred-verify">
+      <input name="proof_url" placeholder="${T('Link to proof (card photo, license #, URL)')}" maxlength="500"${st==='review'&&c.proof_url?` value="${esc(c.proof_url)}"`:''}>
+      <button class="btn-xs">${st==='review'?T('Update'):T('Request verification')}</button>
+    </form>` : '';
   return `<div class="cred">
-    <div class="cred-ic">${verified?'✅':'⬜'}</div>
-    <div class="cred-main"><div class="cred-nm">${esc(c.name)}</div><div class="cred-ex">${c.expires?('exp '+esc(c.expires)):'no expiry'}</div></div>
-    <span class="v ${verified?(soon?'soon':'ok'):'pending'}">${verified?(soon?'Expiring':'Verified'):'Pending'}</span>
+    <div class="cred-ic">${ic}</div>
+    <div class="cred-main"><div class="cred-nm">${esc(c.name)}</div><div class="cred-ex">${c.expires?('exp '+esc(c.expires)):'no expiry'}${c.proof_url&&st!=='verified'?` · <a href="${esc(c.proof_url)}" target="_blank" rel="noopener">${T('proof ↗')}</a>`:''}</div>${reqForm}</div>
+    ${badge}
   </div>`;
 }
 
@@ -972,7 +1019,7 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [],
     </div><div class="colstack">
     <div class="card">
       <div class="sec-h" style="margin-top:0">${T('Credential Wallet')}</div>
-      ${creds.map(credRow).join('') || `<p class="muted">${T('No credentials yet — add one below.')}</p>`}
+      ${creds.map(c=>credRow(c, true)).join('') || `<p class="muted">${T('No credentials yet — add one below.')}</p>`}
     </div>
     <div class="card">
       <div class="sec-h" style="margin-top:0">${T('Add a credential')}</div>
@@ -1112,7 +1159,7 @@ function publicPortfolio({ worker, profile, creds, portfolio, work = [], rating 
       ${work.length?`<div class="card"><div class="sec-h" style="margin-top:0">Work history</div>${workHistoryList(work, false)}</div>`:''}
       <div class="card">
         <div class="sec-h" style="margin-top:0">Verified credentials</div>
-        ${creds.filter(c=>c.verified).map(credRow).join('') || '<p class="muted">No verified credentials listed.</p>'}
+        ${creds.filter(c=>c.verified).map(c=>credRow(c)).join('') || '<p class="muted">No verified credentials listed.</p>'}
       </div>
       <div class="card">
         <div class="sec-h" style="margin-top:0">Work portfolio</div>
@@ -1595,7 +1642,7 @@ function empCandidate({ worker, profile, creds, matches, apps, messages, meId, n
     ${work.length?`<div class="card"><div class="sec-h" style="margin-top:0">Work history</div>${workHistoryList(work, false)}</div>`:''}
     <div class="card">
       <div class="sec-h" style="margin-top:0">Credential wallet</div>
-      ${creds.map(credRow).join('') || '<p class="muted">No credentials listed yet.</p>'}
+      ${creds.map(c=>credRow(c)).join('') || '<p class="muted">No credentials listed yet.</p>'}
     </div>
     <div class="card">
       <div class="sec-h" style="margin-top:0">Portfolio <a href="/p/${worker.id}" target="_blank" rel="noopener">Public page ↗</a></div>
@@ -1680,4 +1727,4 @@ function ogImage() {
 }
 
 module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat };
+  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub };

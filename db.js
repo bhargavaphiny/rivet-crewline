@@ -924,6 +924,8 @@ async function migrate() {
   try { await db.exec('ALTER TABLE users ADD COLUMN company_website TEXT'); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE users ADD COLUMN company_city TEXT'); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE users ADD COLUMN company_size TEXT'); } catch (e) { /* column exists */ }
+  try { await db.exec('ALTER TABLE credentials ADD COLUMN proof_url TEXT'); } catch (e) { /* column exists */ }
+  try { await db.exec("ALTER TABLE credentials ADD COLUMN verify_status TEXT DEFAULT 'unverified'"); } catch (e) { /* column exists */ }
 }
 
 async function seedZips() {
@@ -982,6 +984,13 @@ async function init() {
   try { await seedUsajobs(); } catch (e) { console.error('[db] usajobs seed skipped (non-fatal):', e.message); }
   try { await seedActivity2(); } catch (e) { console.error('[db] activity2 seed skipped (non-fatal):', e.message); }
   try { await seedReviews(); } catch (e) { console.error('[db] reviews seed skipped (non-fatal):', e.message); }
+  try {
+    if(!(await metaGet('credstatus_v1'))){
+      await db.exec("UPDATE credentials SET verify_status='verified' WHERE verified=1");
+      await db.exec("UPDATE credentials SET verify_status='unverified' WHERE verified=0 AND (verify_status IS NULL OR verify_status='')");
+      await metaSet('credstatus_v1','1');
+    }
+  } catch (e) { console.error('[db] cred-status backfill skipped (non-fatal):', e.message); }
   try {
     if(!(await metaGet('xfactor_v1'))){
       // own tools (most trades), reliable transport, bilingual — high-signal flags for recruiters

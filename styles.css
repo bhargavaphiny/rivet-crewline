@@ -148,6 +148,10 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--brand)}
 .v.ok{background:rgba(31,169,113,.13);color:#157a52}
 .v.soon{background:rgba(226,69,59,.1);color:#b7322a}
 .v.pending{background:var(--paper);color:var(--muted)}
+.v.review{background:rgba(204,138,51,.15);color:#9a6a1f}
+.cred-verify{display:flex;gap:6px;margin-top:6px}
+.cred-verify input{flex:1;min-width:120px;font-size:12px;padding:5px 8px}
+.cred-verify .btn-xs{white-space:nowrap}
 .cred-chip{display:inline-block;font-size:10.5px;background:rgba(46,111,183,.1);color:var(--blue);font-weight:700;padding:2px 8px;border-radius:12px;margin:2px}
 
 .profile-head{text-align:center}
