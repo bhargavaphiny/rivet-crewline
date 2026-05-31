@@ -54,7 +54,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=9">
+  <link rel="stylesheet" href="/styles.css?v=10">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -275,7 +275,7 @@ function workerJobs({ matches }) {
 }
 
 // ---------- worker: job detail ----------
-function jobDetail({ job, match, applied }) {
+function jobDetail({ job, match, applied, saved = false }) {
   return `<section class="wrap narrow">
     <a class="back" href="/app/jobs">← All matches</a>
     <div class="card">
@@ -300,7 +300,33 @@ function jobDetail({ job, match, applied }) {
       ${applied
         ? `<div class="ok-card">✓ Applied — the employer can see your verified Work Card.</div>`
         : `<form method="post" action="/app/jobs/${job.id}/apply"><button class="btn full">Apply with verified Work Card</button></form>`}
+      <form method="post" action="/app/jobs/${job.id}/save"><button class="btn full ghost">${saved?'★ Saved — remove':'☆ Save this job'}</button></form>
     </div>
+  </section>`;
+}
+
+// ---------- worker: applications + saved jobs ----------
+function stageTimeline(current){
+  const idx = STAGES.indexOf(current);
+  return `<div class="timeline">${STAGES.map((s,i)=>`<div class="tl-step ${i<idx?'done':''}${i===idx?'now':''}"><span class="tl-dot"></span><span class="tl-lbl">${s}</span></div>`).join('')}</div>`;
+}
+function workerApplications({ apps, savedJobs }) {
+  return `<section class="wrap">
+    <div class="sec-h big">Your applications</div>
+    ${apps.length ? apps.map(a=>`<div class="card app-card">
+      <div class="job-row"><div class="badge">${tradeEmoji(a.trade)}</div>
+        <div class="job-main"><h4>${esc(a.title)}</h4>
+          <div class="muted">${esc(a.company||'')} · ${esc(a.city)} · $${a.pay_min}–${a.pay_max}/hr</div></div>
+        <span class="score-tag ${scoreClass(a.score)}">${a.score}</span></div>
+      ${stageTimeline(a.stage)}
+    </div>`).join('') : '<div class="card muted">No applications yet. <a href="/app/jobs">Browse matches →</a></div>'}
+    <div class="sec-h big" style="margin-top:26px">Saved jobs</div>
+    ${savedJobs.length ? savedJobs.map(j=>`<a class="jobline" href="/app/jobs/${j.id}">
+        <div class="jl-left"><div class="badge">${tradeEmoji(j.trade)}</div>
+          <div><h4>${esc(j.title)}</h4><div class="muted">${esc(j.company||'')} · ${esc(j.city)} · $${j.pay_min}–${j.pay_max}/hr · ${esc(j.shift)}</div></div></div>
+        <span class="nav-link" style="color:var(--orange-d)">View →</span>
+      </a>`).join('')
+      : '<div class="card muted">No saved jobs yet. Tap ☆ Save on any job to keep it here.</div>'}
   </section>`;
 }
 function bd(label,val,max){const pct=Math.round(val/max*100);return `<div class="bd"><span>${label}</span><div class="bdbar"><i style="width:${pct}%"></i></div><b>${val}/${max}</b></div>`;}
@@ -590,4 +616,4 @@ function ogImage() {
 }
 
 module.exports = { layout, landing, authForm, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, empOverview, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES };
+  jobDetail, workerProfile, workerApplications, empOverview, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES };

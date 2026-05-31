@@ -209,6 +209,17 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--orange)}
 .foot-col a:hover{color:var(--amber)}
 .foot-base{border-top:1px solid rgba(255,255,255,.1);margin-top:26px;padding-top:18px;font-size:12.5px;color:#8da0ab}
 
+/* application timeline */
+.app-card .job-row{align-items:center}
+.timeline{display:flex;justify-content:space-between;margin-top:14px;position:relative}
+.timeline:before{content:"";position:absolute;top:7px;left:6%;right:6%;height:2px;background:var(--line)}
+.tl-step{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;position:relative;z-index:1}
+.tl-dot{width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid var(--line)}
+.tl-lbl{font-size:11px;color:var(--muted)}
+.tl-step.done .tl-dot{background:var(--green);border-color:var(--green)}
+.tl-step.now .tl-dot{background:var(--orange);border-color:var(--orange);box-shadow:0 0 0 4px rgba(255,106,26,.18)}
+.tl-step.now .tl-lbl{color:var(--ink);font-weight:700}
+
 /* messaging */
 .ndot{display:inline-grid;place-items:center;min-width:16px;height:16px;padding:0 4px;margin-left:5px;background:var(--orange);color:#fff;font-size:10px;font-weight:800;border-radius:9px;vertical-align:middle}
 .thread{display:flex;flex-direction:column;gap:8px;margin:6px 0 14px;max-height:340px;overflow-y:auto}

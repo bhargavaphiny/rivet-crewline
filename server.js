@@ -265,21 +265,25 @@ const server = http.createServer(async (req,res)=>{
         const apps = await db.prepare(`SELECT a.*, j.title,j.trade,j.pay_min,j.pay_max,j.city,u.company
           FROM applications a JOIN jobs j ON j.id=a.job_id JOIN users u ON u.id=j.employer_id
           WHERE a.worker_id=? ORDER BY a.created_at DESC`).all(user.id);
-        const body = `<section class="wrap"><div class="sec-h big">Your applications</div>
-          ${apps.map(a=>`<div class="card jobline-static"><div class="jl-left"><div class="badge">${({electrician:'⚡',hvac:'🔧',controls:'🏭'}[a.trade]||'🧰')}</div>
-            <div><h4>${a.title}</h4><div class="muted">${a.company||''} · ${a.city} · $${a.pay_min}–${a.pay_max}/hr</div></div></div>
-            <div><span class="stage-pill">${a.stage}</span> <span class="score-tag ${a.score>=85?'s-hi':a.score>=70?'s-md':'s-lo'}">${a.score}</span></div></div>`).join('')
-            || '<div class="card muted">No applications yet. <a href="/app/jobs">Browse matches →</a></div>'}
-          </section>`;
-        return send(res, V.layout({title:'Applications',user,active:'apps',body}));
+        const savedJobs = await db.prepare(`SELECT j.*, u.company FROM saved_jobs s
+          JOIN jobs j ON j.id=s.job_id JOIN users u ON u.id=j.employer_id
+          WHERE s.worker_id=? ORDER BY s.created_at DESC`).all(user.id);
+        return send(res, V.layout({title:'Applications',user,active:'apps',body:V.workerApplications({apps, savedJobs})}));
       }
       const jid = qid(p);
+      if(jid && p===`/app/jobs/${jid}/save` && method==='POST'){
+        const exists = await db.prepare('SELECT 1 FROM saved_jobs WHERE worker_id=? AND job_id=?').get(user.id, jid);
+        if(exists) await db.prepare('DELETE FROM saved_jobs WHERE worker_id=? AND job_id=?').run(user.id, jid);
+        else { try { await db.prepare('INSERT INTO saved_jobs(worker_id,job_id) VALUES(?,?)').run(user.id, jid); } catch(e){} }
+        return redirect(res, `/app/jobs/${jid}`);
+      }
       if(jid && p===`/app/jobs/${jid}` && method==='GET'){
         const job = await db.prepare(`SELECT j.*,u.company FROM jobs j JOIN users u ON u.id=j.employer_id WHERE j.id=?`).get(jid);
         if(!job) return send(res, V.layout({title:'Not found',user,body:'<section class="wrap"><div class="card">Job not found.</div></section>'}),404);
         const match = M.scoreMatch(prof, await getCreds(user.id), job);
         const applied = !!(await db.prepare('SELECT 1 FROM applications WHERE job_id=? AND worker_id=?').get(jid,user.id));
-        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied})}));
+        const saved = !!(await db.prepare('SELECT 1 FROM saved_jobs WHERE worker_id=? AND job_id=?').get(user.id, jid));
+        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied,saved})}));
       }
       if(jid && p===`/app/jobs/${jid}/apply` && method==='POST'){
         const job = await db.prepare('SELECT * FROM jobs WHERE id=?').get(jid);
