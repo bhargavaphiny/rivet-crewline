@@ -248,12 +248,24 @@ const CITY_STATE = {
   Miami:'FL', Tampa:'FL', Nashville:'TN', Charlotte:'NC', Columbus:'OH',
   'Kansas City':'MO', 'Salt Lake City':'UT', Portland:'OR', Minneapolis:'MN', Detroit:'MI',
 };
+// City / metro minimum wages that exceed their state floor (approx. 2025 $/hr).
+const CITY_MIN_WAGE = {
+  Seattle:20.76, 'San Francisco':18.67, 'Los Angeles':17.28, Denver:18.81, Chicago:16.20,
+  'New York':16.50, Flagstaff:17.85, Tucson:14.25, Portland:15.95, Minneapolis:15.97, Tempe:15.00,
+};
 function stateForCity(city){ return CITY_STATE[String(city||'').trim()] || null; }
 function localRules(city){
   const st = stateForCity(city);
   if(!st) return null;
-  return { state: st, stateName: STATE_NAME[st]||st, minWage: STATE_MIN_WAGE[st] || 7.25,
-    overtime: 'Overtime (1.5×) after 40 hrs/week' };
+  const stateWage = STATE_MIN_WAGE[st] || 7.25;
+  const cityWage = CITY_MIN_WAGE[String(city||'').trim()] || 0;
+  const cityApplies = cityWage > stateWage;
+  return {
+    state: st, stateName: STATE_NAME[st]||st, city: String(city||'').trim(),
+    stateWage, cityWage, minWage: cityApplies ? cityWage : stateWage,
+    level: cityApplies ? `${String(city||'').trim()} (city)` : `${STATE_NAME[st]||st} (state)`,
+    cityApplies, overtime: 'Overtime (1.5×) after 40 hrs/week',
+  };
 }
 
 const clamp = (n, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, n));

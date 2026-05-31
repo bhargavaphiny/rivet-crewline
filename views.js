@@ -271,7 +271,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=43">
+  <link rel="stylesheet" href="/styles.css?v=44">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -623,13 +623,13 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
       </div>
       <p class="descr">${esc(T(job.descr))}</p>
       ${rules?`<div class="rules">
-        <div class="rules-h">${T('Local pay & rules')} · ${esc(rules.stateName)}</div>
+        <div class="rules-h">${T('Local pay & rules')} · ${esc(rules.level)}</div>
         <div class="rules-grid">
-          <div><span>${T('State minimum wage')}</span><b>$${rules.minWage.toFixed(2)}/hr</b></div>
+          <div><span>${T('Local minimum wage')}</span><b>$${rules.minWage.toFixed(2)}/hr</b></div>
           <div><span>${T('This job pays')}</span><b class="${belowMin?'r-bad':'r-good'}">$${job.pay_min}–${job.pay_max}/hr</b></div>
           <div><span>${T('Overtime')}</span><b>${T('1.5× after 40 hrs/wk')}</b></div>
         </div>
-        <p class="rules-note">${T('Employers must meet the higher of state, county or city minimum wage. Verify local rules before you start.')}</p>
+        <p class="rules-note">${rules.cityApplies?`${esc(rules.city)} ${T('sets a higher minimum than the state')} ($${rules.stateWage.toFixed(2)}). `:''}${T('Employers must meet the highest of federal, state, county or city minimum wage. Verify local rules before you start.')}</p>
       </div>`:''}
       ${jobMedia.length?`<div class="sec-h" style="margin-top:4px">The work</div>${mediaGallery(jobMedia)}`:''}
       <div class="breakdown">
@@ -677,12 +677,13 @@ function publicJob({ job, rules, jsonld }) {
       </div>
       <p class="descr">${esc(job.descr)}</p>
       ${rules?`<div class="rules">
-        <div class="rules-h">Local pay & rules · ${esc(rules.stateName)}</div>
+        <div class="rules-h">Local pay & rules · ${esc(rules.level)}</div>
         <div class="rules-grid">
-          <div><span>State minimum wage</span><b>$${rules.minWage.toFixed(2)}/hr</b></div>
+          <div><span>Local minimum wage</span><b>$${rules.minWage.toFixed(2)}/hr</b></div>
           <div><span>This job pays</span><b class="${belowMin?'r-bad':'r-good'}">$${job.pay_min}–${job.pay_max}/hr</b></div>
           <div><span>Overtime</span><b>1.5× after 40 hrs/wk</b></div>
         </div>
+        ${rules.cityApplies?`<p class="rules-note">${esc(rules.city)} sets a higher local minimum than ${esc(rules.stateName)} ($${rules.stateWage.toFixed(2)}/hr).</p>`:''}
       </div>`:''}
       ${isExternal(job)
         ? `<a class="btn full" href="${esc(job.apply_url)}" target="_blank" rel="noopener noreferrer">Apply on ${esc(job.source)} ↗</a>
