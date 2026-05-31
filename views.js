@@ -334,15 +334,47 @@ function workerProfile({ user, profile, creds, error }) {
 }
 
 // ================= EMPLOYER (Crewline) =================
-function empOverview({ user, kpis, hot, alerts }) {
+function timeAgo(sqlTs){
+  if(!sqlTs) return '';
+  const t = Date.parse(sqlTs.replace(' ','T')+'Z');
+  if(isNaN(t)) return '';
+  const s = Math.max(0, Math.floor((Date.now()-t)/1000));
+  if(s<60) return 'just now';
+  const m=Math.floor(s/60); if(m<60) return `${m}m ago`;
+  const h=Math.floor(m/60); if(h<24) return `${h}h ago`;
+  const d=Math.floor(h/24); if(d<30) return `${d}d ago`;
+  const mo=Math.floor(d/30); return `${mo}mo ago`;
+}
+function empOverview({ user, kpis, funnel, recent, hot, alerts, fillRate }) {
+  const maxF = Math.max(1, ...STAGES.map(s=>funnel[s]||0));
+  const funnelBars = STAGES.map(s=>`<div class="fn-row">
+      <span class="fn-lbl">${s}</span>
+      <div class="fn-bar"><i class="fn-${s.toLowerCase()}" style="width:${Math.round(((funnel[s]||0)/maxF)*100)}%"></i></div>
+      <b class="fn-n">${funnel[s]||0}</b>
+    </div>`).join('');
   return `<section class="wrap">
     <div class="page-h"><h2>Overview</h2><p class="muted">${esc(user.company||user.name)}</p>
       <a class="btn-sm right" href="/console/jobs/new">+ Post a job</a></div>
     <div class="kpis">
       ${kpi('Open jobs',kpis.openJobs)}
       ${kpi('Verified talent pool',kpis.pool)}
-      ${kpi('Applicants',kpis.applicants)}
       ${kpi('In pipeline',kpis.pipeline)}
+      ${kpi('Hired',kpis.hired)}
+      ${kpi('Fill rate',fillRate+'%')}
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <div class="sec-h" style="margin-top:0">Hiring funnel <span class="muted">${kpis.applicants} candidates</span></div>
+        ${kpis.applicants ? `<div class="funnel">${funnelBars}</div>` : '<p class="muted">No candidates in your pipeline yet. <a href="/console/search">Source from Talent Search →</a></p>'}
+      </div>
+      <div class="card">
+        <div class="sec-h" style="margin-top:0">Recent activity</div>
+        ${recent && recent.length ? recent.map(r=>`<div class="act">
+          <span class="av-t">${initials(r.name)}</span>
+          <div class="act-b"><a class="cand-link" href="/console/candidates/${r.worker_id}">${esc(r.name)}</a> entered <b>${esc(r.title)}</b> <span class="stage-pill sm">${esc(r.stage)}</span></div>
+          <span class="act-t">${timeAgo(r.created_at)}</span>
+        </div>`).join('') : '<p class="muted">No recent activity yet.</p>'}
+      </div>
     </div>
     <div class="grid2">
       <div class="card">

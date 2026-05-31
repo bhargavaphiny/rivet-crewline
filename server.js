@@ -258,8 +258,20 @@ const server = http.createServer(async (req,res)=>{
       if(p==='/console' && method==='GET'){
         const jobs = await db.prepare(`SELECT * FROM jobs WHERE employer_id=?`).all(user.id);
         const jobIds = jobs.map(j=>j.id);
-        const applicants = jobIds.length? (await db.prepare(`SELECT COUNT(*) c FROM applications WHERE job_id IN (${jobIds.map(()=>'?').join(',')})`).get(...jobIds)).c : 0;
-        const pipeline = jobIds.length? (await db.prepare(`SELECT COUNT(*) c FROM applications WHERE stage!='Sourced' AND job_id IN (${jobIds.map(()=>'?').join(',')})`).get(...jobIds)).c : 0;
+        const ph = jobIds.map(()=>'?').join(',');
+        const funnel = {Sourced:0,Screened:0,Interview:0,Offer:0,Hired:0};
+        let recent = [];
+        if(jobIds.length){
+          const rows = await db.prepare(`SELECT stage, COUNT(*) c FROM applications WHERE job_id IN (${ph}) GROUP BY stage`).all(...jobIds);
+          for(const r of rows){ if(funnel[r.stage]!==undefined) funnel[r.stage]=r.c; }
+          recent = await db.prepare(`SELECT a.created_at,a.stage,u.id worker_id,u.name,j.title
+            FROM applications a JOIN users u ON u.id=a.worker_id JOIN jobs j ON j.id=a.job_id
+            WHERE a.job_id IN (${ph}) ORDER BY a.created_at DESC, a.id DESC LIMIT 6`).all(...jobIds);
+        }
+        const applicants = Object.values(funnel).reduce((a,b)=>a+b,0);
+        const pipeline = applicants - funnel.Sourced;
+        const hired = funnel.Hired;
+        const fillRate = applicants ? Math.round((hired/applicants)*100) : 0;
         const pool = (await db.prepare(`SELECT COUNT(*) c FROM worker_profiles`).get()).c;
         const hot = await db.prepare(`SELECT u.id,u.name,p.trade,p.readiness,(SELECT COUNT(*) FROM credentials c WHERE c.user_id=u.id AND c.verified=1) vcount
           FROM users u JOIN worker_profiles p ON p.user_id=u.id WHERE u.role='worker' ORDER BY p.readiness DESC LIMIT 5`).all();
@@ -269,7 +281,7 @@ const server = http.createServer(async (req,res)=>{
         if(pipeline) alerts.push({lvl:'info',text:`⏳ ${pipeline} candidate(s) advancing in your pipeline.`});
         alerts.push({lvl:'ok',text:`✅ ${pool} verified workers available to match right now.`});
         return send(res, V.layout({title:'Overview',user,active:'ov',body:V.empOverview({user,
-          kpis:{openJobs:jobs.filter(j=>j.status==='open').length, pool, applicants, pipeline}, hot, alerts})}));
+          kpis:{openJobs:jobs.filter(j=>j.status==='open').length, pool, applicants, pipeline, hired}, funnel, recent, hot, alerts, fillRate})}));
       }
 
       if(p==='/console/jobs' && method==='GET'){

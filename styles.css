@@ -209,6 +209,21 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--orange)}
 .foot-col a:hover{color:var(--amber)}
 .foot-base{border-top:1px solid rgba(255,255,255,.1);margin-top:26px;padding-top:18px;font-size:12.5px;color:#8da0ab}
 
+/* recruiter funnel + activity */
+.funnel{display:flex;flex-direction:column;gap:10px}
+.fn-row{display:grid;grid-template-columns:84px 1fr 28px;align-items:center;gap:10px}
+.fn-lbl{font-size:12.5px;color:var(--slate);font-weight:600}
+.fn-bar{background:var(--paper);border:1px solid var(--line);border-radius:8px;height:18px;overflow:hidden}
+.fn-bar i{display:block;height:100%;border-radius:7px;min-width:2px}
+.fn-sourced{background:#9fb0bb}.fn-screened{background:var(--blue)}.fn-interview{background:var(--amber)}
+.fn-offer{background:var(--orange)}.fn-hired{background:var(--green)}
+.fn-n{font-size:13px;font-weight:800;text-align:right}
+.act{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:13px}
+.act:first-child{border-top:0}
+.act-b{flex:1}
+.act-t{color:var(--muted);font-size:11.5px;white-space:nowrap}
+.stage-pill.sm{font-size:10.5px;padding:1px 7px}
+
 /* candidate detail (recruiter) */
 .cand-link{color:inherit;font-weight:600;display:inline-flex;align-items:center;gap:8px}
 .cand-link:hover{color:var(--orange-d)}
