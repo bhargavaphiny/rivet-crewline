@@ -71,7 +71,7 @@ const I18N = {
     nav_login:'Log in', nav_get_started:'Get started', nav_home:'Home', nav_find_work:'Jobs',
     nav_work_card:'Work Card', nav_applications:'Applications', nav_training:'Learn', nav_pulse:'Pulse', nav_messages:'Messages',
     nav_hiring:'Hiring →', nav_working:'Working →', nav_logout:'Log out', mode_work:'Work', mode_hire:'Hire',
-    nav_overview:'Overview', nav_talent:'Talent', nav_jobs:'Jobs',
+    nav_overview:'Overview', nav_talent:'Talent', nav_jobs:'Jobs', nav_analytics:'Analytics',
     hero_tag:'The blue-collar hiring platform · U.S.',
     hero_h1a:"America can't ", hero_build:'build', hero_h1b:' what it can\'t ', hero_staff:'staff.',
     hero_lead:'Rivet prepares skilled-trade workers to get hired and certified. Crewline gives employers verified, job-ready crews — fast.',
@@ -118,7 +118,7 @@ const I18N = {
     nav_login:'Entrar', nav_get_started:'Empezar', nav_home:'Inicio', nav_find_work:'Empleos',
     nav_work_card:'Mi perfil', nav_applications:'Solicitudes', nav_training:'Aprender', nav_pulse:'Pulso', nav_messages:'Mensajes',
     nav_hiring:'Contratar →', nav_working:'Trabajar →', nav_logout:'Salir', mode_work:'Trabajo', mode_hire:'Contratar',
-    nav_overview:'Resumen', nav_talent:'Talento', nav_jobs:'Empleos',
+    nav_overview:'Resumen', nav_talent:'Talento', nav_jobs:'Empleos', nav_analytics:'Analíticas',
     hero_tag:'La plataforma de empleo para oficios · EE. UU.',
     hero_h1a:'Estados Unidos no puede ', hero_build:'construir', hero_h1b:' lo que no puede ', hero_staff:'dotar de personal.',
     hero_lead:'Rivet prepara a trabajadores de oficios para ser contratados y certificados. Crewline da a las empresas cuadrillas verificadas y listas para trabajar — rápido.',
@@ -195,6 +195,14 @@ const BUILTIN_ES = {
   'Open roles hiring now':'Empleos disponibles ahora','There are':'Hay','Hiring funnel':'Embudo de contratación','candidates':'candidatos',
   "Here's what's hiring across the country right now. Add your trade to get matched to the best-fit jobs near you — it takes a minute.":'Esto es lo que se está contratando en todo el país ahora. Agrega tu oficio para encontrar los empleos que mejor te quedan cerca de ti — toma un minuto.',
   'verified blue-collar workers ready across the U.S. Post your first job and we’ll match you instantly — see who’s available on the map below.':'trabajadores de oficios verificados listos en todo EE. UU. Publica tu primer trabajo y te emparejamos al instante — mira quién está disponible en el mapa.',
+  // recruiter analytics (instant, correct)
+  'Analytics':'Analíticas','hiring performance':'rendimiento de contratación','Total applicants':'Total de postulantes',
+  'In pipeline':'En proceso','Hired':'Contratados','Offer→hire rate':'Tasa de oferta→contrato','Avg match score':'Puntaje promedio',
+  'Applications over time':'Postulaciones a lo largo del tiempo','last 8 weeks':'últimas 8 semanas','Funnel conversion':'Conversión del embudo',
+  'reached · step %':'alcanzado · % por paso','Top trades by applicants':'Oficios con más postulantes','Jobs by demand':'Empleos por demanda',
+  'Job':'Empleo','Applicants':'Postulantes','No applicants yet.':'Aún no hay postulantes.','No jobs posted yet.':'Aún no has publicado empleos.',
+  'Post a job':'Publicar un empleo','Post a job →':'Publicar un empleo →',
+  'Analytics light up once candidates start flowing into your jobs. Post a role and source from Talent Search to get going.':'Las analíticas se activan cuando los candidatos empiezan a llegar a tus empleos. Publica un puesto y busca en Talento para comenzar.',
 };
 function T(s){
   if(LANG !== 'es' || !s) return s;
@@ -249,7 +257,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   } else {
     const L = (h,l,k)=>`<a class="nav-link ${active===k?'on':''}" href="${h}">${l}</a>`;
     const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/console/messages">${t('nav_messages')}${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
-    nav = `${L('/console',t('nav_overview'),'ov')}${L('/console/search',t('nav_talent'),'search')}${L('/console/jobs',t('nav_jobs'),'jobs')}${L('/pulse',t('nav_pulse'),'pulse')}${msg}
+    nav = `${L('/console',t('nav_overview'),'ov')}${L('/console/search',t('nav_talent'),'search')}${L('/console/jobs',t('nav_jobs'),'jobs')}${L('/console/analytics',t('nav_analytics'),'analytics')}${L('/pulse',t('nav_pulse'),'pulse')}${msg}
            ${modeTg('hire')}
            <a class="who" href="/console/company" title="Company profile">${initials(user.company||user.name)}</a>
            <a class="nav-link" href="/logout">${t('nav_logout')}</a>${langTg}`;
@@ -277,7 +285,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=45">
+  <link rel="stylesheet" href="/styles.css?v=46">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1148,6 +1156,64 @@ function empOverview({ user, kpis, funnel, recent, hot, alerts, fillRate, geo = 
 }
 function kpi(l,v){return `<div class="kpi"><div class="kl">${l}</div><b>${v}</b></div>`;}
 
+function empAnalytics({ user, kpis, weekly = [], conv = [], topTrades = [], topJobs = [], avgScore = 0, totalApps = 0, avgDaysToHire = null }){
+  const maxW = Math.max(1, ...weekly.map(w=>w.n));
+  const weekBars = weekly.map(w=>`<div class="vbar-col">
+      <div class="vbar-track"><i class="vbar" style="height:${Math.max(w.n?6:0,Math.round((w.n/maxW)*100))}%"></i></div>
+      <span class="vbar-n">${w.n}</span><span class="vbar-l">${esc(w.label)}</span>
+    </div>`).join('');
+  const convRows = conv.map((c,i)=>{
+    const step = i===0 ? 100 : (conv[i-1].reached ? Math.round((c.reached/conv[i-1].reached)*100) : 0);
+    return `<div class="fn-row conv">
+      <span class="fn-lbl">${esc(c.stage)}</span>
+      <div class="fn-bar"><i class="fn-${c.stage.toLowerCase()}" style="width:${c.pct}%"></i></div>
+      <b class="fn-n">${c.reached}</b>
+      <span class="conv-step ${i&&step<60?'warn':''}">${i?step+'%':'—'}</span>
+    </div>`;
+  }).join('');
+  const maxT = Math.max(1, ...topTrades.map(t=>t.n));
+  const tradeRows = topTrades.length ? topTrades.map(t=>`<div class="fn-row">
+      <span class="fn-lbl">${esc(TRADES[t.trade]||t.trade)}</span>
+      <div class="fn-bar"><i style="width:${Math.round((t.n/maxT)*100)}%;background:var(--brand)"></i></div>
+      <b class="fn-n">${t.n}</b></div>`).join('') : `<p class="muted">${T('No applicants yet.')}</p>`;
+  const jobRows = topJobs.length ? `<table class="tbl"><tr><th>${T('Job')}</th><th>${T('Applicants')}</th><th>${T('Hired')}</th></tr>
+    ${topJobs.map(j=>`<tr><td><a class="cand-link" href="/console/jobs/${j.id}">${esc(j.title)}</a></td><td>${j.n}</td><td>${j.hired}</td></tr>`).join('')}</table>`
+    : `<p class="muted">${T('No jobs posted yet.')} <a href="/console/jobs/new">${T('Post a job')}</a></p>`;
+  const empty = totalApps===0;
+  return `<section class="wrap">
+    <div class="page-h"><h2>${T('Analytics')}</h2><p class="muted">${esc(user.company||user.name)} · ${T('hiring performance')}</p>
+      <a class="btn-sm right" href="/console/jobs/new">${T('+ Post a job')}</a></div>
+    <div class="kpis">
+      ${kpi(T('Total applicants'),totalApps)}
+      ${kpi(T('In pipeline'),kpis.pipeline)}
+      ${kpi(T('Hired'),kpis.hired)}
+      ${kpi(T('Offer→hire rate'),kpis.fillRate+'%')}
+      ${kpi(T('Avg match score'),avgScore)}
+    </div>
+    ${empty ? `<div class="card"><p class="muted">${T('Analytics light up once candidates start flowing into your jobs. Post a role and source from Talent Search to get going.')} <a href="/console/jobs/new">${T('Post a job →')}</a></p></div>` : `
+    <div class="grid2">
+      <div class="card">
+        <div class="sec-h" style="margin-top:0">${T('Applications over time')} <span class="muted">${T('last 8 weeks')}</span></div>
+        <div class="vbars">${weekBars}</div>
+      </div>
+      <div class="card">
+        <div class="sec-h" style="margin-top:0">${T('Funnel conversion')} <span class="muted">${T('reached · step %')}</span></div>
+        <div class="funnel">${convRows}</div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <div class="sec-h" style="margin-top:0">${T('Top trades by applicants')}</div>
+        <div class="funnel">${tradeRows}</div>
+      </div>
+      <div class="card">
+        <div class="sec-h" style="margin-top:0">${T('Jobs by demand')}</div>
+        ${jobRows}
+      </div>
+    </div>`}
+  </section>`;
+}
+
 const COMPANY_SIZES = ['1–10','11–50','51–200','201–500','500+'];
 function empCompany({ user, saved = false }) {
   const sizeOpts = `<option value="">Company size</option>`+COMPANY_SIZES.map(s=>`<option ${user.company_size===s?'selected':''}>${s}</option>`).join('');
@@ -1411,4 +1477,4 @@ function ogImage() {
 }
 
 module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, empCompany, workerTraining, pulsePage, publicJob };
+  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, empCompany, workerTraining, pulsePage, publicJob };

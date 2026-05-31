@@ -755,6 +755,40 @@ const server = http.createServer(async (req,res)=>{
         return send(res, V.layout({title:'Overview',user,active:'ov',body:V.empOverview({user,
           kpis:{openJobs:jobs.filter(j=>j.status==='open').length, pool, applicants, pipeline, hired}, funnel, recent, hot, alerts, fillRate, geo, isNew:jobs.length===0, talentTotal})}));
       }
+      if(p==='/console/analytics' && method==='GET'){
+        const jobs = await db.prepare('SELECT * FROM jobs WHERE employer_id=?').all(user.id);
+        const jobIds = jobs.map(j=>j.id);
+        const ph = jobIds.map(()=>'?').join(',');
+        let apps = [];
+        if(jobIds.length){
+          apps = await db.prepare(`SELECT a.created_at, a.stage, a.score, j.trade, j.title, j.id job_id
+            FROM applications a JOIN jobs j ON j.id=a.job_id WHERE a.job_id IN (${ph})`).all(...jobIds);
+        }
+        const totalApps = apps.length;
+        const order = V.STAGES;
+        const sidx = s => order.indexOf(s);
+        const conv = order.map((s,i)=>{ const reached = apps.filter(a=>sidx(a.stage)>=i).length;
+          return {stage:s, reached, pct: totalApps ? Math.round((reached/totalApps)*100) : 0}; });
+        const pipeline = apps.filter(a=>a.stage!=='Sourced').length;
+        const hired = apps.filter(a=>a.stage==='Hired').length;
+        const offers = apps.filter(a=>a.stage==='Offer'||a.stage==='Hired').length;
+        const fillRate = offers ? Math.round((hired/offers)*100) : 0;
+        const avgScore = totalApps ? Math.round(apps.reduce((s,a)=>s+(a.score||0),0)/totalApps) : 0;
+        const now = Date.now(), DAY = 864e5;
+        const weekly = [];
+        for(let w=7; w>=0; w--){
+          const start = now-(w+1)*7*DAY, end = now-w*7*DAY;
+          const n = apps.filter(a=>{ const t=Date.parse(String(a.created_at||'').replace(' ','T')+'Z'); return t>=start && t<end; }).length;
+          const d = new Date(end-3*DAY);
+          weekly.push({label:`${d.getMonth()+1}/${d.getDate()}`, n});
+        }
+        const tmap={}; for(const a of apps){ tmap[a.trade]=(tmap[a.trade]||0)+1; }
+        const topTrades = Object.entries(tmap).map(([trade,n])=>({trade,n})).sort((a,b)=>b.n-a.n).slice(0,6);
+        const jmap={}; for(const a of apps){ const k=a.job_id; (jmap[k]=jmap[k]||{id:a.job_id,title:a.title,n:0,hired:0}); jmap[k].n++; if(a.stage==='Hired') jmap[k].hired++; }
+        const topJobs = Object.values(jmap).sort((a,b)=>b.n-a.n).slice(0,6);
+        return send(res, V.layout({title:'Analytics',user,active:'analytics',body:V.empAnalytics({user,
+          kpis:{pipeline, hired, fillRate}, weekly, conv, topTrades, topJobs, avgScore, totalApps})}));
+      }
       if(p==='/console/company' && method==='GET')
         return send(res, V.layout({title:'Company profile',user,active:'',body:V.empCompany({user, saved:url.searchParams.get('saved')==='1'})}));
       if(p==='/console/company' && method==='POST'){

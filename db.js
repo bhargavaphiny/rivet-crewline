@@ -743,6 +743,95 @@ async function seedExternal(){
   console.log('[db] external/partner jobs seeded — +5 jobs with source apply links');
 }
 
+// ---- USAJOBS federal trades feed: real Wage-Grade openings, apply on usajobs.gov (idempotent, no API key) ----
+async function seedUsajobs(){
+  if (await metaGet('usajobs_v1')) return;
+  const eid = (await db.prepare("SELECT id FROM users WHERE email='feed@rivet.test'").get() || {}).id;
+  if(!eid){ await metaSet('usajobs_v1','1'); return; }
+  // city zips so these map nationwide (add any not already seeded)
+  const zips = [
+    ['20001',38.9101,-77.0147,'Washington'],['23508',36.8857,-76.3057,'Norfolk'],
+    ['96818',21.3469,-157.9389,'Honolulu'],['80045',39.7447,-104.8389,'Aurora'],
+    ['78234',29.4600,-98.4400,'San Antonio'],['92134',32.7050,-117.1490,'San Diego'],
+  ];
+  for(const [zip,lat,lon,city] of zips){ try { await db.prepare('INSERT OR IGNORE INTO zip_geo(zip,lat,lon,city) VALUES(?,?,?,?)').run(zip,lat,lon,city); } catch(e){} }
+  const insJob = db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type,source,apply_url) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+  const search = (k,l) => `https://www.usajobs.gov/Search/Results?k=${encodeURIComponent(k)}&l=${encodeURIComponent(l)}&hp=public`;
+  // [title, trade, lo, hi, city, zip, shift, creds, descr, etype, keyword, location]
+  const F = [
+    ['Maintenance Mechanic (WG-4749)','facilities',26,36,'Washington','20001','Day','','Federal facility maintenance — mechanical, plumbing and light electrical. Federal benefits.','Full-time','maintenance mechanic','Washington, DC'],
+    ['Electrician (WG-2805)','electrician',32,44,'San Diego','92134','Day','license','Navy base electrical install and repair. Journeyman-level Wage Grade role.','Full-time','electrician','San Diego, CA'],
+    ['Pipefitter / Plumber (WG-4206)','plumber',30,42,'Norfolk','23508','Day','','Shipyard piping systems install and repair. Federal apprenticeship-to-journeyman track.','Full-time','pipefitter','Norfolk, VA'],
+    ['HVAC Mechanic (WG-5306)','hvac',30,42,'Aurora','80045','Day','epa608','Air-conditioning equipment mechanic at a federal medical center.','Full-time','air conditioning equipment mechanic','Aurora, CO'],
+    ['Welder (WG-3703)','welder',31,43,'Norfolk','23508','4x10','aws_welding','Shipyard structural and pipe welding. 6G a plus.','Full-time','welder','Norfolk, VA'],
+    ['Carpenter (WG-4607)','carpenter',28,38,'Honolulu','96818','Day','','Air Force base carpentry — repair, forming and finish work.','Full-time','carpenter','Honolulu, HI'],
+    ['Heavy Mobile Equipment Mechanic (WG-5803)','diesel_mechanic',30,42,'San Antonio','78234','Day','','Army installation heavy-equipment and diesel repair.','Full-time','heavy mobile equipment mechanic','San Antonio, TX'],
+    ['Motor Vehicle Operator (WG-5703)','cdl_driver',24,33,'Washington','20001','Day','cdl','Federal CDL driving and material transport. Class A required.','Full-time','motor vehicle operator','Washington, DC'],
+  ];
+  for(const [title,trade,lo,hi,city,zip,shift,creds,descr,etype,k,l] of F){
+    try { await insJob.run(eid,title,trade,lo,hi,city,zip,shift,creds,descr,etype,'USAJOBS',search(k,l)); } catch(e){}
+  }
+  await metaSet('usajobs_v1','1');
+  console.log('[db] USAJOBS federal trades feed seeded — +8 Wage-Grade jobs linking to usajobs.gov');
+}
+
+// ---- deeper backdated activity for the demo employer so analytics/charts look alive (idempotent) ----
+async function seedActivity2(){
+  if (await metaGet('activity_v2')) return;
+  const { scoreMatch } = require('./matching');
+  const emp = await db.prepare("SELECT id FROM users WHERE email='ops@sunvalley.test'").get();
+  if(!emp){ await metaSet('activity_v2','1'); return; }
+  const jobs = await db.prepare('SELECT * FROM jobs WHERE employer_id=?').all(emp.id);
+  if(!jobs.length){ await metaSet('activity_v2','1'); return; }
+  const jobByTitle = {}; for(const j of jobs) jobByTitle[j.title] = j;
+  const wId = async (email) => { const u = await db.prepare('SELECT id FROM users WHERE email=?').get(email); return u && u.id; };
+  // a rotating pool of seeded workers that exist across the big/category seeds
+  const pool = ['marcus@rivet.test','kim@rivet.test','ray@rivet.test','diego@rivet.test','lupe@rivet.test','andre@rivet.test',
+    'marisol.vega@rivet.test','aaliyah.brooks@rivet.test','yusuf.ahmed@rivet.test','grady.olsen@rivet.test',
+    'imani.wright@rivet.test','priya.nair@rivet.test','erik.nyland@rivet.test','brandon.pike@rivet.test'];
+  // spread ~26 applications over the last 8 weeks across stages so the over-time + funnel charts are rich
+  // [workerEmail, jobTitle, stage, when]
+  const rows = [
+    ['marisol.vega@rivet.test','Commercial Electrician','Hired','-54 days'],
+    ['kim@rivet.test','Commercial Electrician','Hired','-47 days'],
+    ['yusuf.ahmed@rivet.test','Commercial Electrician','Offer','-12 days'],
+    ['aaliyah.brooks@rivet.test','Commercial Electrician','Interview','-9 days'],
+    ['grady.olsen@rivet.test','Commercial Electrician','Interview','-6 days'],
+    ['imani.wright@rivet.test','Commercial Electrician','Screened','-4 days'],
+    ['ray@rivet.test','Commercial Electrician','Screened','-2 days'],
+    ['marcus@rivet.test','Commercial Electrician','Sourced','-30 hours'],
+    ['andre@rivet.test','HVAC Service Technician','Hired','-49 days'],
+    ['priya.nair@rivet.test','HVAC Service Technician','Offer','-15 days'],
+    ['erik.nyland@rivet.test','HVAC Service Technician','Interview','-11 days'],
+    ['brandon.pike@rivet.test','HVAC Service Technician','Screened','-7 days'],
+    ['diego@rivet.test','HVAC Service Technician','Screened','-3 days'],
+    ['lupe@rivet.test','HVAC Service Technician','Sourced','-20 hours'],
+    ['ray@rivet.test','Controls Technician','Hired','-40 days'],
+    ['grady.olsen@rivet.test','Controls Technician','Interview','-18 days'],
+    ['erik.nyland@rivet.test','Controls Technician','Interview','-10 days'],
+    ['priya.nair@rivet.test','Controls Technician','Screened','-5 days'],
+    ['kim@rivet.test','Controls Technician','Sourced','-2 days'],
+    ['diego@rivet.test','Maintenance Technician','Offer','-22 days'],
+    ['lupe@rivet.test','Maintenance Technician','Interview','-16 days'],
+    ['andre@rivet.test','Maintenance Technician','Screened','-8 days'],
+    ['brandon.pike@rivet.test','Maintenance Technician','Sourced','-3 days'],
+    ['marisol.vega@rivet.test','Maintenance Technician','Sourced','-1 days'],
+  ];
+  for(const [email,title,stage,when] of rows){
+    const job = jobByTitle[title]; const uid = await wId(email);
+    if(!job || !uid) continue;
+    const prof = await db.prepare('SELECT * FROM worker_profiles WHERE user_id=?').get(uid);
+    const creds = await db.prepare('SELECT * FROM credentials WHERE user_id=?').all(uid);
+    let score = 70; try { score = scoreMatch(prof, creds, job).score; } catch(e){}
+    try {
+      await db.prepare(`INSERT INTO applications(job_id,worker_id,stage,score,created_at)
+        VALUES(?,?,?,?,datetime('now',?))`).run(job.id, uid, stage, score, when);
+    } catch(e){}
+  }
+  await metaSet('activity_v2','1');
+  console.log('[db] deeper demo activity seeded — backdated applications across 8 weeks for analytics');
+}
+
 async function migrate() {
   // additive column migrations (idempotent — errors swallowed when already applied)
   try { await db.exec('ALTER TABLE users ADD COLUMN phone TEXT'); } catch (e) { /* column exists */ }
@@ -820,6 +909,8 @@ async function init() {
   try { await seedPosts(); } catch (e) { console.error('[db] posts seed skipped (non-fatal):', e.message); }
   try { await seedLocalGig(); } catch (e) { console.error('[db] localgig seed skipped (non-fatal):', e.message); }
   try { await seedExternal(); } catch (e) { console.error('[db] external seed skipped (non-fatal):', e.message); }
+  try { await seedUsajobs(); } catch (e) { console.error('[db] usajobs seed skipped (non-fatal):', e.message); }
+  try { await seedActivity2(); } catch (e) { console.error('[db] activity2 seed skipped (non-fatal):', e.message); }
   try {
     if(!(await metaGet('xfactor_v1'))){
       // own tools (most trades), reliable transport, bilingual — high-signal flags for recruiters

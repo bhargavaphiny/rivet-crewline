@@ -288,6 +288,15 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--brand)}
 .fn-sourced{background:#9fb0bb}.fn-screened{background:var(--blue)}.fn-interview{background:var(--amber)}
 .fn-offer{background:var(--brand)}.fn-hired{background:var(--green)}
 .fn-n{font-size:13px;font-weight:800;text-align:right}
+.fn-row.conv{grid-template-columns:84px 1fr 28px 42px}
+.conv-step{font-size:11.5px;font-weight:700;color:var(--muted);text-align:right}
+.conv-step.warn{color:var(--brand)}
+.vbars{display:flex;align-items:flex-end;gap:8px;height:170px;padding-top:8px}
+.vbar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%}
+.vbar-track{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center}
+.vbar{display:block;width:62%;min-height:2px;border-radius:5px 5px 0 0;background:linear-gradient(180deg,var(--brand),var(--amber))}
+.vbar-n{font-size:11px;font-weight:800;color:var(--slate)}
+.vbar-l{font-size:10px;color:var(--muted)}
 .act{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:13px}
 .act:first-child{border-top:0}
 .act-b{flex:1}
