@@ -10,6 +10,85 @@ const esc = s => String(s == null ? '' : s)
 
 const initials = name => esc((name||'?').split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase());
 
+// ---------- i18n (en / es) ----------
+let LANG = 'en';
+function setLang(l){ LANG = (l === 'es') ? 'es' : 'en'; }
+const I18N = {
+  en: {
+    nav_login:'Log in', nav_get_started:'Get started', nav_home:'Home', nav_find_work:'Find Work',
+    nav_work_card:'Work Card', nav_applications:'Applications', nav_messages:'Messages',
+    nav_hiring:'Hiring →', nav_working:'Working →', nav_logout:'Log out',
+    nav_overview:'Overview', nav_talent:'Talent', nav_jobs:'Jobs',
+    hero_tag:'The blue-collar hiring platform · U.S.',
+    hero_h1a:"America can't ", hero_build:'build', hero_h1b:' what it can\'t ', hero_staff:'staff.',
+    hero_lead:'Rivet prepares skilled-trade workers to get hired and certified. Crewline gives employers verified, job-ready crews — fast.',
+    cta_worker:"I'm a worker → Rivet", cta_employer:"I'm hiring → Crewline",
+    pc_worker_h:'📱 Rivet — for workers',
+    pc_w1:'Verified credential wallet (license, OSHA, EPA)', pc_w2:'Job-readiness score', pc_w3:'Scored job matches near you', pc_w4:'Apply with one tap',
+    pc_emp_h:'🖥️ Crewline — for employers',
+    pc_e1:'Search verified, ready, local talent', pc_e2:'Post jobs, auto-matched instantly', pc_e3:'Trades-stage hiring pipeline', pc_e4:'Credential compliance built in',
+    how_h:'How it works',
+    how_worker_tag:'For workers · Rivet',
+    hw1_t:'Build your Work Card', hw1_d:'Add your trade, experience and credentials — your readiness score updates live.',
+    hw2_t:'Get matched', hw2_d:'See local jobs ranked by how well you fit, at the pay you want.',
+    hw3_t:'Apply in one tap', hw3_d:'Employers see your verified card instantly — no resume, no re-listing.',
+    how_emp_tag:'For employers · Crewline',
+    he1_t:'Post a job', he1_d:"It's matched against the verified talent pool the moment you publish.",
+    he2_t:'Review ranked crews', he2_d:'Candidates scored on trade fit, pay, location and credential coverage.',
+    he3_t:'Move them through', he3_d:'A trades-stage pipeline from Sourced to Hired — compliance built in.',
+    how_cta_w:'Get hired → Rivet', how_cta_e:'Hire a crew → Crewline',
+    foot_tagline:'The blue-collar hiring platform — built for the trades.',
+    foot_for_workers:'For workers', foot_for_employers:'For employers',
+    foot_get_started:'Get started', foot_post_job:'Post a job',
+    auth_create:'Create your account', auth_welcome:'Welcome back',
+    auth_google:'Continue with Google', auth_phone:'Continue with phone', auth_or:'or',
+    auth_iam:'I am a', auth_worker_opt:'Worker (Rivet)', auth_employer_opt:'Employer (Crewline)',
+    auth_fullname:'Full name', auth_company:'Company', auth_email:'Email', auth_password:'Password',
+    auth_create_btn:'Create account', auth_login_btn:'Log in',
+    auth_have:'Already have an account?', auth_new:'New here?',
+    phone_h:'Sign in with your phone', phone_sub:'We’ll text you a 6-digit code — no password to remember.',
+    phone_number:'Mobile number', phone_yourname:'Your name', phone_textme:'Text me a code',
+    phone_prefer:'Prefer email?',
+  },
+  es: {
+    nav_login:'Entrar', nav_get_started:'Empezar', nav_home:'Inicio', nav_find_work:'Buscar trabajo',
+    nav_work_card:'Mi perfil', nav_applications:'Solicitudes', nav_messages:'Mensajes',
+    nav_hiring:'Contratar →', nav_working:'Trabajar →', nav_logout:'Salir',
+    nav_overview:'Resumen', nav_talent:'Talento', nav_jobs:'Empleos',
+    hero_tag:'La plataforma de empleo para oficios · EE. UU.',
+    hero_h1a:'Estados Unidos no puede ', hero_build:'construir', hero_h1b:' lo que no puede ', hero_staff:'dotar de personal.',
+    hero_lead:'Rivet prepara a trabajadores de oficios para ser contratados y certificados. Crewline da a las empresas cuadrillas verificadas y listas para trabajar — rápido.',
+    cta_worker:'Soy trabajador → Rivet', cta_employer:'Estoy contratando → Crewline',
+    pc_worker_h:'📱 Rivet — para trabajadores',
+    pc_w1:'Cartera de credenciales verificadas (licencia, OSHA, EPA)', pc_w2:'Puntaje de preparación', pc_w3:'Empleos cerca de ti según tu perfil', pc_w4:'Postúlate con un toque',
+    pc_emp_h:'🖥️ Crewline — para empresas',
+    pc_e1:'Busca talento local verificado y listo', pc_e2:'Publica empleos con emparejamiento al instante', pc_e3:'Embudo de contratación por etapas', pc_e4:'Cumplimiento de credenciales integrado',
+    how_h:'Cómo funciona',
+    how_worker_tag:'Para trabajadores · Rivet',
+    hw1_t:'Crea tu perfil de trabajo', hw1_d:'Agrega tu oficio, experiencia y credenciales — tu puntaje se actualiza al instante.',
+    hw2_t:'Encuentra empleos', hw2_d:'Ve empleos locales ordenados por qué tan bien encajas, con el pago que quieres.',
+    hw3_t:'Postúlate con un toque', hw3_d:'Las empresas ven tu perfil verificado al instante — sin currículum.',
+    how_emp_tag:'Para empresas · Crewline',
+    he1_t:'Publica un empleo', he1_d:'Se empareja con el talento verificado en cuanto lo publicas.',
+    he2_t:'Revisa cuadrillas', he2_d:'Candidatos puntuados por oficio, pago, ubicación y credenciales.',
+    he3_t:'Avánzalos', he3_d:'Un embudo por etapas de Contactado a Contratado — con cumplimiento.',
+    how_cta_w:'Conseguir trabajo → Rivet', how_cta_e:'Contratar cuadrilla → Crewline',
+    foot_tagline:'La plataforma de empleo para oficios — hecha para el trabajo.',
+    foot_for_workers:'Para trabajadores', foot_for_employers:'Para empresas',
+    foot_get_started:'Empezar', foot_post_job:'Publicar empleo',
+    auth_create:'Crea tu cuenta', auth_welcome:'Bienvenido de nuevo',
+    auth_google:'Continuar con Google', auth_phone:'Continuar con teléfono', auth_or:'o',
+    auth_iam:'Soy', auth_worker_opt:'Trabajador (Rivet)', auth_employer_opt:'Empresa (Crewline)',
+    auth_fullname:'Nombre completo', auth_company:'Empresa', auth_email:'Correo', auth_password:'Contraseña',
+    auth_create_btn:'Crear cuenta', auth_login_btn:'Entrar',
+    auth_have:'¿Ya tienes cuenta?', auth_new:'¿Nuevo aquí?',
+    phone_h:'Entra con tu teléfono', phone_sub:'Te enviaremos un código de 6 dígitos — sin contraseña que recordar.',
+    phone_number:'Número de celular', phone_yourname:'Tu nombre', phone_textme:'Envíame un código',
+    phone_prefer:'¿Prefieres correo?',
+  },
+};
+function t(k){ return (I18N[LANG] && I18N[LANG][k] != null) ? I18N[LANG][k] : (I18N.en[k] != null ? I18N.en[k] : k); }
+
 function scoreClass(s){ return s>=85?'s-hi':s>=70?'s-md':'s-lo'; }
 
 // ---------- media (URL / embed based) ----------
@@ -35,24 +114,25 @@ function mediaGallery(items, { deletable = false, base = '' } = {}){
 
 // ---------- layout ----------
 function layout({ title, user, body, active = '', flash = '' }) {
+  const langTg = `<a class="nav-link lang-tg" href="/lang/${LANG==='es'?'en':'es'}" title="${LANG==='es'?'English':'Español'}">${LANG==='es'?'EN':'ES'}</a>`;
   let nav = '';
   if (!user) {
-    nav = `<a class="nav-link" href="/login">Log in</a>
-           <a class="btn-sm" href="/signup">Get started</a>`;
+    nav = `<a class="nav-link" href="/login">${t('nav_login')}</a>
+           <a class="btn-sm" href="/signup">${t('nav_get_started')}</a>${langTg}`;
   } else if ((user.mode || user.role) === 'worker') {
     const L = (h,l,k)=>`<a class="nav-link ${active===k?'on':''}" href="${h}">${l}</a>`;
-    const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/app/messages">Messages${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
-    nav = `${L('/app','Home','home')}${L('/app/jobs','Find Work','jobs')}${L('/app/profile','Work Card','profile')}${L('/app/applications','Applications','apps')}${msg}
-           <a class="nav-link switch" href="/console" title="Switch to hiring">Hiring →</a>
+    const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/app/messages">${t('nav_messages')}${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
+    nav = `${L('/app',t('nav_home'),'home')}${L('/app/jobs',t('nav_find_work'),'jobs')}${L('/app/profile',t('nav_work_card'),'profile')}${L('/app/applications',t('nav_applications'),'apps')}${msg}
+           <a class="nav-link switch" href="/console" title="Switch to hiring">${t('nav_hiring')}</a>
            <span class="who">${initials(user.name)}</span>
-           <a class="nav-link" href="/logout">Log out</a>`;
+           <a class="nav-link" href="/logout">${t('nav_logout')}</a>${langTg}`;
   } else {
     const L = (h,l,k)=>`<a class="nav-link ${active===k?'on':''}" href="${h}">${l}</a>`;
-    const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/console/messages">Messages${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
-    nav = `${L('/console','Overview','ov')}${L('/console/search','Talent','search')}${L('/console/jobs','Jobs','jobs')}${msg}
-           <a class="nav-link switch" href="/app" title="Switch to working">Working →</a>
+    const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/console/messages">${t('nav_messages')}${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
+    nav = `${L('/console',t('nav_overview'),'ov')}${L('/console/search',t('nav_talent'),'search')}${L('/console/jobs',t('nav_jobs'),'jobs')}${msg}
+           <a class="nav-link switch" href="/app" title="Switch to working">${t('nav_working')}</a>
            <span class="who">${initials(user.company||user.name)}</span>
-           <a class="nav-link" href="/logout">Log out</a>`;
+           <a class="nav-link" href="/logout">${t('nav_logout')}</a>${langTg}`;
   }
   const brand = user && (user.mode || user.role)==='employer'
     ? `<a class="brand" href="/console"><span class="logo c">C</span> Crewline</a>`
@@ -61,7 +141,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   const desc = 'Rivet × Crewline — the blue-collar hiring platform. Rivet preps skilled-trade workers to get hired and certified; Crewline gives employers verified, job-ready crews, fast.';
   const fullTitle = `${esc(title)} · Rivet × Crewline`;
   const site = 'https://rivet-crewline.onrender.com';
-  return `<!DOCTYPE html><html lang="en"><head>
+  return `<!DOCTYPE html><html lang="${LANG}"><head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${fullTitle}</title>
   <meta name="description" content="${esc(desc)}">
@@ -77,7 +157,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=16">
+  <link rel="stylesheet" href="/styles.css?v=17">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -87,11 +167,11 @@ function layout({ title, user, body, active = '', flash = '' }) {
     : `<footer class="site-foot rich">
     <div class="wrap foot-grid">
       <div class="foot-brand"><a class="brand" href="/"><span class="logo">R</span> Rivet <small>× Crewline</small></a>
-        <p>The blue-collar hiring platform — built for the trades.</p></div>
-      <div class="foot-col"><h5>For workers</h5><a href="/signup?role=worker">Get started</a><a href="/login">Log in</a></div>
-      <div class="foot-col"><h5>For employers</h5><a href="/signup?role=employer">Post a job</a><a href="/login">Log in</a></div>
+        <p>${t('foot_tagline')}</p></div>
+      <div class="foot-col"><h5>${t('foot_for_workers')}</h5><a href="/signup?role=worker">${t('foot_get_started')}</a><a href="/login">${t('nav_login')}</a></div>
+      <div class="foot-col"><h5>${t('foot_for_employers')}</h5><a href="/signup?role=employer">${t('foot_post_job')}</a><a href="/login">${t('nav_login')}</a></div>
     </div>
-    <div class="wrap foot-base">© 2026 Rivet × Crewline · Phoenix, AZ</div>
+    <div class="wrap foot-base">© 2026 Rivet × Crewline · Phoenix, AZ · <a href="/lang/${LANG==='es'?'en':'es'}" style="color:#9fb0bb">${LANG==='es'?'English':'Español'}</a></div>
   </footer>`}
   </body></html>`;
 }
@@ -101,48 +181,48 @@ function landing() {
   return `
   <section class="hero">
     <div class="wrap">
-      <span class="tag">The blue-collar hiring platform · U.S.</span>
-      <h1>America can't <b>build</b> what it can't <b>staff.</b></h1>
-      <p class="lead">Rivet prepares skilled-trade workers to get hired and certified. Crewline gives employers verified, job-ready crews — fast.</p>
+      <span class="tag">${t('hero_tag')}</span>
+      <h1>${t('hero_h1a')}<b>${t('hero_build')}</b>${t('hero_h1b')}<b>${t('hero_staff')}</b></h1>
+      <p class="lead">${t('hero_lead')}</p>
       <div class="cta-row">
-        <a class="btn" href="/signup?role=worker">I'm a worker → Rivet</a>
-        <a class="btn ghost" href="/signup?role=employer">I'm hiring → Crewline</a>
+        <a class="btn" href="/signup?role=worker">${t('cta_worker')}</a>
+        <a class="btn ghost" href="/signup?role=employer">${t('cta_employer')}</a>
       </div>
     </div>
   </section>
   <section class="wrap split2">
     <div class="prodcard worker">
-      <h3>📱 Rivet — for workers</h3>
-      <ul><li>Verified credential wallet (license, OSHA, EPA)</li><li>Job-readiness score</li><li>Scored job matches near you</li><li>Apply with one tap</li></ul>
+      <h3>${t('pc_worker_h')}</h3>
+      <ul><li>${t('pc_w1')}</li><li>${t('pc_w2')}</li><li>${t('pc_w3')}</li><li>${t('pc_w4')}</li></ul>
     </div>
     <div class="prodcard emp">
-      <h3>🖥️ Crewline — for employers</h3>
-      <ul><li>Search verified, ready, local talent</li><li>Post jobs, auto-matched instantly</li><li>Trades-stage hiring pipeline</li><li>Credential compliance built in</li></ul>
+      <h3>${t('pc_emp_h')}</h3>
+      <ul><li>${t('pc_e1')}</li><li>${t('pc_e2')}</li><li>${t('pc_e3')}</li><li>${t('pc_e4')}</li></ul>
     </div>
   </section>
   <section class="how wrap">
-    <h2 class="how-h">How it works</h2>
+    <h2 class="how-h">${t('how_h')}</h2>
     <div class="how-grid">
       <div class="how-col">
-        <div class="how-tag worker">For workers · Rivet</div>
+        <div class="how-tag worker">${t('how_worker_tag')}</div>
         <ol class="steps">
-          <li><b>Build your Work Card</b><span>Add your trade, experience and credentials — your readiness score updates live.</span></li>
-          <li><b>Get matched</b><span>See local jobs ranked by how well you fit, at the pay you want.</span></li>
-          <li><b>Apply in one tap</b><span>Employers see your verified card instantly — no resume, no re-listing.</span></li>
+          <li><b>${t('hw1_t')}</b><span>${t('hw1_d')}</span></li>
+          <li><b>${t('hw2_t')}</b><span>${t('hw2_d')}</span></li>
+          <li><b>${t('hw3_t')}</b><span>${t('hw3_d')}</span></li>
         </ol>
       </div>
       <div class="how-col">
-        <div class="how-tag emp">For employers · Crewline</div>
+        <div class="how-tag emp">${t('how_emp_tag')}</div>
         <ol class="steps">
-          <li><b>Post a job</b><span>It's matched against the verified talent pool the moment you publish.</span></li>
-          <li><b>Review ranked crews</b><span>Candidates scored on trade fit, pay, location and credential coverage.</span></li>
-          <li><b>Move them through</b><span>A trades-stage pipeline from Sourced to Hired — compliance built in.</span></li>
+          <li><b>${t('he1_t')}</b><span>${t('he1_d')}</span></li>
+          <li><b>${t('he2_t')}</b><span>${t('he2_d')}</span></li>
+          <li><b>${t('he3_t')}</b><span>${t('he3_d')}</span></li>
         </ol>
       </div>
     </div>
     <div class="how-cta">
-      <a class="btn" href="/signup?role=worker">Get hired → Rivet</a>
-      <a class="btn ghost" href="/signup?role=employer">Hire a crew → Crewline</a>
+      <a class="btn" href="/signup?role=worker">${t('how_cta_w')}</a>
+      <a class="btn ghost" href="/signup?role=employer">${t('how_cta_e')}</a>
     </div>
   </section>`;
 }
@@ -153,35 +233,35 @@ function authForm(kind, { role = 'worker', error = '', google = false } = {}) {
   const googleBtn = google ? `
       <a class="gbtn full" id="gbtn" href="/auth/google?role=${esc(role)}">
         <svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
-        Continue with Google
+        ${t('auth_google')}
       </a>` : '';
   const phoneBtn = `
       <a class="gbtn full" id="phonebtn" href="/phone?role=${esc(role)}">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="#16242F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
-        Continue with phone
+        ${t('auth_phone')}
       </a>`;
-  const googleBlock = `${googleBtn}${phoneBtn}<div class="or"><span>or</span></div>`;
+  const googleBlock = `${googleBtn}${phoneBtn}<div class="or"><span>${t('auth_or')}</span></div>`;
   return `<section class="wrap narrow">
     <div class="card auth">
-      <h2>${isSignup?'Create your account':'Welcome back'}</h2>
+      <h2>${isSignup?t('auth_create'):t('auth_welcome')}</h2>
       ${error?`<div class="err">${esc(error)}</div>`:''}
       ${googleBlock}
       <form method="post" action="/${kind}">
         ${isSignup?`
-          <label>I am a
+          <label>${t('auth_iam')}
             <select name="role">
-              <option value="worker" ${role==='worker'?'selected':''}>Worker (Rivet)</option>
-              <option value="employer" ${role==='employer'?'selected':''}>Employer (Crewline)</option>
+              <option value="worker" ${role==='worker'?'selected':''}>${t('auth_worker_opt')}</option>
+              <option value="employer" ${role==='employer'?'selected':''}>${t('auth_employer_opt')}</option>
             </select>
           </label>
-          <label>Full name <input name="name" required></label>
-          <label class="emp-only">Company <input name="company" placeholder="Your business name"></label>
+          <label>${t('auth_fullname')} <input name="name" required></label>
+          <label class="emp-only">${t('auth_company')} <input name="company"></label>
         `:''}
-        <label>Email <input type="email" name="email" required></label>
-        <label>Password <input type="password" name="pass" required minlength="6"></label>
-        <button class="btn full" type="submit">${isSignup?'Create account':'Log in'}</button>
+        <label>${t('auth_email')} <input type="email" name="email" required></label>
+        <label>${t('auth_password')} <input type="password" name="pass" required minlength="6"></label>
+        <button class="btn full" type="submit">${isSignup?t('auth_create_btn'):t('auth_login_btn')}</button>
       </form>
-      <p class="muted">${isSignup?`Already have an account? <a href="/login">Log in</a>`:`New here? <a href="/signup">Get started</a>`}</p>
+      <p class="muted">${isSignup?`${t('auth_have')} <a href="/login">${t('auth_login_btn')}</a>`:`${t('auth_new')} <a href="/signup">${t('nav_get_started')}</a>`}</p>
     </div>
   </section>
   <script>
@@ -195,16 +275,16 @@ function authForm(kind, { role = 'worker', error = '', google = false } = {}) {
 // ---------- phone (SMS OTP) ----------
 function phoneStart({ role='worker', name='', phone='', error='' }){
   return `<section class="wrap narrow"><div class="card auth">
-    <h2>Sign in with your phone</h2>
-    <p class="muted">We’ll text you a 6-digit code — no password to remember.</p>
+    <h2>${t('phone_h')}</h2>
+    <p class="muted">${t('phone_sub')}</p>
     ${error?`<div class="err">${esc(error)}</div>`:''}
     <form method="post" action="/phone/start">
       <input type="hidden" name="role" value="${esc(role)}">
-      <label>Mobile number <input name="phone" type="tel" inputmode="tel" autocomplete="tel" value="${esc(phone)}" placeholder="+1 555 123 4567" required></label>
-      <label>Your name <input name="name" value="${esc(name)}" placeholder="First and last name" autocomplete="name"></label>
-      <button class="btn full" type="submit">Text me a code</button>
+      <label>${t('phone_number')} <input name="phone" type="tel" inputmode="tel" autocomplete="tel" value="${esc(phone)}" placeholder="+1 555 123 4567" required></label>
+      <label>${t('phone_yourname')} <input name="name" value="${esc(name)}" autocomplete="name"></label>
+      <button class="btn full" type="submit">${t('phone_textme')}</button>
     </form>
-    <p class="muted">Prefer email? <a href="/login">Log in</a> · <a href="/signup">Sign up</a></p>
+    <p class="muted">${t('phone_prefer')} <a href="/login">${t('nav_login')}</a> · <a href="/signup">${t('nav_get_started')}</a></p>
   </div></section>`;
 }
 function phoneVerify({ phone, demoCode='', error='' }){
@@ -759,5 +839,5 @@ function ogImage() {
 </svg>`;
 }
 
-module.exports = { layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
+module.exports = { setLang, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
   jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES };

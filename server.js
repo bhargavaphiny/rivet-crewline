@@ -166,9 +166,17 @@ const server = http.createServer(async (req,res)=>{
   const p = url.pathname, method = req.method;
   const user = await getUser(req);
   if(user) user.mode = p.startsWith('/console') ? 'employer' : (p.startsWith('/app') ? 'worker' : user.role);
+  V.setLang(getCookie(req,'lang')==='es' ? 'es' : 'en');
 
   try {
     setSecurityHeaders(res);
+    // language toggle
+    const lm = p.match(/^\/lang\/(en|es)$/);
+    if(lm){
+      res.setHeader('Set-Cookie', `lang=${lm[1]}; Path=/; Max-Age=31536000; SameSite=Lax${secAttr(req)}`);
+      let back='/'; try { const u=new URL(req.headers.referer||''); if(u.host===req.headers.host) back=u.pathname+u.search; } catch(e){}
+      return redirect(res, back);
+    }
     // static & utility
     if(p==='/styles.css'){ res.writeHead(200,{'Content-Type':'text/css','Cache-Control':'no-cache'}); return res.end(fs.readFileSync(path.join(__dirname,'styles.css'))); }
     if(p==='/og.svg'){ res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'public, max-age=86400'}); return res.end(V.ogImage()); }
