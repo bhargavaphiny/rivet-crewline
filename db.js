@@ -923,6 +923,13 @@ async function seedReviews(){
   await metaSet('reviews_v1','1');
   console.log('[db] demo reviews + sample interview seeded');
 }
+async function seedSafety(){
+  if (await metaGet('safety_v1')) return;
+  // backfill a site-safety rating on existing worker→employer reviews
+  try { await db.exec("UPDATE reviews SET safety = CASE WHEN stars>=5 THEN 5 WHEN stars=4 THEN 4 ELSE 4 END WHERE subject_kind='employer' AND safety IS NULL"); } catch(e){}
+  await metaSet('safety_v1','1');
+  console.log('[db] safety pulse backfilled on employer reviews');
+}
 
 // ---- X-factors demo data: show-up outcomes, pay outcomes, crews, crew-open jobs (idempotent) ----
 async function seedXfactors(){
@@ -1027,6 +1034,7 @@ async function migrate() {
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN veteran INTEGER DEFAULT 0'); } catch (e) { /* worker is a veteran */ }
   try { await db.exec('ALTER TABLE jobs ADD COLUMN transport_provided INTEGER DEFAULT 0'); } catch (e) { /* employer offers a ride/shuttle */ }
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN commute_mi INTEGER DEFAULT 0'); } catch (e) { /* max miles willing to travel; 0 = no limit */ }
+  try { await db.exec('ALTER TABLE reviews ADD COLUMN safety INTEGER'); } catch (e) { /* worker-rated site safety 1-5 */ }
 }
 
 async function seedZips() {
@@ -1085,6 +1093,7 @@ async function init() {
   try { await seedUsajobs(); } catch (e) { console.error('[db] usajobs seed skipped (non-fatal):', e.message); }
   try { await seedActivity2(); } catch (e) { console.error('[db] activity2 seed skipped (non-fatal):', e.message); }
   try { await seedReviews(); } catch (e) { console.error('[db] reviews seed skipped (non-fatal):', e.message); }
+  try { await seedSafety(); } catch (e) { console.error('[db] safety seed skipped (non-fatal):', e.message); }
   try { await seedXfactors(); } catch (e) { console.error('[db] xfactors seed skipped (non-fatal):', e.message); }
   try { await seedHomeowner(); } catch (e) { console.error('[db] homeowner seed skipped (non-fatal):', e.message); }
   try {

@@ -266,6 +266,11 @@ async function payRep(employerId){
   return { n: total, pct: total ? Math.round((ontime/total)*100) : null };
 }
 const crewOf = (workerId) => db.prepare('SELECT * FROM crew_members WHERE worker_id=? ORDER BY id').all(workerId);
+// Safety Pulse: average worker-rated site safety for an employer.
+async function safetyStat(employerId){
+  const r = await db.prepare("SELECT AVG(safety) avg, COUNT(safety) n FROM reviews WHERE subject_id=? AND subject_kind='employer' AND safety IS NOT NULL").get(employerId);
+  return { avg: r&&r.avg?Number(r.avg):0, n: r?r.n:0 };
+}
 // Rehire signal: how many workers this employer has hired on 2+ of their jobs (they came back).
 async function rehireStat(employerId){
   const r = await db.prepare(`SELECT COUNT(*) n FROM (
@@ -973,10 +978,11 @@ const server = http.createServer(async (req,res)=>{
         const b = await readBody(req);
         const jobId = Number(b.job_id)||0, empId = Number(b.employer_id)||0;
         const stars = Math.max(1, Math.min(5, Number(b.stars)||0));
+        const safety = (Number(b.safety)>=1 && Number(b.safety)<=5) ? Number(b.safety) : null;
         const ok = jobId && await db.prepare("SELECT 1 FROM applications WHERE job_id=? AND worker_id=? AND stage='Hired'").get(jobId, user.id);
         if(ok && empId && stars){
-          try { await db.prepare(`INSERT INTO reviews(author_id,author_name,subject_id,subject_kind,stars,body,job_id)
-            VALUES(?,?,?,'employer',?,?,?)`).run(user.id, user.name, empId, stars, String(b.body||'').slice(0,400), jobId); } catch(e){}
+          try { await db.prepare(`INSERT INTO reviews(author_id,author_name,subject_id,subject_kind,stars,body,job_id,safety)
+            VALUES(?,?,?,'employer',?,?,?,?)`).run(user.id, user.name, empId, stars, String(b.body||'').slice(0,400), jobId, safety); } catch(e){}
         }
         return redirect(res, '/app/applications');
       }
@@ -1014,7 +1020,7 @@ const server = http.createServer(async (req,res)=>{
         const empRating = await ratingFor(job.employer_id, 'employer');
         const empPay = await payRep(job.employer_id);
         const myQuote = job.quotes_ok ? await db.prepare('SELECT * FROM quotes WHERE job_id=? AND worker_id=?').get(jid, user.id) : null;
-        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied,saved,jobMedia,distance,rules,empRating,workAuth:prof.work_auth||'',empPay,myQuote,payFloor:prof.pay_floor||0,empRehire:await rehireStat(job.employer_id)})}));
+        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied,saved,jobMedia,distance,rules,empRating,workAuth:prof.work_auth||'',empPay,myQuote,payFloor:prof.pay_floor||0,empRehire:await rehireStat(job.employer_id),empSafety:await safetyStat(job.employer_id)})}));
       }
       if(jid && p===`/app/jobs/${jid}/quote` && method==='POST'){
         const job = await db.prepare('SELECT id,title,employer_id,quotes_ok FROM jobs WHERE id=?').get(jid);
@@ -1114,7 +1120,7 @@ const server = http.createServer(async (req,res)=>{
           kpis:{pipeline, hired, fillRate}, weekly, conv, topTrades, topJobs, avgScore, totalApps})}));
       }
       if(p==='/console/company' && method==='GET')
-        return send(res, V.layout({title:'Company profile',user,active:'',body:V.empCompany({user, saved:url.searchParams.get('saved')==='1', welcome:url.searchParams.get('welcome')==='1', rating:await ratingFor(user.id,'employer'), reviews:await reviewsFor(user.id,'employer'), payRep:await payRep(user.id), rehire:await rehireStat(user.id)})}));
+        return send(res, V.layout({title:'Company profile',user,active:'',body:V.empCompany({user, saved:url.searchParams.get('saved')==='1', welcome:url.searchParams.get('welcome')==='1', rating:await ratingFor(user.id,'employer'), reviews:await reviewsFor(user.id,'employer'), payRep:await payRep(user.id), rehire:await rehireStat(user.id), safety:await safetyStat(user.id)})}));
       if(p==='/console/company' && method==='POST'){
         const b = await readBody(req);
         let site = String(b.company_website||'').trim().slice(0,200);

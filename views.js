@@ -336,6 +336,8 @@ const BUILTIN_ES = {
   // rehire loop
   'rehired':'recontratados','Workers this employer hired more than once':'Trabajadores que este empleador contrató más de una vez','Invite back':'Invitar de vuelta',
   '★ Saved':'★ Guardado','☆ Save to shortlist':'☆ Guardar en lista',
+  // safety pulse
+  'Site safety':'Seguridad del sitio','Site safety?':'¿Seguridad del sitio?','Safety':'Seguridad','Worker-rated site safety':'Seguridad del sitio calificada por trabajadores',
 };
 function T(s){
   if(LANG !== 'es' || !s) return s;
@@ -418,7 +420,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=65">
+  <link rel="stylesheet" href="/styles.css?v=66">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -925,7 +927,7 @@ function workerJobs({ matches, filters = {}, jobsGeo = null, needZip = false }) 
 }
 
 // ---------- worker: job detail ----------
-function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance = null, rules = null, empRating = {avg:0,count:0}, workAuth = '', empPay = {}, myQuote = null, payFloor = 0, empRehire = 0 }) {
+function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance = null, rules = null, empRating = {avg:0,count:0}, workAuth = '', empPay = {}, myQuote = null, payFloor = 0, empRehire = 0, empSafety = {} }) {
   const belowMin = rules && job.pay_min && job.pay_min < rules.minWage;
   const spon = (job.sponsorship)||'authorized';
   const sponMatch = (spon==='h2a'&&workAuth==='need_h2a')||(spon==='h2b'&&workAuth==='need_h2b');
@@ -985,12 +987,12 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
             : `<form method="post" action="/app/jobs/${job.id}/apply"><button class="btn full">${T('Apply with verified Work Card')}</button></form>`))}
       <form method="post" action="/app/jobs/${job.id}/save"><button class="btn full ghost">${saved?T('★ Saved — remove'):T('☆ Save this job')}</button></form>
     </div>
-    ${(job.company_about||job.company_website||job.company_size||empRating.count||empRehire)?`<div class="card">
+    ${(job.company_about||job.company_website||job.company_size||empRating.count||empRehire||(empSafety&&empSafety.n))?`<div class="card">
       <div class="sec-h" style="margin-top:0">${T('About the employer')}</div>
       <div class="job-row"><div class="big-av c sm">${initials(job.company||'')}</div>
         <div class="job-main"><b>${esc(job.company||'')}</b>
           <div class="muted sm">${esc(job.company_city||'')}${job.company_size?` · ${esc(job.company_size)} ${T('employees')}`:''}</div>
-          ${(empRating.count||empPay.pct!=null||empRehire)?`<div class="rating-row sm">${empRating.count?ratingHead(empRating):''} ${payRepBadge(empPay)} ${rehireBadge(empRehire)}</div>`:''}</div></div>
+          ${(empRating.count||empPay.pct!=null||empRehire||(empSafety&&empSafety.n))?`<div class="rating-row sm">${empRating.count?ratingHead(empRating):''} ${payRepBadge(empPay)} ${rehireBadge(empRehire)} ${safetyBadge(empSafety)}</div>`:''}</div></div>
       ${job.company_about?`<p class="descr" style="margin-top:10px">${esc(job.company_about)}</p>`:''}
       ${job.company_website?`<a class="nav-link" style="color:var(--brand-d)" href="${esc(job.company_website)}" target="_blank" rel="noopener">${esc(job.company_website)} ↗</a>`:''}
     </div>`:''}
@@ -1058,7 +1060,7 @@ function workerApplications({ apps, savedJobs, interviews = [], empReviews = {} 
       ${stageTimeline(a.stage)}
       ${a.stage==='Hired' ? (empReviews[a.job_id]
         ? `<div class="ok-card sm">${T('You reviewed this employer')} ${starBar(empReviews[a.job_id].stars)}</div>`
-        : `<div class="rev-cta"><div class="muted sm">${T('You worked here — rate the employer:')}</div>${reviewForm({action:'/app/reviews', hidden:{job_id:a.job_id, employer_id:a.employer_id}, label:T('Submit review'), prompt:T('How was working here?')})}</div>`) : ''}
+        : `<div class="rev-cta"><div class="muted sm">${T('You worked here — rate the employer:')}</div>${reviewForm({action:'/app/reviews', hidden:{job_id:a.job_id, employer_id:a.employer_id}, label:T('Submit review'), prompt:T('How was working here?'), safety:true})}</div>`) : ''}
       ${a.stage==='Hired' ? (a.pay_outcome
         ? `<div class="ok-card sm">${T('Pay reported')}: ${T({ontime:'Paid on time',late:'Paid late',short:'Paid short',unpaid:'Not paid'}[a.pay_outcome]||a.pay_outcome)}</div>`
         : `<div class="rev-cta"><div class="muted sm">${T('Did this employer pay you as promised?')}</div>
@@ -1386,13 +1388,19 @@ function reviewList(items){
     <div class="rev-top">${starBar(r.stars)} <b>${esc(r.author_name||'')}</b> <span class="rev-t">${timeAgo(r.created_at)}</span></div>
     ${r.body?`<p class="rev-b">${esc(r.body)}</p>`:''}</div>`).join('')}</div>`;
 }
-function reviewForm({ action, hidden = {}, label, prompt }){
+function reviewForm({ action, hidden = {}, label, prompt, safety = false }){
   const h = Object.entries(hidden).map(([k,v])=>`<input type="hidden" name="${esc(k)}" value="${esc(String(v))}">`).join('');
   const opts = [5,4,3,2,1].map(n=>`<option value="${n}">${'★'.repeat(n)} (${n})</option>`).join('');
+  const safetySel = safety ? `<select name="safety" aria-label="${T('Site safety')}"><option value="">${T('Site safety?')}</option>${[5,4,3,2,1].map(n=>`<option value="${n}">${T('Safety')} ${n}/5</option>`).join('')}</select>` : '';
   return `<form method="post" action="${action}" class="rev-form">${h}
     <select name="stars" aria-label="${T('Rating')}">${opts}</select>
+    ${safetySel}
     <input name="body" placeholder="${esc(prompt||T('Share how it went…'))}" maxlength="400">
     <button class="btn-sm">${label}</button></form>`;
+}
+function safetyBadge(s){
+  if(!s || !s.n) return '';
+  return `<span class="rep-badge ${repClass(Math.round(s.avg*20))}" title="${T('Worker-rated site safety')}">${icon('shield')} ${T('Safety')} ${Number(s.avg).toFixed(1)} <span class="rep-n">(${s.n})</span></span>`;
 }
 function fmtSlot(iso){
   const d = new Date(iso); if(isNaN(d)) return esc(iso);
@@ -1674,14 +1682,14 @@ function empAnalytics({ user, kpis, weekly = [], conv = [], topTrades = [], topJ
 }
 
 const COMPANY_SIZES = ['1–10','11–50','51–200','201–500','500+'];
-function empCompany({ user, saved = false, welcome = false, rating = {avg:0,count:0}, reviews = [], payRep = {}, rehire = 0 }) {
+function empCompany({ user, saved = false, welcome = false, rating = {avg:0,count:0}, reviews = [], payRep = {}, rehire = 0, safety = {} }) {
   const sizeOpts = `<option value="">Company size</option>`+COMPANY_SIZES.map(s=>`<option ${user.company_size===s?'selected':''}>${s}</option>`).join('');
   return `<section class="wrap narrow">
     ${welcome?`<div class="card welcome"><div class="welcome-h">${T('Welcome to Crewline')} 👋</div><p>${T('First, add your company so candidates trust your jobs. Then post your first role — takes a minute.')}</p></div>`:''}
     <div class="card profile-head">
       <div class="big-av c">${initials(user.company||user.name)}</div>
       <h2>${esc(user.company||'Your company')}</h2>
-      <div class="rating-row">${ratingHead(rating)} ${payRepBadge(payRep)} ${rehireBadge(rehire)}</div>
+      <div class="rating-row">${ratingHead(rating)} ${payRepBadge(payRep)} ${rehireBadge(rehire)} ${safetyBadge(safety)}</div>
       <p class="muted">${esc(user.company_city||'')}${user.company_size?` · ${esc(user.company_size)} ${T('employees')}`:''}</p>
       ${user.company_website?`<p><a class="nav-link" style="color:var(--brand-d)" href="${esc(user.company_website)}" target="_blank" rel="noopener">${esc(user.company_website)} ↗</a></p>`:''}
       ${user.company_about?`<p class="cand-bio">${esc(user.company_about)}</p>`:''}
