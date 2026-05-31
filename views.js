@@ -333,6 +333,9 @@ const BUILTIN_ES = {
   // shareable work card
   'Share my Work Card':'Compartir mi tarjeta','Preview ↗':'Vista previa ↗','Link copied ✓':'Enlace copiado ✓','Copy link':'Copiar enlace','Portfolio':'Portafolio','Public page ↗':'Página pública ↗',
   'One link with your trades, credentials, reviews & portfolio — text it to any employer.':'Un enlace con tus oficios, credenciales, reseñas y portafolio — envíalo por mensaje a cualquier empleador.',
+  // rehire loop
+  'rehired':'recontratados','Workers this employer hired more than once':'Trabajadores que este empleador contrató más de una vez','Invite back':'Invitar de vuelta',
+  '★ Saved':'★ Guardado','☆ Save to shortlist':'☆ Guardar en lista',
 };
 function T(s){
   if(LANG !== 'es' || !s) return s;
@@ -415,7 +418,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=64">
+  <link rel="stylesheet" href="/styles.css?v=65">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -922,7 +925,7 @@ function workerJobs({ matches, filters = {}, jobsGeo = null, needZip = false }) 
 }
 
 // ---------- worker: job detail ----------
-function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance = null, rules = null, empRating = {avg:0,count:0}, workAuth = '', empPay = {}, myQuote = null, payFloor = 0 }) {
+function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance = null, rules = null, empRating = {avg:0,count:0}, workAuth = '', empPay = {}, myQuote = null, payFloor = 0, empRehire = 0 }) {
   const belowMin = rules && job.pay_min && job.pay_min < rules.minWage;
   const spon = (job.sponsorship)||'authorized';
   const sponMatch = (spon==='h2a'&&workAuth==='need_h2a')||(spon==='h2b'&&workAuth==='need_h2b');
@@ -982,12 +985,12 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
             : `<form method="post" action="/app/jobs/${job.id}/apply"><button class="btn full">${T('Apply with verified Work Card')}</button></form>`))}
       <form method="post" action="/app/jobs/${job.id}/save"><button class="btn full ghost">${saved?T('★ Saved — remove'):T('☆ Save this job')}</button></form>
     </div>
-    ${(job.company_about||job.company_website||job.company_size||empRating.count)?`<div class="card">
+    ${(job.company_about||job.company_website||job.company_size||empRating.count||empRehire)?`<div class="card">
       <div class="sec-h" style="margin-top:0">${T('About the employer')}</div>
       <div class="job-row"><div class="big-av c sm">${initials(job.company||'')}</div>
         <div class="job-main"><b>${esc(job.company||'')}</b>
           <div class="muted sm">${esc(job.company_city||'')}${job.company_size?` · ${esc(job.company_size)} ${T('employees')}`:''}</div>
-          ${(empRating.count||empPay.pct!=null)?`<div class="rating-row sm">${empRating.count?ratingHead(empRating):''} ${payRepBadge(empPay)}</div>`:''}</div></div>
+          ${(empRating.count||empPay.pct!=null||empRehire)?`<div class="rating-row sm">${empRating.count?ratingHead(empRating):''} ${payRepBadge(empPay)} ${rehireBadge(empRehire)}</div>`:''}</div></div>
       ${job.company_about?`<p class="descr" style="margin-top:10px">${esc(job.company_about)}</p>`:''}
       ${job.company_website?`<a class="nav-link" style="color:var(--brand-d)" href="${esc(job.company_website)}" target="_blank" rel="noopener">${esc(job.company_website)} ↗</a>`:''}
     </div>`:''}
@@ -1405,6 +1408,10 @@ function payRepBadge(p){
   if(!p || p.pct==null) return '';
   return `<span class="rep-badge ${repClass(p.pct)}" title="${T('Worker-confirmed pay outcomes')}">${icon('dot')} ${T('Pays on time')} ${p.pct}% <span class="rep-n">(${p.n})</span></span>`;
 }
+function rehireBadge(n){
+  if(!n) return '';
+  return `<span class="rep-badge good" title="${T('Workers this employer hired more than once')}">${icon('star')} ${n} ${n===1?T('rehired'):T('rehired')}</span>`;
+}
 function crewCard({ crew = [], editable = false }){
   const rows = crew.map(m=>`<div class="crew-row"><span class="crew-av">${initials(m.name)}</span>
     <div class="crew-main"><b>${esc(m.name)}</b><span class="muted sm">${esc(TRADES[m.trade]||m.trade||'')}${m.note?` · ${esc(m.note)}`:''}</span></div>
@@ -1667,14 +1674,14 @@ function empAnalytics({ user, kpis, weekly = [], conv = [], topTrades = [], topJ
 }
 
 const COMPANY_SIZES = ['1–10','11–50','51–200','201–500','500+'];
-function empCompany({ user, saved = false, welcome = false, rating = {avg:0,count:0}, reviews = [], payRep = {} }) {
+function empCompany({ user, saved = false, welcome = false, rating = {avg:0,count:0}, reviews = [], payRep = {}, rehire = 0 }) {
   const sizeOpts = `<option value="">Company size</option>`+COMPANY_SIZES.map(s=>`<option ${user.company_size===s?'selected':''}>${s}</option>`).join('');
   return `<section class="wrap narrow">
     ${welcome?`<div class="card welcome"><div class="welcome-h">${T('Welcome to Crewline')} 👋</div><p>${T('First, add your company so candidates trust your jobs. Then post your first role — takes a minute.')}</p></div>`:''}
     <div class="card profile-head">
       <div class="big-av c">${initials(user.company||user.name)}</div>
       <h2>${esc(user.company||'Your company')}</h2>
-      <div class="rating-row">${ratingHead(rating)} ${payRepBadge(payRep)}</div>
+      <div class="rating-row">${ratingHead(rating)} ${payRepBadge(payRep)} ${rehireBadge(rehire)}</div>
       <p class="muted">${esc(user.company_city||'')}${user.company_size?` · ${esc(user.company_size)} ${T('employees')}`:''}</p>
       ${user.company_website?`<p><a class="nav-link" style="color:var(--brand-d)" href="${esc(user.company_website)}" target="_blank" rel="noopener">${esc(user.company_website)} ↗</a></p>`:''}
       ${user.company_about?`<p class="cand-bio">${esc(user.company_about)}</p>`:''}
@@ -1881,16 +1888,17 @@ function inbox({ convos, base, meId }){
 }
 
 // ---------- employer: candidate detail ----------
-function empCandidate({ worker, profile, creds, matches, apps, messages, meId, notes = [], saved = false, portfolio = [], work = [], rating = {avg:0,count:0}, reviews = [], canReviewJob = null, myReview = null, interviews = {}, screen = null, showUp = {}, crew = [] }) {
+function empCandidate({ worker, profile, creds, matches, apps, messages, meId, notes = [], saved = false, portfolio = [], work = [], rating = {avg:0,count:0}, reviews = [], canReviewJob = null, myReview = null, interviews = {}, screen = null, showUp = {}, crew = [], inviteBack = null }) {
   const stageByJob = {}; for (const a of apps) stageByJob[a.job_id] = a.stage;
   const screenPanel = (jobId) => (screen && screen.jobId===jobId) ? `<div class="iv">
     <div class="iv-h">${icon('spark','xic')} ${T('AI screen')}${screen.ai?'':` <span class="muted sm">(${T('offline')})</span>`}</div>
     <p class="agent-line sm">${esc(screen.summary)}</p>
     <ol class="screen-q">${(screen.questions||[]).map(q=>`<li>${esc(q)}</li>`).join('')}</ol></div>` : '';
   return `<section class="wrap narrow">
-    <div class="cand-top"><a class="back" href="/console/search">← Talent Search</a>
+    <div class="cand-top"><a class="back" href="/console/search">← ${T('Talent Search')}</a>
+      ${inviteBack?`<form method="post" action="/console/candidates/${worker.id}/inviteback"><input type="hidden" name="job_id" value="${inviteBack.jobId}"><button class="btn-sm">${icon('star')} ${T('Invite back')} → ${esc(inviteBack.title)}</button></form>`:''}
       <form method="post" action="/console/candidates/${worker.id}/save">
-        <button class="btn-sm ${saved?'':'ghost'}">${saved?'★ Saved':'☆ Save to shortlist'}</button>
+        <button class="btn-sm ${saved?'':'ghost'}">${saved?T('★ Saved'):T('☆ Save to shortlist')}</button>
       </form>
     </div>
     <div class="card profile-head">

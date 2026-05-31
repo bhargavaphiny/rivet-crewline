@@ -1088,6 +1088,20 @@ async function init() {
   try { await seedXfactors(); } catch (e) { console.error('[db] xfactors seed skipped (non-fatal):', e.message); }
   try { await seedHomeowner(); } catch (e) { console.error('[db] homeowner seed skipped (non-fatal):', e.message); }
   try {
+    if(!(await metaGet('rehire_v1'))){
+      // make one Sun Valley worker a repeat hire so the "rehires its crew" stat shows
+      const emp = await db.prepare("SELECT id FROM users WHERE email='ops@sunvalley.test'").get();
+      const w = await db.prepare("SELECT id FROM users WHERE email='kim@rivet.test'").get();
+      if(emp && w){
+        for(const title of ['Commercial Electrician','Controls Technician']){
+          const j = await db.prepare('SELECT id FROM jobs WHERE employer_id=? AND title=?').get(emp.id, title);
+          if(j){ try { await db.prepare("INSERT INTO applications(job_id,worker_id,stage,score,outcome) VALUES(?,?,'Hired',92,'showed') ON CONFLICT(job_id,worker_id) DO UPDATE SET stage='Hired', outcome=COALESCE(applications.outcome,'showed')").run(j.id, w.id); } catch(e){} }
+        }
+      }
+      await metaSet('rehire_v1','1');
+    }
+  } catch (e) { console.error('[db] rehire seed skipped (non-fatal):', e.message); }
+  try {
     if(!(await metaGet('inclusion_v1'))){
       // fair-chance: trades & roles where second-chance hiring is common and impactful
       await db.exec("UPDATE jobs SET fair_chance=1 WHERE trade IN ('warehouse','mover','janitor','landscaper','concrete','demolition','dishwasher','prep_cook','delivery_driver','junk_removal','packing_shed','welder','pipefitter')");

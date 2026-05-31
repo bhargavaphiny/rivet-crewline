@@ -266,6 +266,19 @@ async function payRep(employerId){
   return { n: total, pct: total ? Math.round((ontime/total)*100) : null };
 }
 const crewOf = (workerId) => db.prepare('SELECT * FROM crew_members WHERE worker_id=? ORDER BY id').all(workerId);
+// Rehire signal: how many workers this employer has hired on 2+ of their jobs (they came back).
+async function rehireStat(employerId){
+  const r = await db.prepare(`SELECT COUNT(*) n FROM (
+    SELECT a.worker_id FROM applications a JOIN jobs j ON j.id=a.job_id
+    WHERE j.employer_id=? AND a.stage='Hired' GROUP BY a.worker_id HAVING COUNT(*)>=2)`).get(employerId);
+  return r ? r.n : 0;
+}
+// has this employer hired this worker before (on any job)?
+async function hiredBefore(employerId, workerId){
+  const r = await db.prepare(`SELECT COUNT(*) n FROM applications a JOIN jobs j ON j.id=a.job_id
+    WHERE j.employer_id=? AND a.worker_id=? AND a.stage='Hired'`).get(employerId, workerId);
+  return r ? r.n : 0;
+}
 
 // ---------- agents ----------
 function isExternalJob(j){ return !!(j && j.source && j.source!=='Rivet' && j.apply_url); }
@@ -375,7 +388,14 @@ async function sendCandidate(res, user, wid, screen=null){
   const interviews = {}; for(const iv of ivRows) interviews[iv.job_id] = iv;
   const su = await showUp(wid);
   const crew = await crewOf(wid);
-  return send(res, V.layout({title:w.name,user,active:'search',body:V.empCandidate({worker:w,profile:prof,creds,matches,apps,messages,meId:user.id,notes,saved,portfolio,work,rating,reviews,canReviewJob,myReview,interviews,screen,showUp:su,crew})}));
+  // rehire: if we've hired them before, offer a one-click invite to an open job they're not in
+  let inviteBack = null;
+  if(await hiredBefore(user.id, wid)){
+    const inPipe = new Set(apps.map(a=>a.job_id));
+    const openJob = jobs.find(j=>j.status==='open' && !inPipe.has(j.id));
+    if(openJob) inviteBack = { jobId: openJob.id, title: openJob.title };
+  }
+  return send(res, V.layout({title:w.name,user,active:'search',body:V.empCandidate({worker:w,profile:prof,creds,matches,apps,messages,meId:user.id,notes,saved,portfolio,work,rating,reviews,canReviewJob,myReview,interviews,screen,showUp:su,crew,inviteBack})}));
 }
 
 // ---------- geo / distance ----------
@@ -994,7 +1014,7 @@ const server = http.createServer(async (req,res)=>{
         const empRating = await ratingFor(job.employer_id, 'employer');
         const empPay = await payRep(job.employer_id);
         const myQuote = job.quotes_ok ? await db.prepare('SELECT * FROM quotes WHERE job_id=? AND worker_id=?').get(jid, user.id) : null;
-        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied,saved,jobMedia,distance,rules,empRating,workAuth:prof.work_auth||'',empPay,myQuote,payFloor:prof.pay_floor||0})}));
+        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied,saved,jobMedia,distance,rules,empRating,workAuth:prof.work_auth||'',empPay,myQuote,payFloor:prof.pay_floor||0,empRehire:await rehireStat(job.employer_id)})}));
       }
       if(jid && p===`/app/jobs/${jid}/quote` && method==='POST'){
         const job = await db.prepare('SELECT id,title,employer_id,quotes_ok FROM jobs WHERE id=?').get(jid);
@@ -1094,7 +1114,7 @@ const server = http.createServer(async (req,res)=>{
           kpis:{pipeline, hired, fillRate}, weekly, conv, topTrades, topJobs, avgScore, totalApps})}));
       }
       if(p==='/console/company' && method==='GET')
-        return send(res, V.layout({title:'Company profile',user,active:'',body:V.empCompany({user, saved:url.searchParams.get('saved')==='1', welcome:url.searchParams.get('welcome')==='1', rating:await ratingFor(user.id,'employer'), reviews:await reviewsFor(user.id,'employer'), payRep:await payRep(user.id)})}));
+        return send(res, V.layout({title:'Company profile',user,active:'',body:V.empCompany({user, saved:url.searchParams.get('saved')==='1', welcome:url.searchParams.get('welcome')==='1', rating:await ratingFor(user.id,'employer'), reviews:await reviewsFor(user.id,'employer'), payRep:await payRep(user.id), rehire:await rehireStat(user.id)})}));
       if(p==='/console/company' && method==='POST'){
         const b = await readBody(req);
         let site = String(b.company_website||'').trim().slice(0,200);
@@ -1436,6 +1456,18 @@ const server = http.createServer(async (req,res)=>{
             await db.prepare("INSERT INTO interviews(job_id,worker_id,employer_id,slots,status) VALUES(?,?,?,?,'proposed')").run(jobId, wid, user.id, JSON.stringify(slots));
             await sendMessage(user.id, wid, `Interview invite for "${job.title}" — open your Applications to pick a time.`);
           } catch(e){}
+        }
+        return redirect(res, `/console/candidates/${wid}`);
+      }
+      const cInvite = p.match(/^\/console\/candidates\/(\d+)\/inviteback$/);
+      if(cInvite && method==='POST'){
+        const wid = Number(cInvite[1]); const b = await readBody(req);
+        const jobId = Number(b.job_id)||0;
+        const job = jobId && await db.prepare('SELECT id,title FROM jobs WHERE id=? AND employer_id=?').get(jobId, user.id);
+        if(job && await hiredBefore(user.id, wid)){
+          const prof = await getProfile(wid); const m = bestMatch(prof, await getCreds(wid), job);
+          try { await db.prepare("INSERT INTO applications(job_id,worker_id,stage,score) VALUES(?,?,'Sourced',?)").run(jobId, wid, m.score); } catch(e){}
+          try { await sendMessage(user.id, wid, `We'd love to have you back — I added you to "${job.title}". Interested?`); } catch(e){}
         }
         return redirect(res, `/console/candidates/${wid}`);
       }
