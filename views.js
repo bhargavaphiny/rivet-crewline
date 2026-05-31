@@ -788,42 +788,42 @@ function empOverview({ user, kpis, funnel, recent, hot, alerts, fillRate, geo = 
       <b class="fn-n">${funnel[s]||0}</b>
     </div>`).join('');
   return `<section class="wrap">
-    <div class="page-h"><h2>Overview</h2><p class="muted">${esc(user.company||user.name)}</p>
-      <a class="btn-sm right" href="/console/jobs/new">+ Post a job</a></div>
+    <div class="page-h"><h2>${T('Overview')}</h2><p class="muted">${esc(user.company||user.name)}</p>
+      <a class="btn-sm right" href="/console/jobs/new">${T('+ Post a job')}</a></div>
     <div class="kpis">
-      ${kpi('Open jobs',kpis.openJobs)}
-      ${kpi('Verified talent pool',kpis.pool)}
-      ${kpi('In pipeline',kpis.pipeline)}
-      ${kpi('Hired',kpis.hired)}
-      ${kpi('Fill rate',fillRate+'%')}
+      ${kpi(T('Open jobs'),kpis.openJobs)}
+      ${kpi(T('Verified talent pool'),kpis.pool)}
+      ${kpi(T('In pipeline'),kpis.pipeline)}
+      ${kpi(T('Hired'),kpis.hired)}
+      ${kpi(T('Fill rate'),fillRate+'%')}
     </div>
     <div class="grid2">
       <div class="card">
-        <div class="sec-h" style="margin-top:0">Hiring funnel <span class="muted">${kpis.applicants} candidates</span></div>
-        ${kpis.applicants ? `<div class="funnel">${funnelBars}</div>` : '<p class="muted">No candidates in your pipeline yet. <a href="/console/search">Source from Talent Search →</a></p>'}
+        <div class="sec-h" style="margin-top:0">${T('Hiring funnel')} <span class="muted">${kpis.applicants} ${T('candidates')}</span></div>
+        ${kpis.applicants ? `<div class="funnel">${funnelBars}</div>` : `<p class="muted">${T('No candidates in your pipeline yet.')} <a href="/console/search">${T('Source from Talent Search →')}</a></p>`}
       </div>
       <div class="card">
-        <div class="sec-h" style="margin-top:0">Recent activity</div>
+        <div class="sec-h" style="margin-top:0">${T('Recent activity')}</div>
         ${recent && recent.length ? recent.map(r=>`<div class="act">
           <span class="av-t">${initials(r.name)}</span>
-          <div class="act-b"><a class="cand-link" href="/console/candidates/${r.worker_id}">${esc(r.name)}</a> entered <b>${esc(r.title)}</b> <span class="stage-pill sm">${esc(r.stage)}</span></div>
+          <div class="act-b"><a class="cand-link" href="/console/candidates/${r.worker_id}">${esc(r.name)}</a> ${T('entered')} <b>${esc(r.title)}</b> <span class="stage-pill sm">${esc(r.stage)}</span></div>
           <span class="act-t">${timeAgo(r.created_at)}</span>
-        </div>`).join('') : '<p class="muted">No recent activity yet.</p>'}
+        </div>`).join('') : `<p class="muted">${T('No recent activity yet.')}</p>`}
       </div>
     </div>
-    ${usMap(geo, {title:'Where your talent is', noun:'candidate', emptyMsg:'No mapped candidate locations yet. Locations appear as workers add a ZIP to their Work Card.'})}
+    ${usMap(geo, {title:T('Where your talent is'), noun:T('candidate'), emptyMsg:T('No mapped candidate locations yet. Locations appear as workers add a ZIP to their Work Card.')})}
     <div class="grid2">
       <div class="card">
-        <div class="sec-h" style="margin-top:0">Hot candidates — ready now <a href="/console/search">Search all</a></div>
-        <table class="tbl"><tr><th>Candidate</th><th>Trade</th><th>Readiness</th><th>Creds</th></tr>
+        <div class="sec-h" style="margin-top:0">${T('Hot candidates — ready now')} <a href="/console/search">${T('Search all')}</a></div>
+        <table class="tbl"><tr><th>${T('Candidate')}</th><th>${T('Trade')}</th><th>${T('Readiness')}</th><th>${T('Creds')}</th></tr>
         ${hot.map(w=>`<tr><td><a class="cand-link" href="/console/candidates/${w.id}"><span class="av-t">${initials(w.name)}</span> ${esc(w.name)}</a></td>
           <td>${TRADES[w.trade]||w.trade}</td>
           <td><span class="score-tag ${scoreClass(w.readiness)}">${w.readiness}</span></td>
-          <td>${w.vcount} verified</td></tr>`).join('') || '<tr><td colspan=4 class="muted">No workers yet.</td></tr>'}
+          <td>${w.vcount} ${T('verified')}</td></tr>`).join('') || `<tr><td colspan=4 class="muted">${T('No workers yet.')}</td></tr>`}
         </table>
       </div>
       <div class="card">
-        <div class="sec-h" style="margin-top:0">Needs attention</div>
+        <div class="sec-h" style="margin-top:0">${T('Needs attention')}</div>
         ${alerts.map(a=>`<div class="alert ${a.lvl}">${esc(a.text)}</div>`).join('')}
       </div>
     </div>
@@ -843,7 +843,7 @@ function empCompany({ user, saved = false }) {
       ${user.company_about?`<p class="cand-bio">${esc(user.company_about)}</p>`:''}
     </div>
     <div class="card">
-      <div class="sec-h" style="margin-top:0">Company profile <span class="muted sm">shown to candidates on your jobs</span></div>
+      <div class="sec-h" style="margin-top:0">${T('Company profile')} <span class="muted sm">${T('shown to candidates on your jobs')}</span></div>
       ${saved?'<div class="ok-card">Saved.</div>':''}
       <form method="post" action="/console/company">
         <label>Company name <input name="company" maxlength="80" value="${esc(user.company||'')}" placeholder="e.g. Sun Valley Mechanical"></label>
@@ -853,7 +853,7 @@ function empCompany({ user, saved = false }) {
         </div>
         <label>Website <input name="company_website" maxlength="200" value="${esc(user.company_website||'')}" placeholder="https://…"></label>
         <label>About the company <textarea name="company_about" rows="4" maxlength="800" placeholder="What you build, who you hire, why crews stay. Candidates read this before applying.">${esc(user.company_about||'')}</textarea></label>
-        <button class="btn">Save company profile</button>
+        <button class="btn">${T('Save company profile')}</button>
       </form>
     </div>
   </section>`;
@@ -861,7 +861,7 @@ function empCompany({ user, saved = false }) {
 
 function empJobs({ jobs }) {
   return `<section class="wrap">
-    <div class="page-h"><h2>Job Postings</h2><a class="btn-sm right" href="/console/jobs/new">+ Post a job</a></div>
+    <div class="page-h"><h2>${T('Job Postings')}</h2><a class="btn-sm right" href="/console/jobs/new">${T('+ Post a job')}</a></div>
     ${jobs.map(j=>`<a class="jobline" href="/console/jobs/${j.id}">
       <div class="jl-left"><div class="badge">${tradeEmoji(j.trade)}</div>
         <div><h4>${esc(j.title)}</h4><div class="muted">${esc(j.city)} · $${j.pay_min}–${j.pay_max}/hr · ${esc(j.shift)}</div></div></div>
@@ -876,7 +876,7 @@ function empJobForm(error='') {
   const cred = Object.entries(CRED_KINDS).map(([k,v])=>`<label class="ck"><input type="checkbox" name="req_creds" value="${k}"> ${v}</label>`).join('');
   const typeOpts = JOB_TYPES.map(t=>`<option>${t}</option>`).join('');
   return `<section class="wrap narrow"><div class="card">
-    <h2>Post a job</h2><p class="muted">It's matched against the verified talent pool instantly.</p>
+    <h2>${T('Post a job')}</h2><p class="muted">${T("It's matched against the verified talent pool instantly.")}</p>
     ${error?`<div class="err">${esc(error)}</div>`:''}
     <form method="post" action="/console/jobs/new">
       <label>Title <input name="title" required placeholder="Commercial Electrician"></label>
@@ -938,15 +938,15 @@ function empPipeline({ job, columns, candidates, jobMedia = [], alerted = 0 }) {
 function empSearch({ rows, filters }) {
   const tradeOpts = `<option value="">All trades</option>`+Object.entries(TRADES).map(([k,v])=>`<option value="${k}" ${filters.trade===k?'selected':''}>${v}</option>`).join('');
   return `<section class="wrap">
-    <div class="page-h"><h2>Talent Search</h2><p class="muted">${rows.length} verified candidates</p>
+    <div class="page-h"><h2>${T('Talent Search')}</h2><p class="muted">${rows.length} ${T('verified candidates')}</p>
       <a class="btn-sm right ghost" href="/console/shortlist">★ Shortlist</a></div>
     <form class="filters" method="get" action="/console/search">
       <select name="trade" onchange="this.form.submit()">${tradeOpts}</select>
-      <label class="chk"><input type="checkbox" name="verified" value="1" ${filters.verified?'checked':''} onchange="this.form.submit()"> Verified only</label>
-      <label class="chk"><input type="checkbox" name="ready" value="1" ${filters.ready?'checked':''} onchange="this.form.submit()"> Readiness ≥ 85</label>
-      <label class="chk"><input type="checkbox" name="avail" value="1" ${filters.avail?'checked':''} onchange="this.form.submit()"> 🟢 Available now</label>
-      <label class="chk"><input type="checkbox" name="today" value="1" ${filters.today?'checked':''} onchange="this.form.submit()"> ⚡ Work today</label>
-      <label class="chk"><input type="checkbox" name="relocate" value="1" ${filters.relocate?'checked':''} onchange="this.form.submit()"> ✈️ Open to relocate</label>
+      <label class="chk"><input type="checkbox" name="verified" value="1" ${filters.verified?'checked':''} onchange="this.form.submit()"> ${T('Verified only')}</label>
+      <label class="chk"><input type="checkbox" name="ready" value="1" ${filters.ready?'checked':''} onchange="this.form.submit()"> ${T('Readiness ≥ 85')}</label>
+      <label class="chk"><input type="checkbox" name="avail" value="1" ${filters.avail?'checked':''} onchange="this.form.submit()"> ${T('🟢 Available now')}</label>
+      <label class="chk"><input type="checkbox" name="today" value="1" ${filters.today?'checked':''} onchange="this.form.submit()"> ${T('⚡ Work today')}</label>
+      <label class="chk"><input type="checkbox" name="relocate" value="1" ${filters.relocate?'checked':''} onchange="this.form.submit()"> ${T('✈️ Open to relocate')}</label>
     </form>
     <div class="card" style="padding:0">
       <table class="tbl wide"><tr><th>Candidate</th><th>Trade</th><th>Exp</th><th>Credentials</th><th>Readiness</th><th>Pay floor</th></tr>
@@ -1047,8 +1047,8 @@ function empCandidate({ worker, profile, creds, matches, apps, messages, meId, n
 // ---------- employer: shortlist ----------
 function empShortlist({ rows }) {
   return `<section class="wrap">
-    <div class="page-h"><h2>Shortlist</h2><p class="muted">${rows.length} saved candidate${rows.length===1?'':'s'}</p>
-      <a class="btn-sm right" href="/console/search">Talent Search</a></div>
+    <div class="page-h"><h2>${T('Shortlist')}</h2><p class="muted">${rows.length} ${rows.length===1?T('saved candidate'):T('saved candidates')}</p>
+      <a class="btn-sm right" href="/console/search">${T('Talent Search')}</a></div>
     ${rows.length ? `<div class="card" style="padding:0"><table class="tbl wide"><tr><th>Candidate</th><th>Trade</th><th>Exp</th><th>Readiness</th><th>Pay floor</th></tr>
       ${rows.map(w=>`<tr><td><a class="cand-link" href="/console/candidates/${w.id}"><span class="av-t">${initials(w.name)}</span> ${esc(w.name)}</a>${w.available?'<span class="avail-dot" title="Available for work">●</span>':''}${w.work_today?'<span class="today-chip" title="Can work today">⚡</span>':''}${w.relocate?'<span class="today-chip" title="Open to relocate">✈️</span>':''}</td>
         <td>${TRADES[w.trade]||w.trade}</td><td>${w.years_exp} yr</td>
