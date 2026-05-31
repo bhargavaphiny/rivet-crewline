@@ -77,7 +77,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=12">
+  <link rel="stylesheet" href="/styles.css?v=13">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -290,10 +290,23 @@ function credRow(c){
 }
 
 // ---------- worker: all matches ----------
-function workerJobs({ matches }) {
+function workerJobs({ matches, filters = {} }) {
+  const tradeOpts = `<option value="">All trades</option>`+Object.entries(TRADES).map(([k,v])=>`<option value="${k}" ${filters.trade===k?'selected':''}>${v}</option>`).join('');
+  const shifts = ['Day','Night','4x10','Any'];
+  const shiftOpts = `<option value="">Any shift</option>`+shifts.map(s=>`<option value="${s}" ${filters.shift===s?'selected':''}>${s}</option>`).join('');
+  const active = (filters.q||filters.trade||filters.city||filters.minpay||filters.shift);
   return `<section class="wrap">
-    <div class="sec-h big">Your matches <span class="muted">${matches.length} jobs ranked by fit</span></div>
-    <div class="grid3">${matches.map(jobCard).join('') || '<div class="card muted">No open jobs yet.</div>'}</div>
+    <div class="sec-h big">Find work <span class="muted">${matches.length} job${matches.length===1?'':'s'}${active?' · filtered':' · ranked by fit'}</span></div>
+    <form class="jobfilters" method="get" action="/app/jobs">
+      <input name="q" value="${esc(filters.q||'')}" placeholder="Search title or company" aria-label="Search">
+      <select name="trade" aria-label="Trade">${tradeOpts}</select>
+      <input name="city" value="${esc(filters.city||'')}" placeholder="City" aria-label="City">
+      <input name="minpay" type="number" min="0" inputmode="numeric" value="${filters.minpay||''}" placeholder="Min $/hr" aria-label="Minimum pay">
+      <select name="shift" aria-label="Shift">${shiftOpts}</select>
+      <button class="btn-sm">Search</button>
+      ${active?`<a class="nav-link" style="color:var(--orange-d)" href="/app/jobs">Clear</a>`:''}
+    </form>
+    <div class="grid3">${matches.map(jobCard).join('') || '<div class="card muted">No jobs match those filters. <a href="/app/jobs">Clear filters</a> to see all open work.</div>'}</div>
   </section>`;
 }
 

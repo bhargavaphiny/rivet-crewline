@@ -263,8 +263,22 @@ const server = http.createServer(async (req,res)=>{
 
       if(p==='/app' && method==='GET')
         return send(res, V.layout({title:'Home',user,active:'home',body:V.workerHome({user,profile:prof,creds:await getCreds(user.id),matches:await rankJobsForWorker(user.id)})}));
-      if(p==='/app/jobs' && method==='GET')
-        return send(res, V.layout({title:'Matches',user,active:'jobs',body:V.workerJobs({matches:await rankJobsForWorker(user.id)})}));
+      if(p==='/app/jobs' && method==='GET'){
+        const f = {
+          q:(url.searchParams.get('q')||'').trim(),
+          trade:url.searchParams.get('trade')||'',
+          city:(url.searchParams.get('city')||'').trim(),
+          minpay:Number(url.searchParams.get('minpay'))||0,
+          shift:url.searchParams.get('shift')||'',
+        };
+        let matches = await rankJobsForWorker(user.id);
+        if(f.q){ const q=f.q.toLowerCase(); matches=matches.filter(m=>(m.job.title||'').toLowerCase().includes(q)||(m.job.company||'').toLowerCase().includes(q)); }
+        if(f.trade) matches=matches.filter(m=>m.job.trade===f.trade);
+        if(f.city){ const c=f.city.toLowerCase(); matches=matches.filter(m=>(m.job.city||'').toLowerCase().includes(c)); }
+        if(f.minpay) matches=matches.filter(m=>(m.job.pay_max||0)>=f.minpay);
+        if(f.shift) matches=matches.filter(m=>m.job.shift===f.shift);
+        return send(res, V.layout({title:'Find work',user,active:'jobs',body:V.workerJobs({matches, filters:f})}));
+      }
       if(p==='/app/profile' && method==='GET'){
         const portfolio = await db.prepare("SELECT * FROM media WHERE user_id=? AND target='portfolio' ORDER BY created_at DESC, id DESC").all(user.id);
         return send(res, V.layout({title:'Work Card',user,active:'profile',body:V.workerProfile({user,profile:prof,creds:await getCreds(user.id),portfolio})}));

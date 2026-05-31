@@ -211,6 +211,11 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--orange)}
 .foot-col a:hover{color:var(--amber)}
 .foot-base{border-top:1px solid rgba(255,255,255,.1);margin-top:26px;padding-top:18px;font-size:12.5px;color:#8da0ab}
 
+/* candidate job search */
+.jobfilters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 18px}
+.jobfilters input,.jobfilters select{margin:0;width:auto;flex:1;min-width:130px}
+.jobfilters .btn-sm{flex:0 0 auto}
+
 /* media gallery / portfolio */
 .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin:6px 0}
 .m-item{position:relative;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--paper-2)}
