@@ -150,12 +150,17 @@ function landing() {
 // ---------- auth ----------
 function authForm(kind, { role = 'worker', error = '', google = false } = {}) {
   const isSignup = kind === 'signup';
-  const googleBlock = google ? `
+  const googleBtn = google ? `
       <a class="gbtn full" id="gbtn" href="/auth/google?role=${esc(role)}">
         <svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
         Continue with Google
-      </a>
-      <div class="or"><span>or</span></div>` : '';
+      </a>` : '';
+  const phoneBtn = `
+      <a class="gbtn full" id="phonebtn" href="/phone?role=${esc(role)}">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="#16242F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+        Continue with phone
+      </a>`;
+  const googleBlock = `${googleBtn}${phoneBtn}<div class="or"><span>or</span></div>`;
   return `<section class="wrap narrow">
     <div class="card auth">
       <h2>${isSignup?'Create your account':'Welcome back'}</h2>
@@ -182,8 +187,39 @@ function authForm(kind, { role = 'worker', error = '', google = false } = {}) {
   <script>
     const sel=document.querySelector('select[name=role]');
     const gb=document.getElementById('gbtn');
-    if(sel){const t=()=>{document.querySelectorAll('.emp-only').forEach(e=>e.style.display=sel.value==='employer'?'block':'none');if(gb)gb.href='/auth/google?role='+sel.value;};sel.onchange=t;t();}
+    const pb=document.getElementById('phonebtn');
+    if(sel){const t=()=>{document.querySelectorAll('.emp-only').forEach(e=>e.style.display=sel.value==='employer'?'block':'none');if(gb)gb.href='/auth/google?role='+sel.value;if(pb)pb.href='/phone?role='+sel.value;};sel.onchange=t;t();}
   </script>`;
+}
+
+// ---------- phone (SMS OTP) ----------
+function phoneStart({ role='worker', name='', phone='', error='' }){
+  return `<section class="wrap narrow"><div class="card auth">
+    <h2>Sign in with your phone</h2>
+    <p class="muted">We’ll text you a 6-digit code — no password to remember.</p>
+    ${error?`<div class="err">${esc(error)}</div>`:''}
+    <form method="post" action="/phone/start">
+      <input type="hidden" name="role" value="${esc(role)}">
+      <label>Mobile number <input name="phone" type="tel" inputmode="tel" autocomplete="tel" value="${esc(phone)}" placeholder="+1 555 123 4567" required></label>
+      <label>Your name <input name="name" value="${esc(name)}" placeholder="First and last name" autocomplete="name"></label>
+      <button class="btn full" type="submit">Text me a code</button>
+    </form>
+    <p class="muted">Prefer email? <a href="/login">Log in</a> · <a href="/signup">Sign up</a></p>
+  </div></section>`;
+}
+function phoneVerify({ phone, demoCode='', error='' }){
+  return `<section class="wrap narrow"><div class="card auth">
+    <h2>Enter your code</h2>
+    <p class="muted">We sent a 6-digit code to <b>${esc(phone)}</b>.</p>
+    ${demoCode?`<div class="ok-card">Demo mode (no SMS provider connected yet): your code is <b style="font-size:18px;letter-spacing:2px">${esc(demoCode)}</b></div>`:''}
+    ${error?`<div class="err">${esc(error)}</div>`:''}
+    <form method="post" action="/phone/verify">
+      <input type="hidden" name="phone" value="${esc(phone)}">
+      <label>6-digit code <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]*" placeholder="123456" required></label>
+      <button class="btn full" type="submit">Verify &amp; continue</button>
+    </form>
+    <p class="muted"><a href="/phone">Use a different number</a></p>
+  </div></section>`;
 }
 
 // ---------- worker onboarding ----------
@@ -708,5 +744,5 @@ function ogImage() {
 </svg>`;
 }
 
-module.exports = { layout, landing, authForm, workerOnboard, workerHome, workerJobs,
+module.exports = { layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
   jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES };

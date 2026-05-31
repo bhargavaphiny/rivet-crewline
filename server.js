@@ -16,6 +16,24 @@ const SECRET = process.env.RIVET_SECRET || 'dev-secret-change-me';
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const googleEnabled = !!(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET);
+const TWILIO_SID = process.env.TWILIO_SID || '';
+const TWILIO_TOKEN = process.env.TWILIO_TOKEN || '';
+const TWILIO_FROM = process.env.TWILIO_FROM || '';
+const smsEnabled = !!(TWILIO_SID && TWILIO_TOKEN && TWILIO_FROM);
+
+function normPhone(s){ return String(s||'').trim().replace(/[^\d+]/g,''); }
+function validPhone(s){ return normPhone(s).replace(/\D/g,'').length >= 10; }
+async function sendSms(to, body){
+  if(!smsEnabled) return false;
+  try {
+    const auth = Buffer.from(`${TWILIO_SID}:${TWILIO_TOKEN}`).toString('base64');
+    const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`, {
+      method:'POST', headers:{ Authorization:`Basic ${auth}`, 'Content-Type':'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ From: TWILIO_FROM, To: to, Body: body }),
+    });
+    return r.ok;
+  } catch(e){ console.error('sms send', e); return false; }
+}
 
 function baseUrl(req){
   const proto = (req.headers['x-forwarded-proto'] || '').split(',')[0].trim() || 'http';
@@ -139,6 +157,43 @@ const server = http.createServer(async (req,res)=>{
       return send(res, V.layout({title:'Sign up', user:null, body:V.authForm('signup',{role:url.searchParams.get('role')||'worker', google:googleEnabled})}));
     if(p==='/login' && method==='GET')
       return send(res, V.layout({title:'Log in', user:null, body:V.authForm('login',{google:googleEnabled})}));
+
+    // ---- phone (SMS OTP) login ----
+    if(p==='/phone' && method==='GET')
+      return send(res, V.layout({title:'Phone sign in', user:null, body:V.phoneStart({role:url.searchParams.get('role')||'worker'})}));
+    if(p==='/phone/start' && method==='POST'){
+      const b = await readBody(req);
+      const role = b.role==='employer'?'employer':'worker';
+      const name = String(b.name||'').trim().slice(0,80);
+      const ph = normPhone(b.phone);
+      if(!validPhone(ph)) return send(res, V.layout({title:'Phone sign in',user:null,body:V.phoneStart({role,name,phone:b.phone,error:'Enter a valid phone number (10+ digits, include country code).'})}));
+      const code = String(Math.floor(100000 + Math.random()*900000));
+      await db.prepare("INSERT INTO otp(phone,code,expires,role,name) VALUES(?,?,datetime('now','+10 minutes'),?,?) ON CONFLICT(phone) DO UPDATE SET code=excluded.code, expires=excluded.expires, role=excluded.role, name=excluded.name, created_at=datetime('now')").run(ph, code, role, name);
+      await sendSms(ph, `${code} is your Rivet × Crewline verification code.`);
+      return send(res, V.layout({title:'Enter code',user:null,body:V.phoneVerify({phone:ph, demoCode: smsEnabled ? '' : code})}));
+    }
+    if(p==='/phone/verify' && method==='POST'){
+      const b = await readBody(req);
+      const ph = normPhone(b.phone);
+      const code = String(b.code||'').trim();
+      const row = await db.prepare("SELECT * FROM otp WHERE phone=? AND code=? AND expires > datetime('now')").get(ph, code);
+      if(!row) return send(res, V.layout({title:'Enter code',user:null,body:V.phoneVerify({phone:ph, demoCode:'', error:'That code is invalid or expired. Try again.'})}));
+      let u = await db.prepare('SELECT * FROM users WHERE phone=?').get(ph);
+      const role = row.role==='employer'?'employer':'worker';
+      if(!u){
+        const email = `phone_${ph.replace(/\D/g,'')}@phone.rivet.local`;
+        const placeholder = hashPassword(crypto.randomBytes(24).toString('hex'));
+        try {
+          const r = await db.prepare('INSERT INTO users(email,phone,pass,role,name,company) VALUES(?,?,?,?,?,?)')
+            .run(email, ph, placeholder, role, row.name || ph, null);
+          u = { id:r.lastInsertRowid, role };
+        } catch(e){ u = await db.prepare('SELECT * FROM users WHERE phone=?').get(ph); }
+      }
+      await db.prepare('DELETE FROM otp WHERE phone=?').run(ph);
+      if(!u) return redirect(res,'/phone');
+      setSession(req, res, u.id);
+      return redirect(res, u.role==='employer' ? '/console' : '/app');
+    }
 
     // ---- public shareable portfolio ----
     const pp = p.match(/^\/p\/(\d+)$/);

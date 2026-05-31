@@ -149,6 +149,13 @@ async function createSchema() {
       PRIMARY KEY(employer_id, worker_id)
     );
     CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
+    CREATE TABLE IF NOT EXISTS otp (
+      phone TEXT PRIMARY KEY,
+      code TEXT NOT NULL,
+      expires TEXT NOT NULL,
+      role TEXT, name TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
     CREATE TABLE IF NOT EXISTS media (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER REFERENCES users(id),
@@ -369,8 +376,15 @@ async function seedMedia(){
   console.log('[db] demo media seeded — portfolio pieces + job photos');
 }
 
+async function migrate() {
+  // additive column migrations (idempotent — errors swallowed when already applied)
+  try { await db.exec('ALTER TABLE users ADD COLUMN phone TEXT'); } catch (e) { /* column exists */ }
+  try { await db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone) WHERE phone IS NOT NULL'); } catch (e) {}
+}
+
 async function init() {
   await createSchema();
+  await migrate();
   await seed();
   try { await enrichDemo(); } catch (e) { console.error('[db] enrich skipped (non-fatal):', e.message); }
   try { await seedRealism(); } catch (e) { console.error('[db] realism skipped (non-fatal):', e.message); }
