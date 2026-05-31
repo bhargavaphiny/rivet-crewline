@@ -990,7 +990,23 @@ const server = http.createServer(async (req,res)=>{
         const rules = M.localRules(job.city);
         const empRating = await ratingFor(job.employer_id, 'employer');
         const empPay = await payRep(job.employer_id);
-        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied,saved,jobMedia,distance,rules,empRating,workAuth:prof.work_auth||'',empPay})}));
+        const myQuote = job.quotes_ok ? await db.prepare('SELECT * FROM quotes WHERE job_id=? AND worker_id=?').get(jid, user.id) : null;
+        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied,saved,jobMedia,distance,rules,empRating,workAuth:prof.work_auth||'',empPay,myQuote})}));
+      }
+      if(jid && p===`/app/jobs/${jid}/quote` && method==='POST'){
+        const job = await db.prepare('SELECT id,title,employer_id,quotes_ok FROM jobs WHERE id=?').get(jid);
+        if(job && job.quotes_ok){
+          const b = await readBody(req);
+          const amount = Math.max(1, Math.round(Number(b.amount)||0));
+          const unit = ['job','hour','day'].includes(b.unit) ? b.unit : 'job';
+          if(amount){
+            try { await db.prepare(`INSERT INTO quotes(job_id,worker_id,amount,unit,note) VALUES(?,?,?,?,?)
+              ON CONFLICT(job_id,worker_id) DO UPDATE SET amount=excluded.amount,unit=excluded.unit,note=excluded.note,status='pending'`)
+              .run(jid, user.id, amount, unit, String(b.note||'').slice(0,200)); } catch(e){}
+            try { await sendMessage(user.id, job.employer_id, `I sent a price quote on "${job.title}": $${amount} ${unit==='job'?'for the job':'per '+unit}.`); } catch(e){}
+          }
+        }
+        return redirect(res, `/app/jobs/${jid}`);
       }
       if(jid && p===`/app/jobs/${jid}/apply` && method==='POST'){
         const job = await db.prepare('SELECT * FROM jobs WHERE id=?').get(jid);
@@ -1112,8 +1128,10 @@ const server = http.createServer(async (req,res)=>{
         const empType = V.JOB_TYPES.includes(b.employment_type) ? b.employment_type : 'Full-time';
         const spon = ['authorized','h2a','h2b'].includes(b.sponsorship) ? b.sponsorship : 'authorized';
         const crewOk = b.crew_ok ? 1 : 0;
-        const info = await db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type,sponsorship,crew_ok)
-          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(user.id,b.title,b.trade,Number(b.pay_min)||0,Number(b.pay_max)||0,b.city||'',b.zip||'',b.shift||'Day',reqCreds,b.descr||'',empType,spon,crewOk);
+        const posterKind = b.poster_kind==='individual' ? 'individual' : 'company';
+        const quotesOk = b.quotes_ok ? 1 : 0;
+        const info = await db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type,sponsorship,crew_ok,poster_kind,quotes_ok)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(user.id,b.title,b.trade,Number(b.pay_min)||0,Number(b.pay_max)||0,b.city||'',b.zip||'',b.shift||'Day',reqCreds,b.descr||'',empType,spon,crewOk,posterKind,quotesOk);
         const jobId = info.lastInsertRowid;
         try { await geocodeZip(b.zip); } catch(e){} // pin new job on the demand map immediately
         // SMS job alerts to matching, opted-in, available workers who have a phone
@@ -1152,6 +1170,21 @@ const server = http.createServer(async (req,res)=>{
           }
         }
         return redirect(res, `/console/jobs/${before?before.job_id:''}`);
+      }
+      // Homeowner/poster accepts a worker's price quote
+      const qAccept = p.match(/^\/console\/jobs\/(\d+)\/quotes\/(\d+)\/accept$/);
+      if(qAccept && method==='POST'){
+        const jobId=Number(qAccept[1]), qId=Number(qAccept[2]);
+        const job = await db.prepare('SELECT id,title FROM jobs WHERE id=? AND employer_id=?').get(jobId, user.id);
+        const q = job && await db.prepare('SELECT * FROM quotes WHERE id=? AND job_id=?').get(qId, jobId);
+        if(job && q){
+          await db.prepare("UPDATE quotes SET status='declined' WHERE job_id=?").run(jobId);
+          await db.prepare("UPDATE quotes SET status='accepted' WHERE id=?").run(qId);
+          // move the chosen worker into the pipeline as Hired
+          try { await db.prepare("INSERT INTO applications(job_id,worker_id,stage,score) VALUES(?,?,'Hired',90) ON CONFLICT(job_id,worker_id) DO UPDATE SET stage='Hired'").run(jobId, q.worker_id); } catch(e){}
+          try { await sendMessage(user.id, q.worker_id, `Good news — I accepted your $${q.amount} quote for "${job.title}". Let's coordinate the details here.`); } catch(e){}
+        }
+        return redirect(res, `/console/jobs/${jobId}`);
       }
       // Show-Up Score: employer records whether a hired worker showed up
       const outMatch = p.match(/^\/console\/applications\/(\d+)\/outcome$/);
@@ -1215,8 +1248,10 @@ const server = http.createServer(async (req,res)=>{
         const empType = V.JOB_TYPES.includes(b.employment_type) ? b.employment_type : (job.employment_type||'Full-time');
         const spon = ['authorized','h2a','h2b'].includes(b.sponsorship) ? b.sponsorship : (job.sponsorship||'authorized');
         const crewOk = b.crew_ok ? 1 : 0;
-        await db.prepare(`UPDATE jobs SET title=?,trade=?,pay_min=?,pay_max=?,city=?,zip=?,shift=?,req_creds=?,descr=?,employment_type=?,sponsorship=?,crew_ok=? WHERE id=? AND employer_id=?`)
-          .run(String(b.title).slice(0,120), b.trade||job.trade, Number(b.pay_min)||0, Number(b.pay_max)||0, b.city||'', b.zip||'', b.shift||'Day', reqCreds, String(b.descr||'').slice(0,2000), empType, spon, crewOk, jobId, user.id);
+        const posterKind = b.poster_kind==='individual' ? 'individual' : 'company';
+        const quotesOk = b.quotes_ok ? 1 : 0;
+        await db.prepare(`UPDATE jobs SET title=?,trade=?,pay_min=?,pay_max=?,city=?,zip=?,shift=?,req_creds=?,descr=?,employment_type=?,sponsorship=?,crew_ok=?,poster_kind=?,quotes_ok=? WHERE id=? AND employer_id=?`)
+          .run(String(b.title).slice(0,120), b.trade||job.trade, Number(b.pay_min)||0, Number(b.pay_max)||0, b.city||'', b.zip||'', b.shift||'Day', reqCreds, String(b.descr||'').slice(0,2000), empType, spon, crewOk, posterKind, quotesOk, jobId, user.id);
         return redirect(res, `/console/jobs/${jobId}`);
       }
 
@@ -1232,7 +1267,8 @@ const server = http.createServer(async (req,res)=>{
         const jobMedia = await db.prepare("SELECT * FROM media WHERE job_id=? AND target='job' ORDER BY created_at DESC, id DESC").all(jid);
         const alerted = Number(url.searchParams.get('alerted'))||0;
         const sourced = Number(url.searchParams.get('sourced'))||0;
-        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.empPipeline({job,columns,candidates,jobMedia,alerted,sourced})}));
+        const quotes = job.quotes_ok ? await db.prepare(`SELECT q.*, u.name FROM quotes q JOIN users u ON u.id=q.worker_id WHERE q.job_id=? ORDER BY q.status='accepted' DESC, q.amount ASC`).all(jid) : [];
+        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.empPipeline({job,columns,candidates,jobMedia,alerted,sourced,quotes})}));
       }
 
       if(p==='/console/search' && method==='GET'){

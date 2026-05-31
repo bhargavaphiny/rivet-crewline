@@ -214,6 +214,17 @@ async function createSchema() {
       status TEXT DEFAULT 'proposed',
       created_at TEXT DEFAULT (datetime('now'))
     );
+    CREATE TABLE IF NOT EXISTS quotes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id INTEGER REFERENCES jobs(id),
+      worker_id INTEGER REFERENCES users(id),
+      amount REAL NOT NULL, unit TEXT DEFAULT 'job',
+      note TEXT DEFAULT '', status TEXT DEFAULT 'pending',
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(job_id, worker_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_quotes_job ON quotes(job_id);
+    CREATE INDEX IF NOT EXISTS idx_quotes_worker ON quotes(worker_id);
     CREATE TABLE IF NOT EXISTS crew_members (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       worker_id INTEGER REFERENCES users(id),
@@ -942,6 +953,43 @@ async function seedXfactors(){
   console.log('[db] X-factors seeded — show-up + pay outcomes, crews, crew-open jobs');
 }
 
+// ---- homeowners / small businesses post one-off jobs that workers quote a price on (idempotent) ----
+async function seedHomeowner(){
+  if (await metaGet('homeowner_v1')) return;
+  const pw = hashPassword('demo1234');
+  const insU = db.prepare('INSERT INTO users(email,pass,role,name,company_city) VALUES(?,?,?,?,?)');
+  let h1, h2;
+  try { h1 = (await insU.run('linda.homeowner@rivet.test',pw,'employer','Linda Powell','Phoenix, AZ')).lastInsertRowid; } catch(e){}
+  try { h2 = (await insU.run('cafe.mesa@rivet.test',pw,'employer','Mesa Corner Café','Mesa, AZ')).lastInsertRowid; } catch(e){}
+  const insJob = db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type,poster_kind,quotes_ok)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+  // [poster,title,trade,city,zip,descr,etype]
+  const jobs = [
+    [h1,'Fix a leaking kitchen faucet','plumber','Phoenix','85004','Single-handle faucet drips at the base. Have the replacement part. ~1 hour job.','Outcome-based'],
+    [h1,'Replace 3 ceiling fans','handyman','Phoenix','85004','Swap 3 old fans for new ones I already bought. Ladder work. This weekend.','Outcome-based'],
+    [h1,'Repair backyard fence section','handyman','Phoenix','85004','~12 ft of wood fence blew down. Need it re-set and re-attached.','Outcome-based'],
+    [h2,'Walk-in cooler not holding temp','hvac','Mesa','85201','Small café — walk-in cooler warming up. Need a refrigeration tech ASAP.','Outcome-based'],
+    [h2,'Monthly hood + vent cleaning','janitor','Mesa','85201','Kitchen exhaust hood cleaning, recurring monthly. Quote per visit.','Part-time'],
+  ];
+  const jobIds = [];
+  for(const [poster,title,trade,city,zip,descr,etype] of jobs){
+    if(!poster) continue;
+    try { const r = await insJob.run(poster,title,trade,0,0,city,zip,'Any','',descr,etype,'individual',1); jobIds.push(r.lastInsertRowid); } catch(e){}
+  }
+  // a few seeded quotes so the bidding UI isn't empty
+  const wId = async (email)=>{ const u=await db.prepare('SELECT id FROM users WHERE email=?').get(email); return u&&u.id; };
+  const insQ = db.prepare('INSERT INTO quotes(job_id,worker_id,amount,unit,note,status) VALUES(?,?,?,?,?,?)');
+  if(jobIds[0]){ // faucet
+    const t=await wId('tasha@rivet.test'); if(t){ try{ await insQ.run(jobIds[0],t,120,'job','Can come by tomorrow morning, parts included if needed.','pending'); }catch(e){} }
+  }
+  if(jobIds[1]){ // ceiling fans
+    const m=await wId('marcus@rivet.test'); if(m){ try{ await insQ.run(jobIds[1],m,75,'job','$25/fan, about 2 hours total. Bring my own ladder.','pending'); }catch(e){} }
+    const h=await wId('diego@rivet.test'); if(h){ try{ await insQ.run(jobIds[1],h,90,'job','Available Saturday.','pending'); }catch(e){} }
+  }
+  await metaSet('homeowner_v1','1');
+  console.log('[db] homeowner/individual quote jobs seeded — +2 posters, +'+jobIds.length+' one-off jobs');
+}
+
 async function migrate() {
   // additive column migrations (idempotent — errors swallowed when already applied)
   try { await db.exec('ALTER TABLE users ADD COLUMN phone TEXT'); } catch (e) { /* column exists */ }
@@ -971,6 +1019,8 @@ async function migrate() {
   try { await db.exec('ALTER TABLE applications ADD COLUMN outcome TEXT'); } catch (e) { /* showed/noshow/cancelled */ }
   try { await db.exec('ALTER TABLE applications ADD COLUMN pay_outcome TEXT'); } catch (e) { /* ontime/late/short/unpaid */ }
   try { await db.exec('ALTER TABLE jobs ADD COLUMN crew_ok INTEGER DEFAULT 0'); } catch (e) { /* column exists */ }
+  try { await db.exec("ALTER TABLE jobs ADD COLUMN poster_kind TEXT DEFAULT 'company'"); } catch (e) { /* company|individual */ }
+  try { await db.exec('ALTER TABLE jobs ADD COLUMN quotes_ok INTEGER DEFAULT 0'); } catch (e) { /* accepts price quotes */ }
 }
 
 async function seedZips() {
@@ -1030,6 +1080,7 @@ async function init() {
   try { await seedActivity2(); } catch (e) { console.error('[db] activity2 seed skipped (non-fatal):', e.message); }
   try { await seedReviews(); } catch (e) { console.error('[db] reviews seed skipped (non-fatal):', e.message); }
   try { await seedXfactors(); } catch (e) { console.error('[db] xfactors seed skipped (non-fatal):', e.message); }
+  try { await seedHomeowner(); } catch (e) { console.error('[db] homeowner seed skipped (non-fatal):', e.message); }
   try {
     if(!(await metaGet('sponsorship_v2'))){
       // Recompute cleanly by trade (no employment_type sweep, which mis-tagged Temp jobs).

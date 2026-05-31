@@ -535,6 +535,20 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .pc-outset form{margin:0}
 .pay-btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .pay-btns form{margin:0}
+/* homeowner / price quotes */
+.jtype.quote{background:rgba(31,169,113,.14);color:#157a52}
+.quote-form{margin-top:6px}
+.qf-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.qf-cur{font-size:20px;font-weight:800;color:var(--slate)}
+.quote-form .qf-row input{flex:1;min-width:90px}
+.quote-form .qf-row select{flex:0 0 auto}
+.quote-row{display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.quote-row:first-of-type{border-top:0}
+.quote-row.accepted{background:rgba(31,169,113,.06);border-radius:8px;padding:10px}
+.quote-who{display:inline-flex;align-items:center;gap:8px;font-weight:600}
+.quote-amt{font-weight:800;font-size:15px;color:var(--brand-d,#7a3b22);text-align:right}
+.quote-note{grid-column:1/-1}
+.quote-act{grid-column:2;justify-self:end}
 
 /* ---- training & certifications ---- */
 .info-card{background:rgba(23,99,166,.06);border:1px solid rgba(23,99,166,.18);color:var(--slate);font-size:14px}

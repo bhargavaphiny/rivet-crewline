@@ -308,6 +308,14 @@ const BUILTIN_ES = {
   '✓ Showed up':'✓ Se presentó','✗ No-showed':'✗ No se presentó','Cancelled w/ notice':'Canceló con aviso','Did they show?':'¿Se presentó?',
   'Showed up':'Se presentó','No-showed':'No se presentó','Cancelled with notice':'Canceló con aviso',
   'Open to crews':'Abierto a cuadrillas','Crews ok':'Cuadrillas ok','Open to crews — a worker can bring vetted teammates':'Abierto a cuadrillas — el trabajador puede llevar compañeros verificados',
+  // homeowner posting + price quotes
+  'Posting as':'Publicando como','A company / contractor':'Una empresa / contratista','A homeowner or small business (one-off job)':'Un dueño de casa o pequeño negocio (trabajo puntual)',
+  'e.g. Fix a leaking faucet':'ej. Arreglar una llave que gotea','Let workers send me a price quote (instead of a fixed pay rate)':'Permitir que los trabajadores me envíen una cotización (en vez de un pago fijo)',
+  'Accepting quotes':'Acepta cotizaciones','Posted by a homeowner / small business':'Publicado por un dueño de casa / pequeño negocio','Name your price':'Pon tu precio','Homeowner':'Dueño de casa',
+  'Quote sent':'Cotización enviada','per job':'por trabajo','per hour':'por hora','per day':'por día','accepted! 🎉':'¡aceptada! 🎉','not selected':'no seleccionada','waiting on the poster':'esperando al solicitante',
+  'Your price':'Tu precio','for the job':'por el trabajo','Add a note (when you can start, what’s included)':'Agrega una nota (cuándo puedes empezar, qué incluye)','Send my price quote':'Enviar mi cotización',
+  'Price quotes':'Cotizaciones','quote':'cotización','quotes':'cotizaciones','No quotes yet — they’ll appear here as workers bid.':'Aún no hay cotizaciones — aparecerán aquí cuando los trabajadores oferten.',
+  'Accept quote':'Aceptar cotización','Accepted':'Aceptada','Not selected':'No seleccionada','Photos of the work':'Fotos del trabajo','candidates see these on the job':'los candidatos las ven en el empleo','your quote':'tu cotización',
 };
 function T(s){
   if(LANG !== 'es' || !s) return s;
@@ -390,7 +398,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=57">
+  <link rel="stylesheet" href="/styles.css?v=58">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -793,12 +801,12 @@ function jobCard(m, bare = false){
       <div class="badge">${tradeEmoji(j.trade)}</div>
       <div class="job-main">
         <div class="job-t">${esc(T(j.title))}</div>
-        <div class="job-c">${esc(j.company||'')} · ${esc(j.city)}${m.distance!=null?` · <b class="dist">${m.distance} ${T('mi away')}</b>`:(!bare && m.needZip?` · <span class="zip-hint">${T('add ZIP for distance')}</span>`:'')}</div>
+        <div class="job-c">${j.poster_kind==='individual'?`${T('Homeowner')} · `:`${esc(j.company||'')} · `}${esc(j.city)}${m.distance!=null?` · <b class="dist">${m.distance} ${T('mi away')}</b>`:(!bare && m.needZip?` · <span class="zip-hint">${T('add ZIP for distance')}</span>`:'')}</div>
       </div>
       ${bare?`<span class="mtag fit" style="margin-left:auto">${esc(tl(j.trade))}</span>`:`<span class="score-chip ${scoreClass(m.score)}">${m.score}</span>`}
     </div>
     <div class="job-foot">
-      <span class="pay">$${j.pay_min}–${j.pay_max}<small>/hr</small></span>
+      <span class="pay">${j.quotes_ok&&!j.pay_min?T('Name your price'):`$${j.pay_min}–${j.pay_max}<small>/hr</small>`}</span>
       ${j.employment_type?`<span class="jtype">${esc(T(j.employment_type))}</span>`:''}
       <span class="js-shift">${esc(T(j.shift))}</span>
       ${isExternal(j)?`<span class="ext-badge">${esc(j.source)} ↗</span>`:''}
@@ -880,7 +888,7 @@ function workerJobs({ matches, filters = {}, jobsGeo = null, needZip = false }) 
 }
 
 // ---------- worker: job detail ----------
-function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance = null, rules = null, empRating = {avg:0,count:0}, workAuth = '', empPay = {} }) {
+function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance = null, rules = null, empRating = {avg:0,count:0}, workAuth = '', empPay = {}, myQuote = null }) {
   const belowMin = rules && job.pay_min && job.pay_min < rules.minWage;
   const spon = (job.sponsorship)||'authorized';
   const sponMatch = (spon==='h2a'&&workAuth==='need_h2a')||(spon==='h2b'&&workAuth==='need_h2b');
@@ -891,9 +899,9 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
         <div class="badge big">${tradeEmoji(job.trade)}</div>
         <div class="job-main">
           <h2>${esc(job.title)}</h2>
-          ${job.employment_type?`<span class="jtype">${esc(T(job.employment_type))}</span>`:''}${job.crew_ok?`<span class="jtype crew">${icon('truck')} ${T('Open to crews')}</span>`:''}
-          <div class="job-c">${esc(job.company||'')} · ${esc(job.city)} ${esc(job.zip)} · ${esc(T(job.shift))}${distance!=null?` · <b class="dist">${distance} ${T('mi away')}</b>`:''}</div>
-          <div class="pay big">$${job.pay_min}–${job.pay_max}/hr</div>
+          ${job.employment_type?`<span class="jtype">${esc(T(job.employment_type))}</span>`:''}${job.crew_ok?`<span class="jtype crew">${icon('truck')} ${T('Open to crews')}</span>`:''}${job.quotes_ok?`<span class="jtype quote">${T('Accepting quotes')}</span>`:''}
+          <div class="job-c">${job.poster_kind==='individual'?`${icon('pin')} ${T('Posted by a homeowner / small business')} · `:''}${esc(job.company||'')} · ${esc(job.city)} ${esc(job.zip)} · ${esc(T(job.shift))}${distance!=null?` · <b class="dist">${distance} ${T('mi away')}</b>`:''}</div>
+          <div class="pay big">${job.quotes_ok&&!job.pay_min?T('Name your price'):`$${job.pay_min}–${job.pay_max}/hr`}</div>
         </div>
         <div class="score-pill ${scoreClass(match.score)}">${match.score}<small>${T('match')}</small></div>
       </div>
@@ -902,7 +910,7 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
         <div class="rules-h">${T('Local pay & rules')} · ${esc(rules.level)}</div>
         <div class="rules-grid">
           <div><span>${T('Local minimum wage')}</span><b>$${rules.minWage.toFixed(2)}/hr</b></div>
-          <div><span>${T('This job pays')}</span><b class="${belowMin?'r-bad':'r-good'}">$${job.pay_min}–${job.pay_max}/hr</b></div>
+          <div><span>${T('This job pays')}</span>${job.quotes_ok&&!job.pay_min?`<b>${T('your quote')}</b>`:`<b class="${belowMin?'r-bad':'r-good'}">$${job.pay_min}–${job.pay_max}/hr</b>`}</div>
           <div><span>${T('Overtime')}</span><b>${T('1.5× after 40 hrs/wk')}</b></div>
         </div>
         <p class="rules-note">${rules.cityApplies?`${esc(rules.city)} ${T('sets a higher minimum than the state')} ($${rules.stateWage.toFixed(2)}). `:''}${T('Employers must meet the highest of federal, state, county or city minimum wage. Verify local rules before you start.')}</p>
@@ -926,9 +934,17 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
       ${isExternal(job)
         ? `<a class="btn full" href="${esc(job.apply_url)}" target="_blank" rel="noopener noreferrer">${T('Apply on')} ${esc(job.source)} ↗</a>
            <p class="muted sm" style="text-align:center;margin-top:8px">${T('This opening is listed on')} ${esc(job.source)}. ${T('You’ll finish applying on their site.')}</p>`
-        : (applied
-          ? `<div class="ok-card">${T('✓ Applied — the employer can see your verified Work Card.')}</div>`
-          : `<form method="post" action="/app/jobs/${job.id}/apply"><button class="btn full">${T('Apply with verified Work Card')}</button></form>`)}
+        : (job.quotes_ok
+          ? (myQuote
+            ? `<div class="ok-card">${T('Quote sent')}: <b>$${myQuote.amount} ${T('per '+(myQuote.unit||'job'))}</b>${myQuote.status==='accepted'?` — <b>${T('accepted! 🎉')}</b>`:myQuote.status==='declined'?` — ${T('not selected')}`:` · ${T('waiting on the poster')}`}</div>`
+            : `<form method="post" action="/app/jobs/${job.id}/quote" class="quote-form">
+                <div class="qf-row"><span class="qf-cur">$</span><input type="number" name="amount" min="1" step="1" placeholder="${T('Your price')}" required>
+                  <select name="unit"><option value="job">${T('for the job')}</option><option value="hour">${T('per hour')}</option><option value="day">${T('per day')}</option></select></div>
+                <input name="note" placeholder="${T('Add a note (when you can start, what’s included)')}" maxlength="200">
+                <button class="btn full">${T('Send my price quote')}</button></form>`)
+          : (applied
+            ? `<div class="ok-card">${T('✓ Applied — the employer can see your verified Work Card.')}</div>`
+            : `<form method="post" action="/app/jobs/${job.id}/apply"><button class="btn full">${T('Apply with verified Work Card')}</button></form>`))}
       <form method="post" action="/app/jobs/${job.id}/save"><button class="btn full ghost">${saved?T('★ Saved — remove'):T('☆ Save this job')}</button></form>
     </div>
     ${(job.company_about||job.company_website||job.company_size||empRating.count)?`<div class="card">
@@ -1671,9 +1687,14 @@ function empJobForm(error='', job=null) {
     <h2>${editing?T('Edit job'):T('Post a job')}</h2><p class="muted">${editing?T('Changes update matching and the live posting instantly.'):T("It's matched against the verified talent pool instantly.")}</p>
     ${error?`<div class="err">${esc(error)}</div>`:''}
     <form method="post" action="${editing?`/console/jobs/${job.id}/edit`:'/console/jobs/new'}">
-      <label>${T('Title')} <input name="title" required placeholder="Commercial Electrician" value="${v('title')}"></label>
+      <label>${T('Posting as')} <select name="poster_kind">
+        <option value="company" ${editing&&job.poster_kind!=='individual'?'selected':''}>${T('A company / contractor')}</option>
+        <option value="individual" ${editing&&job.poster_kind==='individual'?'selected':''}>${T('A homeowner or small business (one-off job)')}</option>
+      </select></label>
+      <label>${T('Title')} <input name="title" required placeholder="${T('e.g. Fix a leaking faucet')}" value="${v('title')}"></label>
       <div class="row2"><label>${T('Trade')} <select name="trade">${opts}</select></label>
         <label>${T('Employment type')} <select name="employment_type">${typeOpts}</select></label></div>
+      <label class="ck"><input type="checkbox" name="quotes_ok" value="1" ${editing&&job.quotes_ok?'checked':''}> ${T('Let workers send me a price quote (instead of a fixed pay rate)')}</label>
       <div class="row2"><label>${T('Pay min ($/hr)')} <input type="number" name="pay_min" value="${v('pay_min','36')}"></label>
         <label>${T('Pay max ($/hr)')} <input type="number" name="pay_max" value="${v('pay_max','48')}"></label></div>
       <div class="row2"><label>${T('City')} <input name="city" value="${v('city','Phoenix')}"></label>
@@ -1690,7 +1711,16 @@ function empJobForm(error='', job=null) {
 }
 
 const STAGES = ['Sourced','Screened','Interview','Offer','Hired'];
-function empPipeline({ job, columns, candidates, jobMedia = [], alerted = 0, sourced = 0 }) {
+function empPipeline({ job, columns, candidates, jobMedia = [], alerted = 0, sourced = 0, quotes = [] }) {
+  const quotesCard = job.quotes_ok ? `<div class="card">
+    <div class="sec-h" style="margin-top:0">${T('Price quotes')} <span class="muted sm">${quotes.length} ${quotes.length===1?T('quote'):T('quotes')}</span></div>
+    ${quotes.length ? quotes.map(q=>`<div class="quote-row ${q.status}">
+      <a class="quote-who cand-link" href="/console/candidates/${q.worker_id}"><span class="av-t">${initials(q.name)}</span>${esc(q.name)}</a>
+      <div class="quote-amt">$${q.amount} <span class="muted sm">${T('per '+(q.unit||'job'))}</span></div>
+      ${q.note?`<div class="quote-note muted sm">${esc(q.note)}</div>`:''}
+      <div class="quote-act">${q.status==='accepted'?`<span class="v ok">${T('Accepted')}</span>`:q.status==='declined'?`<span class="v pending">${T('Not selected')}</span>`:`<form method="post" action="/console/jobs/${job.id}/quotes/${q.id}/accept"><button class="btn-xs">${T('Accept quote')}</button></form>`}</div>
+    </div>`).join('') : `<p class="muted sm">${T('No quotes yet — they’ll appear here as workers bid.')}</p>`}
+  </div>` : '';
   const cols = STAGES.map(st=>`<div class="col"><div class="col-h">${st} <span>${(columns[st]||[]).length}</span></div>
     ${(columns[st]||[]).map(a=>`<div class="pcard">
         <a class="pc-nm cand-link" href="/console/candidates/${a.worker_id}"><span class="av-t">${initials(a.name)}</span>${esc(a.name)}</a>
@@ -1718,8 +1748,9 @@ function empPipeline({ job, columns, candidates, jobMedia = [], alerted = 0, sou
         <p class="agent-line">${T('Scan all verified workers and auto-add the strongest matches to this pipeline.')}</p></div>
       <form method="post" action="/console/jobs/${job.id}/source"><button class="btn-sm">${T('Auto-source candidates')}</button></form>
     </div>
+    ${quotesCard}
     <div class="card">
-      <div class="sec-h" style="margin-top:0">Photos of the work <span class="muted sm">candidates see these on the job</span></div>
+      <div class="sec-h" style="margin-top:0">${T('Photos of the work')} <span class="muted sm">${T('candidates see these on the job')}</span></div>
       ${mediaGallery(jobMedia, {deletable:true, base:`/console/jobs/${job.id}/media`}) || '<p class="muted sm">Add photos or a video of the site / work to be done — it helps candidates self-qualify.</p>'}
       <form method="post" action="/console/jobs/${job.id}/media" class="port-form">
         <input name="url" placeholder="Image URL or YouTube / Vimeo link" required>
