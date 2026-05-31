@@ -105,7 +105,7 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--brand)}
 /* job cards */
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 .job-row{display:flex;gap:11px;align-items:flex-start}
-.badge{width:40px;height:40px;border-radius:11px;background:linear-gradient(150deg,var(--steel-2),var(--steel));display:grid;place-items:center;font-size:19px;flex-shrink:0}
+.badge{width:40px;height:40px;border-radius:11px;background:linear-gradient(150deg,var(--steel-2),var(--steel));display:grid;place-items:center;font-size:19px;flex-shrink:0;color:#fff}
 .badge.big{width:54px;height:54px;font-size:26px}
 .job-main{flex:1;min-width:0}
 .job-t{font-size:15px;font-weight:800;color:var(--ink);line-height:1.25;display:block}
@@ -231,7 +231,8 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--brand)}
 .avail-badge.off{color:var(--muted);background:var(--paper)}
 .avail-badge.today{color:var(--brand-d);background:rgba(255,106,26,.12);margin-left:6px}
 .avail-badge.relo{color:var(--brand-d);background:rgba(23,99,166,.12);margin-left:6px}
-.today-chip{margin-left:5px;font-size:11px}
+.today-chip{margin-left:5px;font-size:11px;color:var(--amber-d);vertical-align:middle}
+.avail-dot .ic,.today-chip .ic{width:13px;height:13px}
 
 /* candidate job search */
 .dist{color:var(--brand-d)}
@@ -367,8 +368,9 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 
 /* ---- US candidate map ---- */
 .mapwrap{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
-.usmap{flex:1;min-width:280px;max-width:640px;background:var(--paper);border-radius:12px;border:1px solid var(--line)}
-.us-out{fill:#E3EAF1;stroke:var(--brand);stroke-width:1.2;stroke-linejoin:round}
+.usmap{flex:1;min-width:280px;max-width:660px;background:linear-gradient(180deg,#EAF1F7,#E3EBF2);border-radius:14px;border:1px solid var(--line);padding:6px}
+.us-states .us-state{fill:#D7E2EC;stroke:#fff;stroke-width:.8;stroke-linejoin:round;transition:fill .12s}
+.us-states .us-state:hover{fill:#C4D4E2}
 .mdot circle{fill:var(--amber);fill-opacity:.82;stroke:#fff;stroke-width:1.5}
 .mdot text{fill:var(--steel);font-size:11px;font-weight:800}
 .maplist{list-style:none;margin:0;padding:0;min-width:150px;flex:none}
@@ -419,3 +421,14 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .wide-head .ministats{grid-column:1 / -1;margin-top:6px}
 .wide-head .avail-form{grid-column:1 / -1;margin-top:8px!important}
 @media(max-width:720px){.col2{grid-template-columns:1fr}.wide-head{grid-template-columns:1fr;text-align:center}.wide-head .big-av{margin:0 auto 8px}.wide-head h2,.wide-head .headline,.wide-head .chips,.wide-head>p.muted{grid-column:1;text-align:center}.wide-head .chips{justify-content:center}}
+
+/* ---- inline SVG icons ---- */
+.ic{width:1.15em;height:1.15em;flex:none;vertical-align:-0.18em}
+.badge .tic{width:20px;height:20px}
+.badge.big .tic{width:26px;height:26px}
+.chip .tic,.tradechk .tic,.exp-ic .tic{width:15px;height:15px}
+.exp-ic .tic{width:18px;height:18px;color:var(--brand-d)}
+.xbtn{display:flex;align-items:center;justify-content:center;gap:8px}
+.xic{width:16px;height:16px;flex:none}
+.btn-sm.tgl{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.avail-badge{display:inline-flex;align-items:center;gap:6px}

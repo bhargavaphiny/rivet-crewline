@@ -620,9 +620,9 @@ const server = http.createServer(async (req,res)=>{
           FROM users u JOIN worker_profiles p ON p.user_id=u.id ORDER BY p.readiness DESC LIMIT 5`).all();
         const alerts = [];
         const expiring = (await db.prepare(`SELECT COUNT(*) c FROM credentials WHERE verified=1 AND expires IS NOT NULL AND expires < '2026-08'`).get()).c;
-        if(expiring) alerts.push({lvl:'warn',text:`⚠️ ${expiring} credential(s) in the pool expiring within 60 days.`});
-        if(pipeline) alerts.push({lvl:'info',text:`⏳ ${pipeline} candidate(s) advancing in your pipeline.`});
-        alerts.push({lvl:'ok',text:`✅ ${pool} verified workers available to match right now.`});
+        if(expiring) alerts.push({lvl:'warn',text:`${expiring} credential(s) in the pool expiring within 60 days.`});
+        if(pipeline) alerts.push({lvl:'info',text:`${pipeline} candidate(s) advancing in your pipeline.`});
+        alerts.push({lvl:'ok',text:`${pool} verified workers available to match right now.`});
         const geo = await candidateGeo();
         return send(res, V.layout({title:'Overview',user,active:'ov',body:V.empOverview({user,
           kpis:{openJobs:jobs.filter(j=>j.status==='open').length, pool, applicants, pipeline, hired}, funnel, recent, hot, alerts, fillRate, geo})}));

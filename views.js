@@ -4,6 +4,40 @@
  * Plain template-literal rendering. No template engine, no client framework.
  */
 const { TRADES, CRED_KINDS, TRAINING } = require('./matching');
+const US_STATES = require('./us-geo');
+
+// ---- inline SVG icon set (consistent line style; no emoji) ----
+const ICONS = {
+  bolt:    { f:1, p:'<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>' },
+  dot:     { f:1, p:'<circle cx="12" cy="12" r="6"/>' },
+  wrench:  { f:0, p:'<path d="M14.5 6.5a4 4 0 0 0 5.3 5.3L17 14.6l3.5 3.5a2 2 0 0 1-2.8 2.8L14.2 17l-2.8 2.8a4 4 0 0 1-5.3-5.3L8.9 12 6 9.1a2 2 0 0 1 2.8-2.8L11.7 9z"/>' },
+  droplet: { f:0, p:'<path d="M12 3 6.5 9a7.5 7.5 0 1 0 11 0z"/>' },
+  flame:   { f:0, p:'<path d="M12 3c1 3 4 4.5 4 8a4 4 0 0 1-8 0c0-1.2.5-2 1-2.8C9 10 9 7 12 3z"/><path d="M5 14a7 7 0 0 0 14 0"/>' },
+  hammer:  { f:0, p:'<path d="M14 6 18 2l4 4-4 4z"/><path d="M16 8 8.5 15.5"/><path d="M3 21l5.5-5.5a2 2 0 0 1 0-2.8"/>' },
+  layers:  { f:0, p:'<path d="M12 3 3 8l9 5 9-5z"/><path d="M3 13l9 5 9-5"/>' },
+  truck:   { f:0, p:'<path d="M3 6h11v9H3z"/><path d="M14 9h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17.5" cy="18" r="1.6"/>' },
+  leaf:    { f:0, p:'<path d="M5 19c0-8 6-13 16-13 0 10-5 16-13 16-2 0-3-1-3-3z"/><path d="M5 19C8 14 12 11 17 9"/>' },
+  bell:    { f:0, p:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M10.5 21a2 2 0 0 0 3 0"/>' },
+  pin:     { f:0, p:'<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="2.6"/>' },
+  send:    { f:0, p:'<path d="M22 3 11 14"/><path d="M22 3 15 21l-4-7-7-4z"/>' },
+  check:   { f:0, p:'<path d="M20 6 9 17l-5-5"/>' },
+  star:    { f:1, p:'<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 17l-5.2 2.6 1-5.8L3.5 9.7l5.9-.9z"/>' },
+  warn:    { f:0, p:'<path d="M12 3 2 20h20z"/><path d="M12 10v4"/><path d="M12 17h.01"/>' },
+};
+function icon(name, cls=''){
+  const ic = ICONS[name] || ICONS.wrench;
+  return `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="${ic.f?'currentColor':'none'}" stroke="${ic.f?'none':'currentColor'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ic.p}</svg>`;
+}
+const TRADE_ICON = {
+  electrician:'bolt',solar:'bolt',low_voltage:'bolt',controls:'bolt',
+  hvac:'wrench',sheet_metal:'layers',millwright:'wrench',machinist:'wrench',diesel_mechanic:'wrench',
+  automotive_tech:'wrench',facilities:'wrench',locksmith:'wrench',elevator_tech:'wrench',crane_operator:'truck',
+  plumber:'droplet',pipefitter:'droplet',fire_sprinkler:'droplet',
+  welder:'flame',boilermaker:'flame',ironworker:'flame',
+  carpenter:'hammer',framer:'hammer',drywall:'hammer',roofer:'hammer',glazier:'hammer',
+  insulation:'hammer',painter:'hammer',flooring:'hammer',tile:'hammer',mason:'layers',concrete:'layers',
+  cdl_driver:'truck',heavy_equipment:'truck',landscaper:'leaf',
+};
 
 const esc = s => String(s == null ? '' : s)
   .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -23,9 +57,9 @@ const I18N = {
     hero_h1a:"America can't ", hero_build:'build', hero_h1b:' what it can\'t ', hero_staff:'staff.',
     hero_lead:'Rivet prepares skilled-trade workers to get hired and certified. Crewline gives employers verified, job-ready crews — fast.',
     cta_worker:"I'm a worker → Rivet", cta_employer:"I'm hiring → Crewline",
-    pc_worker_h:'📱 Rivet — for workers',
+    pc_worker_h:'Rivet — for workers',
     pc_w1:'Verified credential wallet (license, OSHA, EPA)', pc_w2:'Job-readiness score', pc_w3:'Scored job matches near you', pc_w4:'Apply with one tap',
-    pc_emp_h:'🖥️ Crewline — for employers',
+    pc_emp_h:'Crewline — for employers',
     pc_e1:'Search verified, ready, local talent', pc_e2:'Post jobs, auto-matched instantly', pc_e3:'Trades-stage hiring pipeline', pc_e4:'Credential compliance built in',
     how_h:'How it works',
     how_worker_tag:'For workers · Rivet',
@@ -49,13 +83,13 @@ const I18N = {
     phone_h:'Sign in with your phone', phone_sub:'We’ll text you a 6-digit code — no password to remember.',
     phone_number:'Mobile number', phone_yourname:'Your name', phone_textme:'Text me a code',
     phone_prefer:'Prefer email?',
-    home_readiness:'Job-Readiness Score', home_hireready:'Hire-ready ⚡', home_almost:'Almost there', home_build:'Build your card',
+    home_readiness:'Job-Readiness Score', home_hireready:'Hire-ready', home_almost:'Almost there', home_build:'Build your card',
     home_credentials:'credentials', home_top:'Top matches near you', home_seeall:'See all', home_nomatch:'No matches yet — check back soon.',
     home_boost:'Boost your card', step_cred:'Add a credential', step_about:'Write your About', step_work:'Add work history', step_port:'Add portfolio photos',
     home_wallet:'Credential Wallet', home_manage:'Manage', home_quick:'Quick stats',
     st_readiness:'READINESS', st_verified:'VERIFIED', st_years:'YEARS',
-    x_avail_on:'🟢 Available for work', x_avail_off:'⚪ Tap: Available', x_today_on:'⚡ Can work today', x_today_off:'⚡ Tap: Work today',
-    x_relo_on:'✈️ Open to relocate', x_relo_off:'✈️ Tap: Relocate', x_alert_on:'🔔 Job alerts on', x_alert_off:'🔔 Tap: Job alerts',
+    x_avail_on:'Available for work', x_avail_off:'Tap: Available', x_today_on:'Can work today', x_today_off:'Tap: Work today',
+    x_relo_on:'Open to relocate', x_relo_off:'Tap: Relocate', x_alert_on:'Job alerts on', x_alert_off:'Tap: Job alerts',
   },
   es: {
     nav_login:'Entrar', nav_get_started:'Empezar', nav_home:'Inicio', nav_find_work:'Empleos',
@@ -66,9 +100,9 @@ const I18N = {
     hero_h1a:'Estados Unidos no puede ', hero_build:'construir', hero_h1b:' lo que no puede ', hero_staff:'dotar de personal.',
     hero_lead:'Rivet prepara a trabajadores de oficios para ser contratados y certificados. Crewline da a las empresas cuadrillas verificadas y listas para trabajar — rápido.',
     cta_worker:'Soy trabajador → Rivet', cta_employer:'Estoy contratando → Crewline',
-    pc_worker_h:'📱 Rivet — para trabajadores',
+    pc_worker_h:'Rivet — para trabajadores',
     pc_w1:'Cartera de credenciales verificadas (licencia, OSHA, EPA)', pc_w2:'Puntaje de preparación', pc_w3:'Empleos cerca de ti según tu perfil', pc_w4:'Postúlate con un toque',
-    pc_emp_h:'🖥️ Crewline — para empresas',
+    pc_emp_h:'Crewline — para empresas',
     pc_e1:'Busca talento local verificado y listo', pc_e2:'Publica empleos con emparejamiento al instante', pc_e3:'Embudo de contratación por etapas', pc_e4:'Cumplimiento de credenciales integrado',
     how_h:'Cómo funciona',
     how_worker_tag:'Para trabajadores · Rivet',
@@ -92,13 +126,13 @@ const I18N = {
     phone_h:'Entra con tu teléfono', phone_sub:'Te enviaremos un código de 6 dígitos — sin contraseña que recordar.',
     phone_number:'Número de celular', phone_yourname:'Tu nombre', phone_textme:'Envíame un código',
     phone_prefer:'¿Prefieres correo?',
-    home_readiness:'Puntaje de preparación', home_hireready:'Listo para contratar ⚡', home_almost:'Casi listo', home_build:'Completa tu perfil',
+    home_readiness:'Puntaje de preparación', home_hireready:'Listo para contratar', home_almost:'Casi listo', home_build:'Completa tu perfil',
     home_credentials:'credenciales', home_top:'Mejores empleos cerca de ti', home_seeall:'Ver todos', home_nomatch:'Aún no hay coincidencias — vuelve pronto.',
     home_boost:'Mejora tu perfil', step_cred:'Agrega una credencial', step_about:'Escribe tu perfil', step_work:'Agrega tu experiencia', step_port:'Agrega fotos de tu trabajo',
     home_wallet:'Cartera de credenciales', home_manage:'Gestionar', home_quick:'Resumen',
     st_readiness:'PREPARACIÓN', st_verified:'VERIFICADAS', st_years:'AÑOS',
-    x_avail_on:'🟢 Disponible para trabajar', x_avail_off:'⚪ Toca: Disponible', x_today_on:'⚡ Puedo trabajar hoy', x_today_off:'⚡ Toca: Trabajar hoy',
-    x_relo_on:'✈️ Dispuesto a mudarme', x_relo_off:'✈️ Toca: Mudarme', x_alert_on:'🔔 Alertas activadas', x_alert_off:'🔔 Toca: Alertas de empleo',
+    x_avail_on:'Disponible para trabajar', x_avail_off:'Toca: Disponible', x_today_on:'Puedo trabajar hoy', x_today_off:'Toca: Trabajar hoy',
+    x_relo_on:'Dispuesto a mudarme', x_relo_off:'Toca: Mudarme', x_alert_on:'Alertas activadas', x_alert_off:'Toca: Alertas de empleo',
   },
 };
 function t(k){ return (I18N[LANG] && I18N[LANG][k] != null) ? I18N[LANG][k] : (I18N.en[k] != null ? I18N.en[k] : k); }
@@ -185,7 +219,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=28">
+  <link rel="stylesheet" href="/styles.css?v=29">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -364,9 +398,9 @@ function workerOnboard(error='') {
 }
 
 // ---------- worker dashboard ----------
-function xToggle(action, on, onLabel, offLabel, next){
+function xToggle(action, on, iconName, onLabel, offLabel, next){
   return `<form method="post" action="${action}" class="xf"><input type="hidden" name="next" value="${next}">
-    <button class="xbtn ${on?'on':''}">${on?onLabel:offLabel}</button></form>`;
+    <button class="xbtn ${on?'on':''}">${icon(iconName,'xic')}<span>${on?onLabel:offLabel}</span></button></form>`;
 }
 function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 0, jobsGeo = null }) {
   const top = matches.slice(0,3).map(m=>jobCard(m)).join('');
@@ -380,10 +414,10 @@ function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 
   const doneN = steps.filter(s=>s.done).length;
   return `<section class="wrap">
     <div class="xbar">
-      ${xToggle('/app/available', profile.available, t('x_avail_on'), t('x_avail_off'), '/app')}
-      ${xToggle('/app/work-today', profile.work_today, t('x_today_on'), t('x_today_off'), '/app')}
-      ${xToggle('/app/relocate', profile.relocate, t('x_relo_on'), t('x_relo_off'), '/app')}
-      ${xToggle('/app/alerts', profile.alerts, t('x_alert_on'), t('x_alert_off'), '/app')}
+      ${xToggle('/app/available', profile.available, 'dot', t('x_avail_on'), t('x_avail_off'), '/app')}
+      ${xToggle('/app/work-today', profile.work_today, 'bolt', t('x_today_on'), t('x_today_off'), '/app')}
+      ${xToggle('/app/relocate', profile.relocate, 'send', t('x_relo_on'), t('x_relo_off'), '/app')}
+      ${xToggle('/app/alerts', profile.alerts, 'bell', t('x_alert_on'), t('x_alert_off'), '/app')}
     </div>
     <div class="dash-grid">
       <div>
@@ -407,7 +441,7 @@ function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 
           <div class="sec-h" style="margin-top:0">${t('home_wallet')} <a href="/app/profile">${t('home_manage')}</a></div>
           ${creds.slice(0,4).map(credRow).join('') || `<p class="muted">${t('step_cred')}</p>`}
         </div>
-        ${expiring?`<div class="card warn-card">⚠️ ${expiring} · <a href="/app/profile">${t('home_manage')}</a></div>`:''}
+        ${expiring?`<div class="card warn-card">${icon('warn','xic')} ${expiring} · <a href="/app/profile">${t('home_manage')}</a></div>`:''}
         <div class="card">
           <div class="sec-h" style="margin-top:0">${t('home_quick')}</div>
           <div class="ministats">
@@ -457,7 +491,7 @@ function jobCard(m){
   </a>`;
 }
 
-function tradeEmoji(t){return {electrician:'⚡',hvac:'🔧',plumber:'🚰',pipefitter:'🔩',welder:'🔥',sheet_metal:'🛠️',carpenter:'🪚',framer:'🏗️',drywall:'🧱',painter:'🎨',roofer:'🏠',mason:'🧱',concrete:'🪨',flooring:'🪵',tile:'◻️',glazier:'🪟',insulation:'🧤',ironworker:'⛓️',millwright:'⚙️',boilermaker:'♨️',controls:'🏭',solar:'☀️',low_voltage:'🔌',fire_sprinkler:'🚿',elevator_tech:'🛗',heavy_equipment:'🚜',crane_operator:'🏗️',cdl_driver:'🚛',diesel_mechanic:'🔧',automotive_tech:'🚗',machinist:'⚙️',landscaper:'🌳',locksmith:'🔑',facilities:'🧰'}[t]||'🧰';}
+function tradeEmoji(t){ return icon(TRADE_ICON[t] || 'wrench', 'tic'); }
 
 function credRow(c){
   const verified = c.verified;
@@ -605,16 +639,16 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [] 
         <div><b>${creds.length}</b><span>${T('TOTAL CREDS')}</span></div>
       </div>
       <form method="post" action="/app/available" class="avail-form">
-        <button class="btn-sm ${profile.available?'':'ghost'}">${profile.available?T('🟢 Available for work — tap to pause'):T('⚪ Paused — tap to go available')}</button>
+        <button class="btn-sm tgl ${profile.available?'':'ghost'}">${icon('dot','xic')}<span>${profile.available?T('Available for work — tap to pause'):T('Paused — tap to go available')}</span></button>
       </form>
       <form method="post" action="/app/work-today" class="avail-form" style="margin-top:8px">
-        <button class="btn-sm ${profile.work_today?'':'ghost'}">${profile.work_today?T('⚡ Can work TODAY — tap to clear'):T('⚡ I can work today')}</button>
+        <button class="btn-sm tgl ${profile.work_today?'':'ghost'}">${icon('bolt','xic')}<span>${profile.work_today?T('Can work today — tap to clear'):T('I can work today')}</span></button>
       </form>
       <form method="post" action="/app/alerts" class="avail-form" style="margin-top:8px">
-        <button class="btn-sm ${profile.alerts?'':'ghost'}">${profile.alerts?T('🔔 Job alerts ON — tap to stop'):T('🔔 Text me new job alerts')}</button>
+        <button class="btn-sm tgl ${profile.alerts?'':'ghost'}">${icon('bell','xic')}<span>${profile.alerts?T('Job alerts on — tap to stop'):T('Text me new job alerts')}</span></button>
       </form>
       <form method="post" action="/app/relocate" class="avail-form" style="margin-top:8px">
-        <button class="btn-sm ${profile.relocate?'':'ghost'}">${profile.relocate?T('✈️ Open to relocate — tap to clear'):T('✈️ I’m open to relocating')}</button>
+        <button class="btn-sm tgl ${profile.relocate?'':'ghost'}">${icon('send','xic')}<span>${profile.relocate?T('Open to relocate — tap to clear'):T('I’m open to relocating')}</span></button>
       </form>
     </div>
     <div class="col2"><div class="colstack">
@@ -752,36 +786,26 @@ function timeAgo(sqlTs){
   const d=Math.floor(h/24); if(d<30) return `${d}d ago`;
   const mo=Math.floor(d/30); return `${mo}mo ago`;
 }
-// ---------- US candidate map (SVG, projection shared by outline + dots) ----------
-const US_OUTLINE = [
-  [-124.7,48.4],[-123.9,46.2],[-124.2,43.5],[-124.4,40.4],[-122.4,37.8],[-120.6,34.5],
-  [-117.1,32.5],[-114.7,32.7],[-111.0,31.3],[-108.2,31.3],[-106.5,31.8],[-103.0,29.0],
-  [-101.5,29.8],[-99.5,27.5],[-97.1,25.9],[-95.0,29.0],[-91.0,29.2],[-89.0,29.2],
-  [-87.5,30.3],[-84.0,30.0],[-82.0,24.6],[-80.4,27.0],[-80.6,31.0],[-79.0,33.5],
-  [-76.0,36.5],[-75.0,38.5],[-74.0,40.5],[-71.0,41.5],[-70.0,43.5],[-67.0,44.5],
-  [-69.2,47.5],[-71.5,45.0],[-76.0,43.5],[-79.0,43.3],[-82.5,41.7],[-83.0,42.3],
-  [-82.5,45.0],[-84.7,45.8],[-87.0,45.4],[-87.8,47.5],[-90.0,46.7],[-92.0,46.8],
-  [-95.0,49.0],[-104.0,49.0],[-117.0,49.0],[-122.8,49.0]
-];
+// ---------- US map (real state outlines from us-geo, same linear projection as dots) ----------
 // generalized: points = [{city,lat,lon,n,kind?}]; opts controls labels/legend
 function usMap(points = [], opts = {}){
   const { title='Where your talent is', noun='candidate', emptyMsg='No mapped locations yet.', legend=null } = opts;
   const MINLON=-125, MAXLON=-66, MINLAT=24, MAXLAT=50, VW=620, VH=350;
   const px = lon => ((lon-MINLON)/(MAXLON-MINLON)*VW).toFixed(1);
   const py = lat => ((MAXLAT-lat)/(MAXLAT-MINLAT)*VH).toFixed(1);
-  const path = US_OUTLINE.map(([lo,la],i)=>`${i?'L':'M'}${px(lo)} ${py(la)}`).join(' ')+' Z';
+  const statePaths = US_STATES.map(s=>`<path class="us-state" d="${s.d}"><title>${esc(s.n)}</title></path>`).join('');
   const total = points.reduce((a,g)=>a+(g.n||0),0);
   const dots = points.map(g=>{
-    const r = Math.min(20, 5 + (g.n||1)*2.5);
+    const r = Math.min(18, 5 + (g.n||1)*2.2);
     const cls = g.kind==='related' ? 'mdot related' : 'mdot';
     const lbl = g.label || `${g.city||''}: ${g.n} ${noun}${g.n===1?'':'s'}`;
-    return `<g class="${cls}"><circle cx="${px(g.lon)}" cy="${py(g.lat)}" r="${r}"><title>${esc(lbl)}</title></circle>${g.n>1?`<text x="${px(g.lon)}" y="${(+py(g.lat)+3.5).toFixed(1)}" text-anchor="middle">${g.n}</text>`:''}</g>`;
+    return `<g class="${cls}"><circle cx="${px(g.lon)}" cy="${py(g.lat)}" r="${r}"><title>${esc(lbl)}</title></circle>${g.n>1?`<text x="${px(g.lon)}" y="${(+py(g.lat)+3.6).toFixed(1)}" text-anchor="middle">${g.n}</text>`:''}</g>`;
   }).join('');
   const top = points.slice(0,6).map(g=>`<li><span>${esc(g.city||'—')}</span><b>${g.n}</b></li>`).join('');
   return `<div class="card">
     <div class="sec-h" style="margin-top:0">${esc(title)} <span class="muted">${total} ${noun}${total===1?'':'s'} mapped</span></div>
     ${points.length ? `<div class="mapwrap"><svg class="usmap" viewBox="0 0 ${VW} ${VH}" role="img" aria-label="US map">
-        <path class="us-out" d="${path}"/>${dots}</svg>
+        <g class="us-states">${statePaths}</g>${dots}</svg>
       <ul class="maplist">${top}</ul></div>${legend?`<div class="maplegend">${legend}</div>`:''}`
       : `<p class="muted">${esc(emptyMsg)}</p>`}
   </div>`;
@@ -915,7 +939,7 @@ function empPipeline({ job, columns, candidates, jobMedia = [], alerted = 0 }) {
   return `<section class="wrap">
     <a class="back" href="/console/jobs">← All jobs</a>
     <div class="page-h"><h2>${esc(job.title)}</h2><p class="muted">$${job.pay_min}–${job.pay_max}/hr · ${esc(job.city)}</p></div>
-    ${alerted>0?`<div class="ok-card">🔔 ${alerted} matching worker${alerted===1?'':'s'} with alerts on ${alerted===1?'was':'were'} notified about this job.</div>`:''}
+    ${alerted>0?`<div class="ok-card">${icon('bell','xic')} ${alerted} matching worker${alerted===1?'':'s'} with alerts on ${alerted===1?'was':'were'} notified about this job.</div>`:''}
     <div class="card">
       <div class="sec-h" style="margin-top:0">Photos of the work <span class="muted sm">candidates see these on the job</span></div>
       ${mediaGallery(jobMedia, {deletable:true, base:`/console/jobs/${job.id}/media`}) || '<p class="muted sm">Add photos or a video of the site / work to be done — it helps candidates self-qualify.</p>'}
@@ -950,13 +974,13 @@ function empSearch({ rows, filters }) {
       <select name="trade" onchange="this.form.submit()">${tradeOpts}</select>
       <label class="chk"><input type="checkbox" name="verified" value="1" ${filters.verified?'checked':''} onchange="this.form.submit()"> ${T('Verified only')}</label>
       <label class="chk"><input type="checkbox" name="ready" value="1" ${filters.ready?'checked':''} onchange="this.form.submit()"> ${T('Readiness ≥ 85')}</label>
-      <label class="chk"><input type="checkbox" name="avail" value="1" ${filters.avail?'checked':''} onchange="this.form.submit()"> ${T('🟢 Available now')}</label>
-      <label class="chk"><input type="checkbox" name="today" value="1" ${filters.today?'checked':''} onchange="this.form.submit()"> ${T('⚡ Work today')}</label>
-      <label class="chk"><input type="checkbox" name="relocate" value="1" ${filters.relocate?'checked':''} onchange="this.form.submit()"> ${T('✈️ Open to relocate')}</label>
+      <label class="chk"><input type="checkbox" name="avail" value="1" ${filters.avail?'checked':''} onchange="this.form.submit()"> ${icon('dot')} ${T('Available now')}</label>
+      <label class="chk"><input type="checkbox" name="today" value="1" ${filters.today?'checked':''} onchange="this.form.submit()"> ${icon('bolt')} ${T('Work today')}</label>
+      <label class="chk"><input type="checkbox" name="relocate" value="1" ${filters.relocate?'checked':''} onchange="this.form.submit()"> ${icon('send')} ${T('Open to relocate')}</label>
     </form>
     <div class="card" style="padding:0">
       <table class="tbl wide"><tr><th>Candidate</th><th>Trade</th><th>Exp</th><th>Credentials</th><th>Readiness</th><th>Pay floor</th></tr>
-      ${rows.map(w=>`<tr><td><a class="cand-link" href="/console/candidates/${w.id}"><span class="av-t">${initials(w.name)}</span> ${esc(w.name)}</a>${w.available?'<span class="avail-dot" title="Available for work">●</span>':''}${w.work_today?'<span class="today-chip" title="Can work today">⚡</span>':''}${w.relocate?'<span class="today-chip" title="Open to relocate">✈️</span>':''}</td>
+      ${rows.map(w=>`<tr><td><a class="cand-link" href="/console/candidates/${w.id}"><span class="av-t">${initials(w.name)}</span> ${esc(w.name)}</a>${w.available?`<span class="avail-dot" title="Available for work">${icon('dot')}</span>`:''}${w.work_today?`<span class="today-chip" title="Can work today">${icon('bolt')}</span>`:''}${w.relocate?`<span class="today-chip" title="Open to relocate">${icon('send')}</span>`:''}</td>
         <td>${TRADES[w.trade]||w.trade}</td><td>${w.years_exp} yr</td>
         <td>${w.creds.map(c=>`<span class="cred-chip">${esc(c.name)}</span>`).join('')||'<span class="muted">—</span>'}</td>
         <td><span class="score-tag ${scoreClass(w.readiness)}">${w.readiness}</span></td>
@@ -1000,7 +1024,7 @@ function empCandidate({ worker, profile, creds, matches, apps, messages, meId, n
       ${profile.headline?`<p class="headline">${esc(profile.headline)}</p>`:''}
       <div class="chips">${tradeChips(profile)}</div>
       <p class="muted">${esc(profile.city)} ${esc(profile.zip||'')} · ${profile.years_exp} yrs experience · seeks $${profile.pay_floor}+/hr</p>
-      ${profile.available?'<div class="avail-badge">🟢 Available for work</div>':'<div class="avail-badge off">⚪ Not currently available</div>'}${profile.work_today?'<div class="avail-badge today">⚡ Can work today</div>':''}${profile.relocate?'<div class="avail-badge relo">✈️ Open to relocate</div>':''}
+      ${profile.available?`<div class="avail-badge">${icon('dot','xic')} ${T('Available for work')}</div>`:`<div class="avail-badge off">${T('Not currently available')}</div>`}${profile.work_today?`<div class="avail-badge today">${icon('bolt','xic')} ${T('Can work today')}</div>`:''}${profile.relocate?`<div class="avail-badge relo">${icon('send','xic')} ${T('Open to relocate')}</div>`:''}
       <div class="ministats">
         <div><b>${profile.readiness}</b><span>READINESS</span></div>
         <div><b>${creds.filter(c=>c.verified).length}</b><span>VERIFIED</span></div>
@@ -1056,7 +1080,7 @@ function empShortlist({ rows }) {
     <div class="page-h"><h2>${T('Shortlist')}</h2><p class="muted">${rows.length} ${rows.length===1?T('saved candidate'):T('saved candidates')}</p>
       <a class="btn-sm right" href="/console/search">${T('Talent Search')}</a></div>
     ${rows.length ? `<div class="card" style="padding:0"><table class="tbl wide"><tr><th>Candidate</th><th>Trade</th><th>Exp</th><th>Readiness</th><th>Pay floor</th></tr>
-      ${rows.map(w=>`<tr><td><a class="cand-link" href="/console/candidates/${w.id}"><span class="av-t">${initials(w.name)}</span> ${esc(w.name)}</a>${w.available?'<span class="avail-dot" title="Available for work">●</span>':''}${w.work_today?'<span class="today-chip" title="Can work today">⚡</span>':''}${w.relocate?'<span class="today-chip" title="Open to relocate">✈️</span>':''}</td>
+      ${rows.map(w=>`<tr><td><a class="cand-link" href="/console/candidates/${w.id}"><span class="av-t">${initials(w.name)}</span> ${esc(w.name)}</a>${w.available?`<span class="avail-dot" title="Available for work">${icon('dot')}</span>`:''}${w.work_today?`<span class="today-chip" title="Can work today">${icon('bolt')}</span>`:''}${w.relocate?`<span class="today-chip" title="Open to relocate">${icon('send')}</span>`:''}</td>
         <td>${TRADES[w.trade]||w.trade}</td><td>${w.years_exp} yr</td>
         <td><span class="score-tag ${scoreClass(w.readiness)}">${w.readiness}</span></td>
         <td>$${w.pay_floor}/hr</td></tr>`).join('')}
