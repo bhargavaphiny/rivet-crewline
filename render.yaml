@@ -35,6 +35,10 @@ services:
         sync: false
       - key: TWILIO_FROM
         sync: false
+      # Optional free $0 AI drafting (Groq). Set GROQ_API_KEY in the dashboard to
+      # turn on AI-written drafts; unset = a built-in template writes them instead.
+      - key: GROQ_API_KEY
+        sync: false
     # ---- Persistent data (PAID plan only) ----
     # To keep data permanently: upgrade `plan` above to `starter`, uncomment
     # the disk block below, and change RIVET_DATA_DIR above to /var/data.

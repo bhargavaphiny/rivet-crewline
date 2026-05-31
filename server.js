@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const { db, init, hashPassword, verifyPassword, recomputeReadiness } = require('./db');
 const M = require('./matching');
 const V = require('./views');
+const LLM = require('./llm');
 
 const PORT = process.env.PORT || 3000;
 const SECRET = process.env.RIVET_SECRET || 'dev-secret-change-me';
@@ -522,6 +523,14 @@ const server = http.createServer(async (req,res)=>{
         const cur = prof && prof.relocate ? 1 : 0;
         await db.prepare('UPDATE worker_profiles SET relocate=? WHERE user_id=?').run(cur?0:1, user.id);
         return redirect(res, '/app/profile');
+      }
+      if(p==='/app/profile/suggest-about' && method==='POST'){
+        const tradeLabels = profTrades(prof).map(t=>M.TRADES[t]||t);
+        const wh = await getWorkHistory(user.id);
+        const workLines = wh.slice(0,3).map(w=>`${w.role||''}${w.employer?` at ${w.employer}`:''}`.trim()).filter(Boolean);
+        const about = await LLM.workerAbout({ name:user.name, tradeLabels, years:prof.years_exp, city:prof.city, workLines });
+        if(about) await db.prepare('UPDATE worker_profiles SET about=? WHERE user_id=?').run(about.slice(0,600), user.id);
+        return redirect(res,'/app/profile');
       }
       if(p==='/app/training' && method==='GET'){
         const have = (await getCreds(user.id)).map(c=>c.kind);

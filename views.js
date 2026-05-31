@@ -574,6 +574,9 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [] 
         <label>About you <textarea name="about" rows="3" maxlength="600" placeholder="Where you've worked, what you're great at, what you're looking for.">${esc(profile.about||'')}</textarea></label>
         <button class="btn-sm">Save details</button>
       </form>
+      <form method="post" action="/app/profile/suggest-about" style="margin-top:8px">
+        <button class="btn-sm ghost" title="Drafts an About from your trades and work history — free">✨ Draft my About for me</button>
+      </form>
     </div>
     <div class="card">
       <div class="sec-h" style="margin-top:0">Work history</div>
