@@ -616,7 +616,8 @@ const server = http.createServer(async (req,res)=>{
         const info = await db.prepare('INSERT INTO users(email,pass,role,name,company) VALUES(?,?,?,?,?)')
           .run(b.email.toLowerCase().trim(), hashPassword(b.pass), role, b.name.trim(), role==='employer'?(b.company||'').trim():null);
         setSession(req, res, info.lastInsertRowid);
-        return redirect(res, role==='employer'?'/console':'/app/onboard');
+        // new employers set up their company first so worker-facing job pages aren't empty
+        return redirect(res, role==='employer'?'/console/company?welcome=1':'/app/onboard');
       }catch(e){
         return send(res, V.layout({title:'Sign up',user:null,body:V.authForm('signup',{role,google:googleEnabled,error:'That email is already registered.'})}));
       }
@@ -1091,7 +1092,7 @@ const server = http.createServer(async (req,res)=>{
           kpis:{pipeline, hired, fillRate}, weekly, conv, topTrades, topJobs, avgScore, totalApps})}));
       }
       if(p==='/console/company' && method==='GET')
-        return send(res, V.layout({title:'Company profile',user,active:'',body:V.empCompany({user, saved:url.searchParams.get('saved')==='1', rating:await ratingFor(user.id,'employer'), reviews:await reviewsFor(user.id,'employer'), payRep:await payRep(user.id)})}));
+        return send(res, V.layout({title:'Company profile',user,active:'',body:V.empCompany({user, saved:url.searchParams.get('saved')==='1', welcome:url.searchParams.get('welcome')==='1', rating:await ratingFor(user.id,'employer'), reviews:await reviewsFor(user.id,'employer'), payRep:await payRep(user.id)})}));
       if(p==='/console/company' && method==='POST'){
         const b = await readBody(req);
         let site = String(b.company_website||'').trim().slice(0,200);

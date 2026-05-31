@@ -318,6 +318,9 @@ const BUILTIN_ES = {
   'Accept quote':'Aceptar cotización','Accepted':'Aceptada','Not selected':'No seleccionada','Photos of the work':'Fotos del trabajo','candidates see these on the job':'los candidatos las ven en el empleo','your quote':'tu cotización',
   // job duration
   'Duration':'Duración','Not specified':'Sin especificar','1 day':'1 día','This weekend':'Este fin de semana','1–2 weeks':'1–2 semanas','1 month':'1 mes','3 months':'3 meses','6+ months':'6+ meses','Ongoing':'Continuo','2 weeks':'2 semanas',
+  // audit pass: clarity
+  'Received':'Recibida','Boost your score':'Sube tu puntaje','Set your pay floor':'Define tu pago mínimo','Verify one more credential':'Verifica una credencial más','Add your work history to show experience':'Agrega tu historial laboral para mostrar experiencia',
+  'First, add your company so candidates trust your jobs. Then post your first role — takes a minute.':'Primero, agrega tu empresa para que los candidatos confíen en tus empleos. Luego publica tu primer puesto — toma un minuto.',
 };
 function T(s){
   if(LANG !== 'es' || !s) return s;
@@ -400,7 +403,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=59">
+  <link rel="stylesheet" href="/styles.css?v=60">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -633,6 +636,7 @@ function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 
             <div class="r-lbl">${t('home_readiness')}</div>
             <div class="r-big">${profile.readiness>=85?t('home_hireready'):profile.readiness>=70?t('home_almost'):t('home_build')}</div>
             <p>${creds.length} ${t('home_credentials')} · ${tradesOf(profile).map(t=>TRADES[t]||t).join(', ')} · ${esc(profile.city)}</p>
+            ${readinessTip(profile, creds)}
           </div>
         </div>`}
         <div class="sec-h">${isNew?T('Open roles hiring now'):t('home_top')} <a href="/app/jobs">${t('home_seeall')}</a></div>
@@ -667,6 +671,17 @@ function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 
   </section>`;
 }
 
+// One concrete next step to raise the readiness score (it's otherwise opaque).
+function readinessTip(profile, creds = []){
+  if((profile.readiness||0) >= 95) return '';
+  const verified = creds.filter(c=>c.verified).length;
+  let tip;
+  if(!(profile.pay_floor>0)) tip = `<a href="/app/profile">${T('Set your pay floor')}</a> → <b>+5</b>`;
+  else if(verified*8 < 30) tip = `<a href="/app/profile">${T('Verify one more credential')}</a> → <b>+8</b>`;
+  else if((profile.years_exp||0)*3 < 30) tip = T('Add your work history to show experience');
+  else return '';
+  return `<p class="r-tip">${icon('spark','xic')} ${T('Boost your score')}: ${tip}</p>`;
+}
 function ring(score){
   const off = 163 - (163*score/100);
   return `<svg width="66" height="66" viewBox="0 0 66 66">
@@ -1005,9 +1020,11 @@ function publicJob({ job, rules, jsonld }) {
 }
 
 // ---------- worker: applications + saved jobs ----------
+// worker-facing stage labels (avoid recruiter jargon like "Sourced")
+function stageLabelW(s){ return T(s==='Sourced'?'Received':s); }
 function stageTimeline(current){
   const idx = STAGES.indexOf(current);
-  return `<div class="timeline">${STAGES.map((s,i)=>`<div class="tl-step ${i<idx?'done':''}${i===idx?'now':''}"><span class="tl-dot"></span><span class="tl-lbl">${s}</span></div>`).join('')}</div>`;
+  return `<div class="timeline">${STAGES.map((s,i)=>`<div class="tl-step ${i<idx?'done':''}${i===idx?'now':''}"><span class="tl-dot"></span><span class="tl-lbl">${stageLabelW(s)}</span></div>`).join('')}</div>`;
 }
 function workerApplications({ apps, savedJobs, interviews = [], empReviews = {} }) {
   return `<section class="wrap">
@@ -1617,9 +1634,10 @@ function empAnalytics({ user, kpis, weekly = [], conv = [], topTrades = [], topJ
 }
 
 const COMPANY_SIZES = ['1–10','11–50','51–200','201–500','500+'];
-function empCompany({ user, saved = false, rating = {avg:0,count:0}, reviews = [], payRep = {} }) {
+function empCompany({ user, saved = false, welcome = false, rating = {avg:0,count:0}, reviews = [], payRep = {} }) {
   const sizeOpts = `<option value="">Company size</option>`+COMPANY_SIZES.map(s=>`<option ${user.company_size===s?'selected':''}>${s}</option>`).join('');
   return `<section class="wrap narrow">
+    ${welcome?`<div class="card welcome"><div class="welcome-h">${T('Welcome to Crewline')} 👋</div><p>${T('First, add your company so candidates trust your jobs. Then post your first role — takes a minute.')}</p></div>`:''}
     <div class="card profile-head">
       <div class="big-av c">${initials(user.company||user.name)}</div>
       <h2>${esc(user.company||'Your company')}</h2>
