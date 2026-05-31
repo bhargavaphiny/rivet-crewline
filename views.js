@@ -185,7 +185,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=26">
+  <link rel="stylesheet" href="/styles.css?v=27">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -586,8 +586,8 @@ function workHistoryList(items, editable){
 function workerProfile({ user, profile, creds, error, portfolio = [], work = [] }) {
   const kinds = Object.entries(CRED_KINDS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
   const trades = tradesOf(profile);
-  return `<section class="wrap narrow">
-    <div class="card profile-head">
+  return `<section class="wrap">
+    <div class="card profile-head wide-head">
       <div class="big-av">${initials(user.name)}</div>
       <h2>${esc(user.name)}</h2>
       ${profile.headline?`<p class="headline">${esc(profile.headline)}</p>`:''}
@@ -611,6 +611,7 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [] 
         <button class="btn-sm ${profile.relocate?'':'ghost'}">${profile.relocate?T('✈️ Open to relocate — tap to clear'):T('✈️ I’m open to relocating')}</button>
       </form>
     </div>
+    <div class="col2"><div class="colstack">
     <div class="card">
       <div class="sec-h" style="margin-top:0">${T('Trades, headline & about')}</div>
       ${error?`<div class="err">${esc(error)}</div>`:''}
@@ -647,6 +648,7 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [] 
         <button class="btn-sm">${T('Add to work history')}</button>
       </form>
     </div>
+    </div><div class="colstack">
     <div class="card">
       <div class="sec-h" style="margin-top:0">${T('Credential Wallet')}</div>
       ${creds.map(credRow).join('') || `<p class="muted">${T('No credentials yet — add one below.')}</p>`}
@@ -670,6 +672,7 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [] 
         <button class="btn-sm">${T('Add to portfolio')}</button>
       </form>
     </div>
+    </div></div>
   </section>`;
 }
 
