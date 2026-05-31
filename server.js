@@ -241,6 +241,39 @@ async function loadTranslations(){
   } catch(e){}
   V.setEs(ES);
 }
+// Pre-warm the Spanish cache at boot: render key pages in es to collect every
+// T()-wrapped string, then batch-translate via Groq so the first es page is Spanish.
+async function prewarmEs(){
+  if(!LLM.enabled) return;
+  try {
+    const stubUser = { id:0, name:'Demo', company:'Demo Co', mode:'worker' };
+    const stubProf = { trades:'electrician', trade:'electrician', city:'Phoenix', zip:'85004', years_exp:5, pay_floor:30, shift:'Day', readiness:80, available:1 };
+    V.setLang('es');
+    const renders = [
+      ()=>V.workerOnboard(),
+      ()=>V.workerJobs({matches:[], filters:{}, jobsGeo:{points:[]}}),
+      ()=>V.workerProfile({user:stubUser, profile:stubProf, creds:[], work:[]}),
+      ()=>V.workerApplications({apps:[], savedJobs:[]}),
+      ()=>V.workerTraining({have:[]}),
+      ()=>V.empCompany({user:stubUser}),
+      ()=>V.empSearch({rows:[], filters:{}}),
+      ()=>V.empJobForm(),
+      ()=>V.empOverview({user:stubUser, kpis:{openJobs:0,pool:0,pipeline:0,hired:0,applicants:0}, funnel:{}, recent:[], hot:[], alerts:[], fillRate:0, geo:[]}),
+    ];
+    for(const r of renders){ try { r(); } catch(e){} }
+    V.setLang('en');
+    let misses = V.drainEsMisses().filter(s=>!ES.has(s));
+    while(misses.length){
+      const batch = misses.splice(0, 25);
+      const map = await LLM.translateBatch(batch, 'Spanish');
+      for(const [src,dst] of Object.entries(map)){
+        ES.set(src, dst);
+        try { await db.prepare("INSERT OR IGNORE INTO translations(lang,src,dst) VALUES('es',?,?)").run(src, dst); } catch(e){}
+      }
+    }
+    console.log('[i18n] Spanish cache pre-warmed');
+  } catch(e){ V.setLang('en'); }
+}
 let trBusy = false;
 async function fillTranslations(){
   if(trBusy || !LLM.enabled) return;
@@ -248,10 +281,14 @@ async function fillTranslations(){
   if(!misses.length) return;
   trBusy = true;
   try {
-    const map = await LLM.translateBatch(misses, 'Spanish');
-    for(const [src,dst] of Object.entries(map)){
-      ES.set(src, dst);
-      try { await db.prepare("INSERT OR IGNORE INTO translations(lang,src,dst) VALUES('es',?,?)").run(src, dst); } catch(e){}
+    let pending = misses.slice();
+    while(pending.length){
+      const batch = pending.splice(0, 25);
+      const map = await LLM.translateBatch(batch, 'Spanish');
+      for(const [src,dst] of Object.entries(map)){
+        ES.set(src, dst);
+        try { await db.prepare("INSERT OR IGNORE INTO translations(lang,src,dst) VALUES('es',?,?)").run(src, dst); } catch(e){}
+      }
     }
   } catch(e){ /* non-fatal */ } finally { trBusy = false; }
 }
@@ -824,4 +861,5 @@ const server = http.createServer(async (req,res)=>{
 init()
   .then(loadTranslations)
   .then(()=> server.listen(PORT, ()=>console.log(`Rivet × Crewline running → http://localhost:${PORT}`)))
+  .then(()=> { prewarmEs().catch(()=>{}); })
   .catch(err=>{ console.error('init failed', err); process.exit(1); });

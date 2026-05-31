@@ -6,14 +6,14 @@ const KEY = process.env.GROQ_API_KEY || '';
 const MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
 const enabled = !!KEY;
 
-async function chat(prompt) {
+async function chat(prompt, maxTokens = 220, timeoutMs = 8000) {
   if (!KEY) return null;
   try {
-    const opts = { signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(8000) : undefined };
+    const opts = { signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(timeoutMs) : undefined };
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: MODEL, temperature: 0.6, max_tokens: 220,
+      body: JSON.stringify({ model: MODEL, temperature: 0.4, max_tokens: maxTokens,
         messages: [{ role: 'user', content: prompt }] }),
       ...opts,
     });
@@ -55,14 +55,14 @@ async function workerAbout(d) {
 // whatever it could translate; {} when disabled or on failure (caller keeps English).
 async function translateBatch(texts, langName = 'Spanish') {
   if (!KEY || !texts || !texts.length) return {};
-  const list = texts.slice(0, 50);
+  const list = texts.slice(0, 25);
   const numbered = list.map((s, i) => `${i + 1}. ${s.replace(/\n/g, ' ')}`).join('\n');
   const prompt = `Translate each UI string for a US blue-collar hiring app into ${langName}.\n`
     + `Rules: keep any leading emoji exactly as given and DO NOT add new emojis; keep it concise and natural for tradespeople; `
     + `do NOT translate the brand names "Rivet" or "Crewline".\n`
     + `Return ONLY a JSON array of plain strings — element i is the translation of input i, same order, same count. No objects, no keys, no commentary.\n`
     + `Example input: 1. Find work 2. Save\nExample output: ["Buscar trabajo","Guardar"]\n\n${numbered}`;
-  const out = await chat(prompt);
+  const out = await chat(prompt, 1800, 15000);
   if (!out) return {};
   try {
     const start = out.indexOf('['), end = out.lastIndexOf(']');
