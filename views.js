@@ -15,7 +15,7 @@ let LANG = 'en';
 function setLang(l){ LANG = (l === 'es') ? 'es' : 'en'; }
 const I18N = {
   en: {
-    nav_login:'Log in', nav_get_started:'Get started', nav_home:'Home', nav_find_work:'Find Work',
+    nav_login:'Log in', nav_get_started:'Get started', nav_home:'Home', nav_find_work:'Jobs',
     nav_work_card:'Work Card', nav_applications:'Applications', nav_messages:'Messages',
     nav_hiring:'Hiring →', nav_working:'Working →', nav_logout:'Log out',
     nav_overview:'Overview', nav_talent:'Talent', nav_jobs:'Jobs',
@@ -51,7 +51,7 @@ const I18N = {
     phone_prefer:'Prefer email?',
   },
   es: {
-    nav_login:'Entrar', nav_get_started:'Empezar', nav_home:'Inicio', nav_find_work:'Buscar trabajo',
+    nav_login:'Entrar', nav_get_started:'Empezar', nav_home:'Inicio', nav_find_work:'Empleos',
     nav_work_card:'Mi perfil', nav_applications:'Solicitudes', nav_messages:'Mensajes',
     nav_hiring:'Contratar →', nav_working:'Trabajar →', nav_logout:'Salir',
     nav_overview:'Resumen', nav_talent:'Talento', nav_jobs:'Empleos',
@@ -145,8 +145,8 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${fullTitle}</title>
   <meta name="description" content="${esc(desc)}">
-  <meta name="theme-color" content="#16242F">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23FF6A1A'/%3E%3Ctext x='16' y='23' font-size='20' font-weight='900' fill='white' text-anchor='middle' font-family='Arial,sans-serif'%3ER%3C/text%3E%3C/svg%3E">
+  <meta name="theme-color" content="#13212B">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231763A6'/%3E%3Ctext x='16' y='23' font-size='20' font-weight='900' fill='white' text-anchor='middle' font-family='Arial,sans-serif'%3ER%3C/text%3E%3C/svg%3E">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Rivet × Crewline">
   <meta property="og:title" content="${fullTitle}">
@@ -157,7 +157,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=17">
+  <link rel="stylesheet" href="/styles.css?v=18">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -237,7 +237,7 @@ function authForm(kind, { role = 'worker', error = '', google = false } = {}) {
       </a>` : '';
   const phoneBtn = `
       <a class="gbtn full" id="phonebtn" href="/phone?role=${esc(role)}">
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="#16242F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="#13212B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
         ${t('auth_phone')}
       </a>`;
   const googleBlock = `${googleBtn}${phoneBtn}<div class="or"><span>${t('auth_or')}</span></div>`;
@@ -368,7 +368,7 @@ function ring(score){
   const off = 163 - (163*score/100);
   return `<svg width="66" height="66" viewBox="0 0 66 66">
     <circle cx="33" cy="33" r="26" fill="none" stroke="rgba(255,255,255,.15)" stroke-width="7"/>
-    <circle cx="33" cy="33" r="26" fill="none" stroke="#FFC042" stroke-width="7" stroke-linecap="round"
+    <circle cx="33" cy="33" r="26" fill="none" stroke="#F6A623" stroke-width="7" stroke-linecap="round"
       stroke-dasharray="163" stroke-dashoffset="${off}" transform="rotate(-90 33 33)"/>
     <text x="33" y="38" text-anchor="middle" fill="#fff" font-size="16" font-weight="800">${score}</text></svg>`;
 }
@@ -422,7 +422,7 @@ function workerJobs({ matches, filters = {} }) {
       <select name="shift" aria-label="Shift">${shiftOpts}</select>
       <label class="chk"><input type="checkbox" name="sort" value="distance" ${filters.sort==='distance'?'checked':''}> Nearest first</label>
       <button class="btn-sm">Search</button>
-      ${active?`<a class="nav-link" style="color:var(--orange-d)" href="/app/jobs">Clear</a>`:''}
+      ${active?`<a class="nav-link" style="color:var(--brand-d)" href="/app/jobs">Clear</a>`:''}
     </form>
     <div class="grid3">${matches.map(jobCard).join('') || '<div class="card muted">No jobs match those filters. <a href="/app/jobs">Clear filters</a> to see all open work.</div>'}</div>
   </section>`;
@@ -479,7 +479,7 @@ function workerApplications({ apps, savedJobs }) {
     ${savedJobs.length ? savedJobs.map(j=>`<a class="jobline" href="/app/jobs/${j.id}">
         <div class="jl-left"><div class="badge">${tradeEmoji(j.trade)}</div>
           <div><h4>${esc(j.title)}</h4><div class="muted">${esc(j.company||'')} · ${esc(j.city)} · $${j.pay_min}–${j.pay_max}/hr · ${esc(j.shift)}</div></div></div>
-        <span class="nav-link" style="color:var(--orange-d)">View →</span>
+        <span class="nav-link" style="color:var(--brand-d)">View →</span>
       </a>`).join('')
       : '<div class="card muted">No saved jobs yet. Tap ☆ Save on any job to keep it here.</div>'}
   </section>`;
@@ -825,16 +825,16 @@ function empShortlist({ rows }) {
 // Branded 1200x630 social-share image (served at /og.svg).
 function ogImage() {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-  <rect width="1200" height="630" fill="#16242F"/>
-  <rect width="1200" height="8" y="622" fill="#FF6A1A"/>
+  <rect width="1200" height="630" fill="#13212B"/>
+  <rect width="1200" height="8" y="622" fill="#1763A6"/>
   <g transform="translate(90,90)">
-    <rect width="92" height="92" rx="20" fill="#FF6A1A"/>
+    <rect width="92" height="92" rx="20" fill="#1763A6"/>
     <text x="46" y="66" font-family="Arial,Helvetica,sans-serif" font-size="58" font-weight="900" fill="#fff" text-anchor="middle">R</text>
     <text x="118" y="40" font-family="Arial,Helvetica,sans-serif" font-size="34" font-weight="800" fill="#fff">Rivet</text>
     <text x="118" y="76" font-family="Arial,Helvetica,sans-serif" font-size="26" font-weight="600" fill="#9fb0bb">× Crewline</text>
   </g>
-  <text x="90" y="320" font-family="Arial,Helvetica,sans-serif" font-size="76" font-weight="800" fill="#fff">America can't <tspan fill="#FFC042">build</tspan></text>
-  <text x="90" y="408" font-family="Arial,Helvetica,sans-serif" font-size="76" font-weight="800" fill="#fff">what it can't <tspan fill="#FFC042">staff.</tspan></text>
+  <text x="90" y="320" font-family="Arial,Helvetica,sans-serif" font-size="76" font-weight="800" fill="#fff">America can't <tspan fill="#F6A623">build</tspan></text>
+  <text x="90" y="408" font-family="Arial,Helvetica,sans-serif" font-size="76" font-weight="800" fill="#fff">what it can't <tspan fill="#F6A623">staff.</tspan></text>
   <text x="90" y="500" font-family="Arial,Helvetica,sans-serif" font-size="32" font-weight="500" fill="#c3cfd6">The blue-collar hiring platform — built for the trades.</text>
 </svg>`;
 }

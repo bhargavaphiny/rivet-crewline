@@ -101,7 +101,7 @@ async function sendMessage(fromId, toId, body){
 }
 
 // ---------- helpers ----------
-function send(res, html, code=200){ res.writeHead(code, {'Content-Type':'text/html; charset=utf-8'}); res.end(html); }
+function send(res, html, code=200){ res.writeHead(code, {'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}); res.end(html); }
 function redirect(res, loc){ res.writeHead(302, {Location: loc}); res.end(); }
 function readBody(req){
   return new Promise(resolve=>{
