@@ -389,6 +389,31 @@ async function seedMedia(){
   console.log('[db] demo media seeded — portfolio pieces + job photos');
 }
 
+// ---- richer portfolios: more pieces across more workers + a sample video (idempotent) ----
+async function seedMedia2(){
+  if (await metaGet('media_v2')) return;
+  const wId = async (email) => { const u = await db.prepare('SELECT id FROM users WHERE email=?').get(email); return u && u.id; };
+  const img = (seed) => `https://picsum.photos/seed/${seed}/640/420`;
+  const pieces = [
+    ['marcus@rivet.test','image',img('rivet-solar1'),'Rooftop PV array','24-panel commercial install, East Valley'],
+    ['marcus@rivet.test','video','https://www.youtube.com/watch?v=dQw4w9WgXcQ','Walkthrough: service upgrade','Short site walkthrough'],
+    ['andre@rivet.test','image',img('rivet-split'),'Mini-split install','Multi-zone, light commercial'],
+    ['andre@rivet.test','image',img('rivet-ducts'),'Duct fabrication','Sheet-metal trunk line'],
+    ['tasha@rivet.test','image',img('rivet-repipe'),'Commercial repipe','Copper repipe, retail TI'],
+    ['tasha@rivet.test','image',img('rivet-fixtures'),'Fixture rough-in','Restroom block, ground-up'],
+    ['omar@rivet.test','image',img('rivet-weld1'),'Structural steel','Moment connections, FCAW'],
+    ['omar@rivet.test','image',img('rivet-weld2'),'Pipe weld — stainless','TIG root, sanitary line'],
+    ['will@rivet.test','image',img('rivet-loader'),'Site material run','Loader + flatbed delivery'],
+    ['nina@rivet.test','image',img('rivet-pv2'),'Ground-mount PV','Inverter commissioning'],
+  ];
+  for (const [email, kind, url, title, caption] of pieces){
+    const uid = await wId(email); if(!uid) continue;
+    try { await db.prepare("INSERT INTO media(user_id,target,kind,url,title,caption) VALUES(?,'portfolio',?,?,?,?)").run(uid, kind, url, title, caption); } catch(e){}
+  }
+  await metaSet('media_v2','1');
+  console.log('[db] richer portfolio media seeded');
+}
+
 // ---- demo work history + multi-trade + headlines/about (idempotent) ----
 async function seedExperience(){
   if (await metaGet('experience_v1')) return;
@@ -525,6 +550,7 @@ async function init() {
   try { await enrichDemo(); } catch (e) { console.error('[db] enrich skipped (non-fatal):', e.message); }
   try { await seedRealism(); } catch (e) { console.error('[db] realism skipped (non-fatal):', e.message); }
   try { await seedMedia(); } catch (e) { console.error('[db] media seed skipped (non-fatal):', e.message); }
+  try { await seedMedia2(); } catch (e) { console.error('[db] media2 seed skipped (non-fatal):', e.message); }
   try { await seedExperience(); } catch (e) { console.error('[db] experience seed skipped (non-fatal):', e.message); }
   try { await seedJobTypes(); } catch (e) { console.error('[db] job-types seed skipped (non-fatal):', e.message); }
   try { await seedCompanies(); } catch (e) { console.error('[db] company seed skipped (non-fatal):', e.message); }
