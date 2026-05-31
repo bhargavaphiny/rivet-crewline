@@ -1,6 +1,6 @@
 :root{
   /* earthy-industrial palette: kraft/tan canvas, oxidized-rust primary, ochre + slate-steel */
-  --brand:#B4471F;--brand-d:#8F3415;--amber:#D98A1E;--amber-d:#B06F12;--steel:#2B3338;--steel-2:#3A464D;
+  --brand:#9A4B2E;--brand-d:#763620;--amber:#CC8A33;--amber-d:#A97121;--steel:#2B3338;--steel-2:#3A464D;
   --slate:#4A453D;--ink:#241D16;--paper:#EADFCB;--paper-2:#F4EEE0;--card:#FCF8F0;--line:#DBCFB8;
   --muted:#736857;--green:#3E8E5A;--red:#C23B2E;--blue:#3A6A7A;
   --shadow:0 16px 40px rgba(58,40,18,.16);--shadow-sm:0 3px 12px rgba(58,40,18,.09);
@@ -500,3 +500,8 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .rules-grid b.r-bad{color:var(--red)}
 .rules-note{font-size:11.5px;color:var(--muted);margin-top:9px;line-height:1.45}
 @media(max-width:480px){.rules-grid{grid-template-columns:1fr}}
+
+/* ---- map physical-geography layers ---- */
+.geo-forest{fill:rgba(86,120,72,.18)}
+.geo-river{fill:none;stroke:rgba(120,158,178,.55);stroke-width:1;stroke-linecap:round;stroke-linejoin:round}
+.geo-mtn{fill:rgba(196,176,142,.4);stroke:rgba(120,100,72,.4);stroke-width:.4;stroke-linejoin:round}

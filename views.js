@@ -72,6 +72,7 @@ const I18N = {
     hero_tag:'The blue-collar hiring platform · U.S.',
     hero_h1a:"America can't ", hero_build:'build', hero_h1b:' what it can\'t ', hero_staff:'staff.',
     hero_lead:'Rivet prepares skilled-trade workers to get hired and certified. Crewline gives employers verified, job-ready crews — fast.',
+    hero_map_title:'Live demand across the U.S.',
     cta_worker:"I'm a worker → Rivet", cta_employer:"I'm hiring → Crewline",
     pc_worker_h:'Rivet — for workers',
     pc_w1:'Verified credential wallet (license, OSHA, EPA)', pc_w2:'Job-readiness score', pc_w3:'Scored job matches near you', pc_w4:'Apply with one tap',
@@ -118,6 +119,7 @@ const I18N = {
     hero_tag:'La plataforma de empleo para oficios · EE. UU.',
     hero_h1a:'Estados Unidos no puede ', hero_build:'construir', hero_h1b:' lo que no puede ', hero_staff:'dotar de personal.',
     hero_lead:'Rivet prepara a trabajadores de oficios para ser contratados y certificados. Crewline da a las empresas cuadrillas verificadas y listas para trabajar — rápido.',
+    hero_map_title:'Demanda en vivo en EE. UU.',
     cta_worker:'Soy trabajador → Rivet', cta_employer:'Estoy contratando → Crewline',
     pc_worker_h:'Rivet — para trabajadores',
     pc_w1:'Cartera de credenciales verificadas (licencia, OSHA, EPA)', pc_w2:'Puntaje de preparación', pc_w3:'Empleos cerca de ti según tu perfil', pc_w4:'Postúlate con un toque',
@@ -244,7 +246,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=36">
+  <link rel="stylesheet" href="/styles.css?v=37">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -264,7 +266,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
 }
 
 // ---------- marketing landing ----------
-function landing() {
+function landing(demandGeo = []) {
   return `
   <section class="hero">
     <div class="wrap">
@@ -277,6 +279,7 @@ function landing() {
       </div>
     </div>
   </section>
+  ${demandGeo && demandGeo.length ? `<section class="wrap" style="margin-top:24px">${usMap(demandGeo, {title:t('hero_map_title'), noun:T('job'), cta:T('View'), emptyMsg:''})}</section>` : ''}
   <section class="wrap split2">
     <div class="prodcard worker">
       <h3>${t('pc_worker_h')}</h3>
@@ -899,6 +902,21 @@ const MAP_CITIES = [
   ['Houston',-95.37,29.76],['Minneapolis',-93.27,44.98],['Chicago',-87.63,41.88],['Detroit',-83.05,42.33],
   ['Nashville',-86.78,36.17],['Atlanta',-84.39,33.75],['Miami',-80.19,25.76],['New York',-74.0,40.71],
 ];
+// stylized physical-geography layers (hand-simplified, lon/lat)
+const MAP_RIVERS = [
+  [[-95.0,47.2],[-92,44],[-91.2,41.5],[-90.2,38.6],[-89.9,35.1],[-91,32.3],[-89.3,29.2]], // Mississippi
+  [[-111.5,45.9],[-104,47.9],[-100.8,46.9],[-96.4,42.8],[-94.7,40],[-90.2,38.8]],          // Missouri
+  [[-80,40.4],[-84.5,39.1],[-86.8,37.9],[-89,37]],                                          // Ohio
+  [[-105.8,40.2],[-108.2,39.1],[-110.5,38.9],[-111.6,36.9],[-114.0,36.0],[-114.6,32.7]],    // Colorado
+  [[-106.5,37.8],[-106.6,31.8],[-102,29.3],[-99.5,27.5],[-97.5,26]],                        // Rio Grande
+  [[-117,46],[-119.5,46],[-121.2,45.6],[-123.9,46.2]],                                      // Columbia
+];
+const MAP_MTNS = [ // mountain ranges as clusters of peak points
+  [-110,48],[-111,45],[-110.5,42],[-106.5,40],[-107,38],[-108,36],   // Rockies
+  [-121,46],[-121.4,43],[-119,38.5],[-118.5,36.5],                   // Cascades/Sierra
+  [-80,42],[-81,40],[-82,38],[-83.5,36],[-84,34.6],                  // Appalachians
+];
+const MAP_FORESTS = [[-122,46.8,30],[-121,44,24],[-90,46.5,26],[-94,47.8,22],[-84,34,26],[-82,36,22],[-72,44,24],[-69,46,20]];
 function usMap(points = [], opts = {}){
   const { title='Where your talent is', noun='candidate', emptyMsg='No mapped locations yet.', legend=null, cta='Open' } = opts;
   const MINLON=-125, MAXLON=-66, MINLAT=24, MAXLAT=50, VW=620, VH=350;
@@ -909,6 +927,10 @@ function usMap(points = [], opts = {}){
   // demand heat: soft amber glow blobs sized by how many openings/candidates cluster there
   const heatDefs = `<defs><radialGradient id="rvheat"><stop offset="0%" stop-color="#E89A2E" stop-opacity=".66"/><stop offset="55%" stop-color="#D9701E" stop-opacity=".2"/><stop offset="100%" stop-color="#B4471F" stop-opacity="0"/></radialGradient></defs>`;
   const heat = points.map(g=>{ const hr=Math.min(64, 18 + (g.n||1)*9); return `<circle class="heat" cx="${px(g.lon)}" cy="${py(g.lat)}" r="${hr}" fill="url(#rvheat)"/>`; }).join('');
+  // physical-geography layers
+  const forests = MAP_FORESTS.map(([lo,la,r])=>`<circle class="geo-forest" cx="${px(lo)}" cy="${py(la)}" r="${r}"/>`).join('');
+  const rivers = MAP_RIVERS.map(r=>`<polyline class="geo-river" points="${r.map(([lo,la])=>`${px(lo)},${py(la)}`).join(' ')}"/>`).join('');
+  const mtns = MAP_MTNS.map(([lo,la])=>{ const x=+px(lo), y=+py(la); return `<path class="geo-mtn" d="M${(x-3.4).toFixed(1)} ${(y+2.6).toFixed(1)} L${x.toFixed(1)} ${(y-3).toFixed(1)} L${(x+3.4).toFixed(1)} ${(y+2.6).toFixed(1)} Z"/>`; }).join('');
   const total = points.reduce((a,g)=>a+(g.n||0),0);
   const dots = points.map((g,i)=>{
     const r = Math.min(18, 6 + (g.n||1)*2.2);
@@ -928,6 +950,8 @@ function usMap(points = [], opts = {}){
         <svg class="usmap" id="rvsvg" viewBox="0 0 ${VW} ${VH}" role="img" aria-label="US map">
           ${heatDefs}
           <g class="us-states">${statePaths}</g>
+          <g class="us-geo"><clipPath id="rvclip"><rect x="0" y="0" width="${VW}" height="${VH}"/></clipPath>
+            <g clip-path="url(#rvclip)"><g class="geo-forests">${forests}</g><g class="geo-rivers">${rivers}</g><g class="geo-mtns">${mtns}</g></g></g>
           <g class="us-heat">${heat}</g>
           <g class="us-cities">${cityLayer}</g>${dots}
         </svg>

@@ -169,7 +169,7 @@ async function candidateGeo(){
     ORDER BY p.readiness DESC`).all();
   const byZip = {};
   for(const r of rows){
-    const b = byZip[r.zip] || (byZip[r.zip] = {city:r.city, lat:r.lat, lon:r.lon, n:0, items:[]});
+    const _k=r.city||r.zip; const b = byZip[_k] || (byZip[_k] = {city:r.city, lat:r.lat, lon:r.lon, n:0, items:[]});
     b.n++;
     if(b.items.length<12) b.items.push({ label:r.name, sub:`${M.TRADES[r.trade]||r.trade} · readiness ${r.readiness}`, href:`/console/candidates/${r.id}` });
   }
@@ -181,7 +181,7 @@ async function jobGeoAll(){
     FROM jobs j JOIN zip_geo z ON z.zip=j.zip JOIN users u ON u.id=j.employer_id WHERE j.status='open'`).all();
   const byZip = {};
   for(const r of rows){
-    const b = byZip[r.zip] || (byZip[r.zip] = {city:r.city, lat:r.lat, lon:r.lon, n:0, items:[]});
+    const _k=r.city||r.zip; const b = byZip[_k] || (byZip[_k] = {city:r.city, lat:r.lat, lon:r.lon, n:0, items:[]});
     b.n++;
     if(b.items.length<12) b.items.push({ label:`${r.title} · $${r.pay_min}–${r.pay_max}/hr`, sub:`${r.company||''} · ${M.TRADES[r.trade]||r.trade}`, href:`/app/jobs/${r.id}` });
   }
@@ -200,7 +200,7 @@ async function jobGeoForWorker(prof){
   for(const r of rows){
     const isDirect = direct.has(r.trade), isRelated = related.has(r.trade);
     if(!isDirect && !isRelated) continue;
-    const b = byZip[r.zip] || (byZip[r.zip] = {city:r.city, lat:r.lat, lon:r.lon, n:0, anyDirect:false, items:[]});
+    const _k=r.city||r.zip; const b = byZip[_k] || (byZip[_k] = {city:r.city, lat:r.lat, lon:r.lon, n:0, anyDirect:false, items:[]});
     b.n++; if(isDirect) b.anyDirect = true;
     b.items.push({ label:`${r.title} · $${r.pay_min}–${r.pay_max}/hr`, sub:`${r.company||''} · ${M.TRADES[r.trade]||r.trade}`, href:`/app/jobs/${r.id}` });
   }
@@ -355,7 +355,8 @@ const server = http.createServer(async (req,res)=>{
     // ---- public ----
     if(p==='/' && method==='GET'){
       if(user) return redirect(res, user.role==='employer'?'/console':'/app');
-      return send(res, V.layout({title:'Hire & get hired in the trades', user:null, body:V.landing()}));
+      const demandGeo = await jobGeoAll();
+      return send(res, V.layout({title:'Hire & get hired in the trades', user:null, body:V.landing(demandGeo)}));
     }
     if(p==='/signup' && method==='GET')
       return send(res, V.layout({title:'Sign up', user:null, body:V.authForm('signup',{role:url.searchParams.get('role')||'worker', google:googleEnabled})}));
