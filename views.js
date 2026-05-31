@@ -77,7 +77,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=14">
+  <link rel="stylesheet" href="/styles.css?v=15">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -303,7 +303,7 @@ function jobCard(m){
       <div class="badge">${tradeEmoji(j.trade)}</div>
       <div class="job-main">
         <a class="job-t" href="/app/jobs/${j.id}">${esc(j.title)}</a>
-        <div class="job-c">${esc(j.company||'')} · ${esc(j.city)} · ${esc(j.shift)} shift</div>
+        <div class="job-c">${esc(j.company||'')} · ${esc(j.city)} · ${esc(j.shift)} shift${m.distance!=null?` · <b class="dist">${m.distance} mi away</b>`:''}</div>
         <div class="pay">$${j.pay_min}–${j.pay_max}/hr</div>
         <div class="mrow">${fitTags.join('')}</div>
         <div class="matchbar"><i style="width:${m.score}%"></i></div>
@@ -338,7 +338,9 @@ function workerJobs({ matches, filters = {} }) {
       <select name="trade" aria-label="Trade">${tradeOpts}</select>
       <input name="city" value="${esc(filters.city||'')}" placeholder="City" aria-label="City">
       <input name="minpay" type="number" min="0" inputmode="numeric" value="${filters.minpay||''}" placeholder="Min $/hr" aria-label="Minimum pay">
+      <input name="maxmi" type="number" min="0" inputmode="numeric" value="${filters.maxmi||''}" placeholder="Within mi" aria-label="Within miles">
       <select name="shift" aria-label="Shift">${shiftOpts}</select>
+      <label class="chk"><input type="checkbox" name="sort" value="distance" ${filters.sort==='distance'?'checked':''}> Nearest first</label>
       <button class="btn-sm">Search</button>
       ${active?`<a class="nav-link" style="color:var(--orange-d)" href="/app/jobs">Clear</a>`:''}
     </form>

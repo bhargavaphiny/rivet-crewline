@@ -218,6 +218,7 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--orange)}
 .avail-badge.off{color:var(--muted);background:var(--paper)}
 
 /* candidate job search */
+.dist{color:var(--orange-d)}
 .jobfilters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 18px}
 .jobfilters input,.jobfilters select{margin:0;width:auto;flex:1;min-width:130px}
 .jobfilters .btn-sm{flex:0 0 auto}

@@ -133,6 +133,33 @@ async function rankWorkersForJob(job){
   return out.sort((a,b)=>b.score-a.score);
 }
 
+// ---------- geo / distance ----------
+function haversineMi(a, b){
+  if(!a || !b) return null;
+  const R=3958.8, toRad=d=>d*Math.PI/180;
+  const dLat=toRad(b.lat-a.lat), dLon=toRad(b.lon-a.lon);
+  const s=Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLon/2)**2;
+  return Math.round(2*R*Math.asin(Math.sqrt(s)));
+}
+async function geocodeZip(zip){
+  zip = String(zip||'').trim().slice(0,5);
+  if(!/^\d{5}$/.test(zip)) return null;
+  try {
+    const cached = await db.prepare('SELECT lat,lon FROM zip_geo WHERE zip=?').get(zip);
+    if(cached && cached.lat!=null) return { lat:cached.lat, lon:cached.lon };
+    const opts = (typeof AbortSignal!=='undefined' && AbortSignal.timeout) ? { signal: AbortSignal.timeout(2500) } : {};
+    const r = await fetch(`https://api.zippopotam.us/us/${zip}`, opts);
+    if(!r.ok) return null;
+    const j = await r.json();
+    const place = j.places && j.places[0];
+    if(!place) return null;
+    const lat = parseFloat(place.latitude), lon = parseFloat(place.longitude);
+    if(isNaN(lat) || isNaN(lon)) return null;
+    try { await db.prepare('INSERT OR IGNORE INTO zip_geo(zip,lat,lon,city) VALUES(?,?,?,?)').run(zip, lat, lon, place['place name']||''); } catch(e){}
+    return { lat, lon };
+  } catch(e){ return null; }
+}
+
 // ---------- router ----------
 const server = http.createServer(async (req,res)=>{
   const url = new URL(req.url, `http://${req.headers.host}`);
@@ -325,6 +352,8 @@ const server = http.createServer(async (req,res)=>{
           city:(url.searchParams.get('city')||'').trim(),
           minpay:Number(url.searchParams.get('minpay'))||0,
           shift:url.searchParams.get('shift')||'',
+          maxmi:Number(url.searchParams.get('maxmi'))||0,
+          sort:url.searchParams.get('sort')||'',
         };
         let matches = await rankJobsForWorker(user.id);
         if(f.q){ const q=f.q.toLowerCase(); matches=matches.filter(m=>(m.job.title||'').toLowerCase().includes(q)||(m.job.company||'').toLowerCase().includes(q)); }
@@ -332,6 +361,18 @@ const server = http.createServer(async (req,res)=>{
         if(f.city){ const c=f.city.toLowerCase(); matches=matches.filter(m=>(m.job.city||'').toLowerCase().includes(c)); }
         if(f.minpay) matches=matches.filter(m=>(m.job.pay_max||0)>=f.minpay);
         if(f.shift) matches=matches.filter(m=>m.job.shift===f.shift);
+        // distance from the worker's ZIP (cached; graceful if geo unavailable)
+        const home = await geocodeZip(prof.zip);
+        if(home){
+          const zc = {};
+          for(const m of matches){
+            const z = m.job.zip;
+            if(z && !(z in zc)) zc[z] = await geocodeZip(z);
+            m.distance = (z && zc[z]) ? haversineMi(home, zc[z]) : null;
+          }
+        }
+        if(f.maxmi) matches = matches.filter(m=> m.distance!=null && m.distance<=f.maxmi);
+        if(f.sort==='distance') matches.sort((a,b)=> (a.distance==null?1e9:a.distance)-(b.distance==null?1e9:b.distance));
         return send(res, V.layout({title:'Find work',user,active:'jobs',body:V.workerJobs({matches, filters:f})}));
       }
       if(p==='/app/profile' && method==='GET'){

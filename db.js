@@ -168,6 +168,10 @@ async function createSchema() {
     );
     CREATE INDEX IF NOT EXISTS idx_media_portfolio ON media(user_id, target);
     CREATE INDEX IF NOT EXISTS idx_media_job ON media(job_id);
+    CREATE TABLE IF NOT EXISTS zip_geo (
+      zip TEXT PRIMARY KEY, lat REAL, lon REAL, city TEXT,
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
     CREATE INDEX IF NOT EXISTS idx_messages_to ON messages(to_id, read_at);
     CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_id, to_id);
     CREATE INDEX IF NOT EXISTS idx_applications_worker ON applications(worker_id);
@@ -383,10 +387,26 @@ async function migrate() {
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN available INTEGER DEFAULT 1'); } catch (e) { /* column exists */ }
 }
 
+async function seedZips() {
+  const zips = [
+    ['85004', 33.4515, -112.0712, 'Phoenix'],
+    ['85008', 33.4664, -111.9870, 'Phoenix'],
+    ['85021', 33.5650, -112.0890, 'Phoenix'],
+    ['85281', 33.4255, -111.9400, 'Tempe'],
+    ['85251', 33.4942, -111.9261, 'Scottsdale'],
+    ['85201', 33.4361, -111.8344, 'Mesa'],
+    ['85301', 33.5387, -112.1860, 'Glendale'],
+  ];
+  for (const [zip, lat, lon, city] of zips) {
+    try { await db.prepare('INSERT OR IGNORE INTO zip_geo(zip,lat,lon,city) VALUES(?,?,?,?)').run(zip, lat, lon, city); } catch(e){}
+  }
+}
+
 async function init() {
   await createSchema();
   await migrate();
   await seed();
+  try { await seedZips(); } catch (e) { console.error('[db] zip seed skipped (non-fatal):', e.message); }
   try { await enrichDemo(); } catch (e) { console.error('[db] enrich skipped (non-fatal):', e.message); }
   try { await seedRealism(); } catch (e) { console.error('[db] realism skipped (non-fatal):', e.message); }
   try { await seedMedia(); } catch (e) { console.error('[db] media seed skipped (non-fatal):', e.message); }
