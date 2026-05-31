@@ -143,6 +143,8 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--brand)}
 
 .profile-head{text-align:center}
 .big-av{width:74px;height:74px;border-radius:20px;background:var(--brand);margin:0 auto 10px;display:grid;place-items:center;font-size:28px;color:#fff;font-weight:800}
+.big-av.c{background:var(--amber);color:var(--steel)}
+.big-av.sm{width:46px;height:46px;border-radius:12px;font-size:17px;margin:0}
 .profile-head .ministats{margin-top:14px}
 
 /* employer */

@@ -446,6 +446,23 @@ async function seedJobTypes(){
   console.log('[db] demo job employment types seeded');
 }
 
+// ---- demo company profiles (idempotent) ----
+async function seedCompanies(){
+  if (await metaGet('company_v1')) return;
+  const rows = [
+    ['ops@sunvalley.test','Sun Valley Mechanical','Phoenix, AZ','51–200','https://example.com/sunvalley',
+      'Commercial HVAC and electrical contractor serving the Phoenix metro since 2004. We run union and merit crews, pay weekly, and promote from within — most of our foremen started as apprentices here.'],
+    ['hr@coppermountain.test','Copper Mountain Builders','Phoenix, AZ','201–500','https://example.com/coppermountain',
+      'Ground-up commercial and industrial general contractor. Steady pipeline of work across the Valley, strong safety record, and a real apprenticeship-to-journeyman track.'],
+  ];
+  for (const [email,name,city,size,site,about] of rows){
+    try { await db.prepare('UPDATE users SET company=?,company_city=?,company_size=?,company_website=?,company_about=? WHERE email=?')
+      .run(name, city, size, site, about, email); } catch(e){}
+  }
+  await metaSet('company_v1','1');
+  console.log('[db] demo company profiles seeded');
+}
+
 async function migrate() {
   // additive column migrations (idempotent — errors swallowed when already applied)
   try { await db.exec('ALTER TABLE users ADD COLUMN phone TEXT'); } catch (e) { /* column exists */ }
@@ -458,6 +475,10 @@ async function migrate() {
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN about TEXT'); } catch (e) { /* column exists */ }
   try { await db.exec("ALTER TABLE jobs ADD COLUMN employment_type TEXT DEFAULT 'Full-time'"); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN relocate INTEGER DEFAULT 0'); } catch (e) { /* column exists */ }
+  try { await db.exec('ALTER TABLE users ADD COLUMN company_about TEXT'); } catch (e) { /* column exists */ }
+  try { await db.exec('ALTER TABLE users ADD COLUMN company_website TEXT'); } catch (e) { /* column exists */ }
+  try { await db.exec('ALTER TABLE users ADD COLUMN company_city TEXT'); } catch (e) { /* column exists */ }
+  try { await db.exec('ALTER TABLE users ADD COLUMN company_size TEXT'); } catch (e) { /* column exists */ }
 }
 
 async function seedZips() {
@@ -506,6 +527,7 @@ async function init() {
   try { await seedMedia(); } catch (e) { console.error('[db] media seed skipped (non-fatal):', e.message); }
   try { await seedExperience(); } catch (e) { console.error('[db] experience seed skipped (non-fatal):', e.message); }
   try { await seedJobTypes(); } catch (e) { console.error('[db] job-types seed skipped (non-fatal):', e.message); }
+  try { await seedCompanies(); } catch (e) { console.error('[db] company seed skipped (non-fatal):', e.message); }
   try {
     if(!(await metaGet('relocate_v1'))){
       for(const email of ['omar@rivet.test','will@rivet.test','sam@rivet.test']){

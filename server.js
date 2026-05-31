@@ -70,7 +70,7 @@ async function getUser(req){
   const token = cookie.slice(5);
   const [uid, sig] = token.split('.');
   if(!uid || sig !== sign(uid)) return null;
-  const u = await db.prepare('SELECT id,email,role,name,company FROM users WHERE id=?').get(Number(uid));
+  const u = await db.prepare('SELECT id,email,role,name,company,company_about,company_website,company_city,company_size FROM users WHERE id=?').get(Number(uid));
   if(!u) return null;
   try { u.unread = (await db.prepare('SELECT COUNT(*) c FROM messages WHERE to_id=? AND read_at IS NULL').get(u.id)).c; }
   catch(e){ u.unread = 0; }
@@ -545,7 +545,7 @@ const server = http.createServer(async (req,res)=>{
         return redirect(res, `/app/jobs/${jid}`);
       }
       if(jid && p===`/app/jobs/${jid}` && method==='GET'){
-        const job = await db.prepare(`SELECT j.*,u.company FROM jobs j JOIN users u ON u.id=j.employer_id WHERE j.id=?`).get(jid);
+        const job = await db.prepare(`SELECT j.*,u.company,u.company_about,u.company_website,u.company_city,u.company_size FROM jobs j JOIN users u ON u.id=j.employer_id WHERE j.id=?`).get(jid);
         if(!job) return send(res, V.layout({title:'Not found',user,body:'<section class="wrap"><div class="card">Job not found.</div></section>'}),404);
         const match = bestMatch(prof, await getCreds(user.id), job);
         const applied = !!(await db.prepare('SELECT 1 FROM applications WHERE job_id=? AND worker_id=?').get(jid,user.id));
@@ -595,6 +595,17 @@ const server = http.createServer(async (req,res)=>{
         const geo = await candidateGeo();
         return send(res, V.layout({title:'Overview',user,active:'ov',body:V.empOverview({user,
           kpis:{openJobs:jobs.filter(j=>j.status==='open').length, pool, applicants, pipeline, hired}, funnel, recent, hot, alerts, fillRate, geo})}));
+      }
+      if(p==='/console/company' && method==='GET')
+        return send(res, V.layout({title:'Company profile',user,active:'',body:V.empCompany({user, saved:url.searchParams.get('saved')==='1'})}));
+      if(p==='/console/company' && method==='POST'){
+        const b = await readBody(req);
+        let site = String(b.company_website||'').trim().slice(0,200);
+        if(site && !/^https?:\/\//i.test(site)) site = 'https://'+site;
+        await db.prepare('UPDATE users SET company=?,company_city=?,company_size=?,company_website=?,company_about=? WHERE id=?')
+          .run(String(b.company||'').slice(0,80), String(b.company_city||'').slice(0,60),
+            String(b.company_size||'').slice(0,20), site, String(b.company_about||'').slice(0,800), user.id);
+        return redirect(res,'/console/company?saved=1');
       }
 
       if(p==='/console/jobs' && method==='GET'){

@@ -131,7 +131,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
     const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/console/messages">${t('nav_messages')}${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
     nav = `${L('/console',t('nav_overview'),'ov')}${L('/console/search',t('nav_talent'),'search')}${L('/console/jobs',t('nav_jobs'),'jobs')}${msg}
            <a class="nav-link switch" href="/app" title="Switch to working">${t('nav_working')}</a>
-           <span class="who">${initials(user.company||user.name)}</span>
+           <a class="who" href="/console/company" title="Company profile">${initials(user.company||user.name)}</a>
            <a class="nav-link" href="/logout">${t('nav_logout')}</a>${langTg}`;
   }
   const brand = user && (user.mode || user.role)==='employer'
@@ -157,7 +157,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=22">
+  <link rel="stylesheet" href="/styles.css?v=23">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -472,6 +472,14 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
         : `<form method="post" action="/app/jobs/${job.id}/apply"><button class="btn full">Apply with verified Work Card</button></form>`}
       <form method="post" action="/app/jobs/${job.id}/save"><button class="btn full ghost">${saved?'★ Saved — remove':'☆ Save this job'}</button></form>
     </div>
+    ${(job.company_about||job.company_website||job.company_size)?`<div class="card">
+      <div class="sec-h" style="margin-top:0">About the employer</div>
+      <div class="job-row"><div class="big-av c sm">${initials(job.company||'')}</div>
+        <div class="job-main"><b>${esc(job.company||'')}</b>
+          <div class="muted sm">${esc(job.company_city||'')}${job.company_size?` · ${esc(job.company_size)} employees`:''}</div></div></div>
+      ${job.company_about?`<p class="descr" style="margin-top:10px">${esc(job.company_about)}</p>`:''}
+      ${job.company_website?`<a class="nav-link" style="color:var(--brand-d)" href="${esc(job.company_website)}" target="_blank" rel="noopener">${esc(job.company_website)} ↗</a>`:''}
+    </div>`:''}
   </section>`;
 }
 
@@ -745,6 +753,34 @@ function empOverview({ user, kpis, funnel, recent, hot, alerts, fillRate, geo = 
 }
 function kpi(l,v){return `<div class="kpi"><div class="kl">${l}</div><b>${v}</b></div>`;}
 
+const COMPANY_SIZES = ['1–10','11–50','51–200','201–500','500+'];
+function empCompany({ user, saved = false }) {
+  const sizeOpts = `<option value="">Company size</option>`+COMPANY_SIZES.map(s=>`<option ${user.company_size===s?'selected':''}>${s}</option>`).join('');
+  return `<section class="wrap narrow">
+    <div class="card profile-head">
+      <div class="big-av c">${initials(user.company||user.name)}</div>
+      <h2>${esc(user.company||'Your company')}</h2>
+      <p class="muted">${esc(user.company_city||'')}${user.company_size?` · ${esc(user.company_size)} employees`:''}</p>
+      ${user.company_website?`<p><a class="nav-link" style="color:var(--brand-d)" href="${esc(user.company_website)}" target="_blank" rel="noopener">${esc(user.company_website)} ↗</a></p>`:''}
+      ${user.company_about?`<p class="cand-bio">${esc(user.company_about)}</p>`:''}
+    </div>
+    <div class="card">
+      <div class="sec-h" style="margin-top:0">Company profile <span class="muted sm">shown to candidates on your jobs</span></div>
+      ${saved?'<div class="ok-card">Saved.</div>':''}
+      <form method="post" action="/console/company">
+        <label>Company name <input name="company" maxlength="80" value="${esc(user.company||'')}" placeholder="e.g. Sun Valley Mechanical"></label>
+        <div class="row2">
+          <label>City <input name="company_city" maxlength="60" value="${esc(user.company_city||'')}" placeholder="Phoenix, AZ"></label>
+          <label>Size <select name="company_size">${sizeOpts}</select></label>
+        </div>
+        <label>Website <input name="company_website" maxlength="200" value="${esc(user.company_website||'')}" placeholder="https://…"></label>
+        <label>About the company <textarea name="company_about" rows="4" maxlength="800" placeholder="What you build, who you hire, why crews stay. Candidates read this before applying.">${esc(user.company_about||'')}</textarea></label>
+        <button class="btn">Save company profile</button>
+      </form>
+    </div>
+  </section>`;
+}
+
 function empJobs({ jobs }) {
   return `<section class="wrap">
     <div class="page-h"><h2>Job Postings</h2><a class="btn-sm right" href="/console/jobs/new">+ Post a job</a></div>
@@ -963,4 +999,4 @@ function ogImage() {
 }
 
 module.exports = { setLang, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES };
+  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, empCompany };
