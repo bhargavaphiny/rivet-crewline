@@ -216,6 +216,8 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--orange)}
 .avail-dot{color:var(--green);font-size:11px;margin-left:6px;vertical-align:middle}
 .avail-badge{display:inline-block;margin-top:10px;font-size:12.5px;font-weight:700;color:var(--green);background:rgba(31,169,113,.12);padding:4px 10px;border-radius:20px}
 .avail-badge.off{color:var(--muted);background:var(--paper)}
+.avail-badge.today{color:var(--orange-d);background:rgba(255,106,26,.12);margin-left:6px}
+.today-chip{margin-left:5px;font-size:11px}
 
 /* candidate job search */
 .dist{color:var(--orange-d)}
