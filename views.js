@@ -54,7 +54,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=8">
+  <link rel="stylesheet" href="/styles.css?v=9">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -462,7 +462,8 @@ function empPipeline({ job, columns, candidates }) {
 function empSearch({ rows, filters }) {
   const tradeOpts = `<option value="">All trades</option>`+Object.entries(TRADES).map(([k,v])=>`<option value="${k}" ${filters.trade===k?'selected':''}>${v}</option>`).join('');
   return `<section class="wrap">
-    <div class="page-h"><h2>Talent Search</h2><p class="muted">${rows.length} verified candidates</p></div>
+    <div class="page-h"><h2>Talent Search</h2><p class="muted">${rows.length} verified candidates</p>
+      <a class="btn-sm right ghost" href="/console/shortlist">★ Shortlist</a></div>
     <form class="filters" method="get" action="/console/search">
       <select name="trade" onchange="this.form.submit()">${tradeOpts}</select>
       <label class="chk"><input type="checkbox" name="verified" value="1" ${filters.verified?'checked':''} onchange="this.form.submit()"> Verified only</label>
@@ -500,10 +501,14 @@ function inbox({ convos, base, meId }){
 }
 
 // ---------- employer: candidate detail ----------
-function empCandidate({ worker, profile, creds, matches, apps, messages, meId }) {
+function empCandidate({ worker, profile, creds, matches, apps, messages, meId, notes = [], saved = false }) {
   const stageByJob = {}; for (const a of apps) stageByJob[a.job_id] = a.stage;
   return `<section class="wrap narrow">
-    <a class="back" href="/console/search">← Talent Search</a>
+    <div class="cand-top"><a class="back" href="/console/search">← Talent Search</a>
+      <form method="post" action="/console/candidates/${worker.id}/save">
+        <button class="btn-sm ${saved?'':'ghost'}">${saved?'★ Saved':'☆ Save to shortlist'}</button>
+      </form>
+    </div>
     <div class="card profile-head">
       <div class="big-av">${initials(worker.name)}</div>
       <h2>${esc(worker.name)}</h2>
@@ -541,6 +546,29 @@ function empCandidate({ worker, profile, creds, matches, apps, messages, meId })
         <button class="btn-sm">Send</button>
       </form>
     </div>
+    <div class="card">
+      <div class="sec-h" style="margin-top:0">Private notes <span class="muted sm">only your team sees these</span></div>
+      ${notes.length ? notes.map(n=>`<div class="note"><div class="note-b">${esc(n.body)}</div><div class="note-t">${timeAgo(n.created_at)}</div></div>`).join('') : '<p class="muted sm">No notes yet.</p>'}
+      <form method="post" action="/console/candidates/${worker.id}/note" class="msg-form" style="margin-top:10px">
+        <input name="body" placeholder="Add a private note…" autocomplete="off" required maxlength="2000">
+        <button class="btn-sm ghost">Add note</button>
+      </form>
+    </div>
+  </section>`;
+}
+
+// ---------- employer: shortlist ----------
+function empShortlist({ rows }) {
+  return `<section class="wrap">
+    <div class="page-h"><h2>Shortlist</h2><p class="muted">${rows.length} saved candidate${rows.length===1?'':'s'}</p>
+      <a class="btn-sm right" href="/console/search">Talent Search</a></div>
+    ${rows.length ? `<div class="card" style="padding:0"><table class="tbl wide"><tr><th>Candidate</th><th>Trade</th><th>Exp</th><th>Readiness</th><th>Pay floor</th></tr>
+      ${rows.map(w=>`<tr><td><a class="cand-link" href="/console/candidates/${w.id}"><span class="av-t">${initials(w.name)}</span> ${esc(w.name)}</a></td>
+        <td>${TRADES[w.trade]||w.trade}</td><td>${w.years_exp} yr</td>
+        <td><span class="score-tag ${scoreClass(w.readiness)}">${w.readiness}</span></td>
+        <td>$${w.pay_floor}/hr</td></tr>`).join('')}
+      </table></div>`
+      : '<div class="card muted">No saved candidates yet. Open a candidate from <a href="/console/search">Talent Search</a> and tap ☆ Save to shortlist.</div>'}
   </section>`;
 }
 
@@ -562,4 +590,4 @@ function ogImage() {
 }
 
 module.exports = { layout, landing, authForm, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, empOverview, empJobs, empJobForm, empPipeline, empSearch, empCandidate, inbox, ogImage, STAGES };
+  jobDetail, workerProfile, empOverview, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES };

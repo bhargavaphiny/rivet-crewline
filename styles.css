@@ -235,6 +235,12 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--orange)}
 .stage-pill.sm{font-size:10.5px;padding:1px 7px}
 
 /* candidate detail (recruiter) */
+.cand-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:18px 0 6px}
+.cand-top .back{margin:0}
+.note{border-top:1px solid var(--line);padding:9px 0}
+.note:first-of-type{border-top:0}
+.note-b{font-size:13.5px}
+.note-t{font-size:11px;color:var(--muted);margin-top:2px}
 .cand-link{color:inherit;font-weight:600;display:inline-flex;align-items:center;gap:8px}
 .cand-link:hover{color:var(--orange-d)}
 .cand-bio{margin-top:12px;color:var(--slate);font-size:14px}

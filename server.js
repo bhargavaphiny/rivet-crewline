@@ -405,6 +405,28 @@ const server = http.createServer(async (req,res)=>{
         if(w) await sendMessage(user.id, wid, b.body);
         return redirect(res, `/console/candidates/${wid}`);
       }
+      const cNote = p.match(/^\/console\/candidates\/(\d+)\/note$/);
+      if(cNote && method==='POST'){
+        const wid = Number(cNote[1]);
+        const b = await readBody(req);
+        const body = String(b.body||'').trim().slice(0,2000);
+        if(body) await db.prepare('INSERT INTO notes(author_id,worker_id,body) VALUES(?,?,?)').run(user.id, wid, body);
+        return redirect(res, `/console/candidates/${wid}`);
+      }
+      const cSave = p.match(/^\/console\/candidates\/(\d+)\/save$/);
+      if(cSave && method==='POST'){
+        const wid = Number(cSave[1]);
+        const exists = await db.prepare('SELECT 1 FROM saved_candidates WHERE employer_id=? AND worker_id=?').get(user.id, wid);
+        if(exists) await db.prepare('DELETE FROM saved_candidates WHERE employer_id=? AND worker_id=?').run(user.id, wid);
+        else await db.prepare('INSERT INTO saved_candidates(employer_id,worker_id) VALUES(?,?)').run(user.id, wid);
+        return redirect(res, `/console/candidates/${wid}`);
+      }
+      if(p==='/console/shortlist' && method==='GET'){
+        const rows = await db.prepare(`SELECT u.id,u.name,p.* FROM saved_candidates s
+          JOIN users u ON u.id=s.worker_id JOIN worker_profiles p ON p.user_id=s.worker_id
+          WHERE s.employer_id=? ORDER BY s.created_at DESC`).all(user.id);
+        return send(res, V.layout({title:'Shortlist',user,active:'search',body:V.empShortlist({rows})}));
+      }
 
       const candMatch = p.match(/^\/console\/candidates\/(\d+)$/);
       if(candMatch && method==='GET'){
@@ -418,7 +440,9 @@ const server = http.createServer(async (req,res)=>{
         const apps = jobs.length ? await db.prepare(`SELECT job_id,stage FROM applications WHERE worker_id=? AND job_id IN (${jobs.map(()=>'?').join(',')})`).all(wid, ...jobs.map(j=>j.id)) : [];
         const messages = await db.prepare(`SELECT * FROM messages WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=?) ORDER BY created_at, id`).all(user.id, wid, wid, user.id);
         await db.prepare("UPDATE messages SET read_at=datetime('now') WHERE to_id=? AND from_id=? AND read_at IS NULL").run(user.id, wid);
-        return send(res, V.layout({title:w.name,user,active:'search',body:V.empCandidate({worker:w,profile:prof,creds,matches,apps,messages,meId:user.id})}));
+        const notes = await db.prepare('SELECT * FROM notes WHERE author_id=? AND worker_id=? ORDER BY created_at DESC, id DESC').all(user.id, wid);
+        const saved = !!(await db.prepare('SELECT 1 FROM saved_candidates WHERE employer_id=? AND worker_id=?').get(user.id, wid));
+        return send(res, V.layout({title:w.name,user,active:'search',body:V.empCandidate({worker:w,profile:prof,creds,matches,apps,messages,meId:user.id,notes,saved})}));
       }
     }
 
