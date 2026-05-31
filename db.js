@@ -185,6 +185,12 @@ async function createSchema() {
       lang TEXT NOT NULL, src TEXT NOT NULL, dst TEXT NOT NULL,
       PRIMARY KEY (lang, src)
     );
+    CREATE TABLE IF NOT EXISTS posts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      author_id INTEGER, author_name TEXT, trade TEXT,
+      body TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
     CREATE INDEX IF NOT EXISTS idx_messages_to ON messages(to_id, read_at);
     CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_id, to_id);
     CREATE INDEX IF NOT EXISTS idx_applications_worker ON applications(worker_id);
@@ -654,6 +660,23 @@ async function seedCategories(){
   console.log('[db] category expansion seeded — +5 employers, +15 jobs, +5 workers (healthcare/ag/food/logistics/security)');
 }
 
+// ---- seed a few community board posts (idempotent) ----
+async function seedPosts(){
+  if (await metaGet('posts_v1')) return;
+  const posts = [
+    ['Marcus Lee','electrician','Anyone else seeing data-center work blow up around Phoenix? Three GCs called me this week. Get your OSHA 30 if you don\'t have it — every one of them asked.','-2 days'],
+    ['Andre Cole','hvac','EPA 608 Universal paid off big. Light-commercial service pays $6/hr more than resi here. Worth the exam.','-3 days'],
+    ['Gloria Mendez','cna','Home health is hiring like crazy and the schedules are flexible. If you have your CNA + BLS you can pick your shifts right now.','-30 hours'],
+    ['DeShawn Carter','welder','6G cert is the difference between $28 and $42/hr on pipe work. Travel jobs pay per-diem on top. Don\'t sleep on it.','-5 days'],
+    ['Sofia Reyes','plumber','Backflow certification opened up a whole side income for me doing annual tests. Quick class, steady demand.','-12 hours'],
+  ];
+  for (const [name, trade, body, when] of posts){
+    try { await db.prepare(`INSERT INTO posts(author_id,author_name,trade,body,created_at) VALUES(NULL,?,?,?,datetime('now',?))`).run(name, trade, body, when); } catch(e){}
+  }
+  await metaSet('posts_v1','1');
+  console.log('[db] community posts seeded');
+}
+
 async function migrate() {
   // additive column migrations (idempotent — errors swallowed when already applied)
   try { await db.exec('ALTER TABLE users ADD COLUMN phone TEXT'); } catch (e) { /* column exists */ }
@@ -722,6 +745,7 @@ async function init() {
   try { await seedCompanies(); } catch (e) { console.error('[db] company seed skipped (non-fatal):', e.message); }
   try { await seedBig(); } catch (e) { console.error('[db] big seed skipped (non-fatal):', e.message); }
   try { await seedCategories(); } catch (e) { console.error('[db] category seed skipped (non-fatal):', e.message); }
+  try { await seedPosts(); } catch (e) { console.error('[db] posts seed skipped (non-fatal):', e.message); }
   try {
     if(!(await metaGet('relocate_v1'))){
       for(const email of ['omar@rivet.test','will@rivet.test','sam@rivet.test']){

@@ -63,7 +63,7 @@ function setLang(l){ LANG = (l === 'es') ? 'es' : 'en'; }
 const I18N = {
   en: {
     nav_login:'Log in', nav_get_started:'Get started', nav_home:'Home', nav_find_work:'Jobs',
-    nav_work_card:'Work Card', nav_applications:'Applications', nav_training:'Learn', nav_messages:'Messages',
+    nav_work_card:'Work Card', nav_applications:'Applications', nav_training:'Learn', nav_pulse:'Pulse', nav_messages:'Messages',
     nav_hiring:'Hiring →', nav_working:'Working →', nav_logout:'Log out',
     nav_overview:'Overview', nav_talent:'Talent', nav_jobs:'Jobs',
     hero_tag:'The blue-collar hiring platform · U.S.',
@@ -107,7 +107,7 @@ const I18N = {
   },
   es: {
     nav_login:'Entrar', nav_get_started:'Empezar', nav_home:'Inicio', nav_find_work:'Empleos',
-    nav_work_card:'Mi perfil', nav_applications:'Solicitudes', nav_training:'Aprender', nav_messages:'Mensajes',
+    nav_work_card:'Mi perfil', nav_applications:'Solicitudes', nav_training:'Aprender', nav_pulse:'Pulso', nav_messages:'Mensajes',
     nav_hiring:'Contratar →', nav_working:'Trabajar →', nav_logout:'Salir',
     nav_overview:'Resumen', nav_talent:'Talento', nav_jobs:'Empleos',
     hero_tag:'La plataforma de empleo para oficios · EE. UU.',
@@ -199,14 +199,14 @@ function layout({ title, user, body, active = '', flash = '' }) {
   } else if ((user.mode || user.role) === 'worker') {
     const L = (h,l,k)=>`<a class="nav-link ${active===k?'on':''}" href="${h}">${l}</a>`;
     const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/app/messages">${t('nav_messages')}${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
-    nav = `${L('/app',t('nav_home'),'home')}${L('/app/jobs',t('nav_find_work'),'jobs')}${L('/app/profile',t('nav_work_card'),'profile')}${L('/app/applications',t('nav_applications'),'apps')}${L('/app/training',t('nav_training'),'training')}${msg}
+    nav = `${L('/app',t('nav_home'),'home')}${L('/app/jobs',t('nav_find_work'),'jobs')}${L('/app/profile',t('nav_work_card'),'profile')}${L('/app/applications',t('nav_applications'),'apps')}${L('/app/training',t('nav_training'),'training')}${L('/pulse',t('nav_pulse'),'pulse')}${msg}
            <a class="nav-link switch" href="/console" title="Switch to hiring">${t('nav_hiring')}</a>
            <span class="who">${initials(user.name)}</span>
            <a class="nav-link" href="/logout">${t('nav_logout')}</a>${langTg}`;
   } else {
     const L = (h,l,k)=>`<a class="nav-link ${active===k?'on':''}" href="${h}">${l}</a>`;
     const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/console/messages">${t('nav_messages')}${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
-    nav = `${L('/console',t('nav_overview'),'ov')}${L('/console/search',t('nav_talent'),'search')}${L('/console/jobs',t('nav_jobs'),'jobs')}${msg}
+    nav = `${L('/console',t('nav_overview'),'ov')}${L('/console/search',t('nav_talent'),'search')}${L('/console/jobs',t('nav_jobs'),'jobs')}${L('/pulse',t('nav_pulse'),'pulse')}${msg}
            <a class="nav-link switch" href="/app" title="Switch to working">${t('nav_working')}</a>
            <a class="who" href="/console/company" title="Company profile">${initials(user.company||user.name)}</a>
            <a class="nav-link" href="/logout">${t('nav_logout')}</a>${langTg}`;
@@ -234,7 +234,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=30">
+  <link rel="stylesheet" href="/styles.css?v=31">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -754,6 +754,58 @@ function workerTraining({ have = [] }) {
   </section>`;
 }
 
+// ---------- Industry Pulse: trends + community board ----------
+const PULSE_NEWS = [
+  { tag:'Demand', title:'Data-center boom is driving record electrician & HVAC demand', body:'Hyperscale and AI build-outs are pulling thousands of electricians, controls techs and HVAC installers into commercial work — often at premium pay.' },
+  { tag:'Wages', title:'Skilled-trade wages keep climbing faster than inflation', body:'Welders, plumbers and pipefitters with current certs are commanding sign-on bonuses and per-diem on travel jobs as the labor crunch continues.' },
+  { tag:'Healthcare', title:'CNAs and home-health aides are among the fastest-growing roles', body:'An aging population is fueling steady, flexible demand for certified nursing assistants and caregivers nationwide.' },
+  { tag:'Logistics', title:'Warehouse, delivery and CDL roles stay red-hot', body:'E-commerce and regional distribution keep last-mile drivers, forklift operators and warehouse crews in constant demand.' },
+];
+function pulsePage({ user, trending, posts, totalOpen }) {
+  const maxN = Math.max(1, ...trending.map(t=>t.n));
+  const trendRows = trending.map((t,i)=>`<div class="trend-row">
+      <span class="trend-rank">${i+1}</span>
+      <span class="trend-ic">${tradeEmoji(t.trade)}</span>
+      <div class="trend-main"><div class="trend-nm">${TRADES[t.trade]||t.trade}</div>
+        <div class="trend-bar"><i style="width:${Math.round((t.n/maxN)*100)}%"></i></div></div>
+      <b class="trend-n">${t.n}</b>
+    </div>`).join('');
+  return `<section class="wrap">
+    <div class="sec-h big">${T('Industry Pulse')} <span class="muted">${T("What's in demand right now")}</span></div>
+    <div class="grid2">
+      <div class="card">
+        <div class="sec-h" style="margin-top:0">${T('Trending trades')} <span class="muted">${totalOpen} ${T('open jobs')}</span></div>
+        ${trendRows || `<p class="muted">${T('No open jobs yet.')}</p>`}
+      </div>
+      <div class="card">
+        <div class="sec-h" style="margin-top:0">${T('Industry news')}</div>
+        ${PULSE_NEWS.map(n=>`<div class="news">
+          <span class="news-tag">${T(n.tag)}</span>
+          <div class="news-t">${T(n.title)}</div>
+          <p class="news-b">${T(n.body)}</p>
+        </div>`).join('')}
+        <p class="muted sm" style="margin-top:8px">${T('Trends reflect open jobs on Rivet plus public labor data.')} <a href="https://www.bls.gov/ooh/" target="_blank" rel="noopener noreferrer">BLS ↗</a></p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="sec-h" style="margin-top:0">${T('Community board')} <span class="muted">${T('Tips from the field')}</span></div>
+      ${user ? `<form method="post" action="/pulse" class="msg-form" style="margin-bottom:14px">
+        <input name="body" placeholder="${T("Share a tip, a lead, or what's hiring near you…")}" autocomplete="off" required maxlength="600">
+        <button class="btn-sm">${T('Post')}</button>
+      </form>` : `<p class="muted">${T('Log in to join the conversation.')}</p>`}
+      <div class="board">
+        ${posts.length ? posts.map(p=>`<div class="post">
+          <span class="av-t">${initials(p.author_name||'?')}</span>
+          <div class="post-main">
+            <div class="post-h"><b>${esc(p.author_name||'Member')}</b>${p.trade?`<span class="chip sm">${tradeEmoji(p.trade)} ${TRADES[p.trade]||p.trade}</span>`:''}<span class="post-t">${timeAgo(p.created_at)}</span></div>
+            <p class="post-b">${esc(p.body)}</p>
+          </div>
+        </div>`).join('') : `<p class="muted">${T('No posts yet — be the first.')}</p>`}
+      </div>
+    </div>
+  </section>`;
+}
+
 // ---------- public shareable portfolio ----------
 function publicPortfolio({ worker, profile, creds, portfolio, work = [] }) {
   return `<section class="hero pub-hero"><div class="wrap">
@@ -1144,4 +1196,4 @@ function ogImage() {
 }
 
 module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, empCompany, workerTraining };
+  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, empCompany, workerTraining, pulsePage };

@@ -318,6 +318,25 @@ const server = http.createServer(async (req,res)=>{
     if(p==='/healthz'){ res.writeHead(200,{'Content-Type':'text/plain'}); return res.end('ok'); }
     if(p==='/robots.txt'){ res.writeHead(200,{'Content-Type':'text/plain'}); return res.end('User-agent: *\nAllow: /\nDisallow: /app\nDisallow: /console\nDisallow: /auth\n'); }
 
+    // ---- Industry Pulse (trends + community board) — open to all ----
+    if(p==='/pulse' && method==='GET'){
+      const trending = await db.prepare(`SELECT trade, COUNT(*) n FROM jobs WHERE status='open' GROUP BY trade ORDER BY n DESC LIMIT 8`).all();
+      const totalOpen = (await db.prepare(`SELECT COUNT(*) c FROM jobs WHERE status='open'`).get()).c;
+      const posts = await db.prepare(`SELECT * FROM posts ORDER BY created_at DESC, id DESC LIMIT 40`).all();
+      return send(res, V.layout({title:'Industry Pulse', user, active:'pulse', body:V.pulsePage({user, trending, posts, totalOpen})}));
+    }
+    if(p==='/pulse' && method==='POST'){
+      if(!user) return redirect(res, '/login');
+      const b = await readBody(req);
+      const body = String(b.body||'').trim().slice(0,600);
+      if(body){
+        const prof = await getProfile(user.id);
+        const trade = prof ? (profTrades(prof)[0]||null) : null;
+        try { await db.prepare('INSERT INTO posts(author_id,author_name,trade,body) VALUES(?,?,?,?)').run(user.id, user.name, trade, body); } catch(e){}
+      }
+      return redirect(res, '/pulse');
+    }
+
     // ---- public ----
     if(p==='/' && method==='GET'){
       if(user) return redirect(res, user.role==='employer'?'/console':'/app');

@@ -450,3 +450,28 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .xic{width:16px;height:16px;flex:none}
 .btn-sm.tgl{display:inline-flex;align-items:center;justify-content:center;gap:7px}
 .avail-badge{display:inline-flex;align-items:center;gap:6px}
+
+/* ---- Industry Pulse: trends + community board ---- */
+.trend-row{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--line)}
+.trend-row:last-child{border-bottom:none}
+.trend-rank{width:20px;font-weight:800;color:var(--muted);font-size:13px;text-align:center}
+.trend-ic{width:30px;height:30px;border-radius:8px;background:var(--steel);color:#fff;display:grid;place-items:center;flex:none}
+.trend-ic .tic{width:16px;height:16px}
+.trend-main{flex:1;min-width:0}
+.trend-nm{font-size:13px;font-weight:700;margin-bottom:4px}
+.trend-bar{height:6px;border-radius:6px;background:#EAE0CD;overflow:hidden}
+.trend-bar i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--amber),var(--amber-d))}
+.trend-n{font-weight:800;color:var(--brand-d);min-width:24px;text-align:right}
+.news{padding:11px 0;border-bottom:1px solid var(--line)}
+.news:last-of-type{border-bottom:none}
+.news-tag{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--brand-d);background:rgba(23,99,166,.1);padding:2px 8px;border-radius:12px}
+.news-t{font-weight:800;font-size:14px;margin:6px 0 3px;line-height:1.3}
+.news-b{font-size:13px;color:var(--slate);line-height:1.5}
+.board{display:flex;flex-direction:column;gap:2px}
+.post{display:flex;gap:11px;padding:13px 0;border-bottom:1px solid var(--line)}
+.post:last-child{border-bottom:none}
+.post-main{flex:1;min-width:0}
+.post-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.post-h b{font-size:13.5px}
+.post-t{font-size:11px;color:var(--muted);margin-left:auto}
+.post-b{font-size:13.5px;color:var(--slate);line-height:1.5;margin-top:4px}
