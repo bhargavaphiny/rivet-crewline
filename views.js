@@ -328,6 +328,8 @@ const BUILTIN_ES = {
   // get-there / transport
   'Transport provided — we get workers to the site':'Transporte incluido — llevamos a los trabajadores al sitio','Transport provided':'Transporte incluido','Ride provided':'Con transporte',
   'Farthest you’ll travel (miles, 0 = no limit)':'Distancia máxima que viajarías (millas, 0 = sin límite)','past your commute':'fuera de tu rango',
+  // payscale fit
+  'Worker sets the price':'El trabajador pone el precio','Asks':'Pide','within your range':'dentro de tu rango','Meets your':'Cumple tu','floor':'mínimo','over budget':'sobre tu presupuesto','below your':'por debajo de tu',
 };
 function T(s){
   if(LANG !== 'es' || !s) return s;
@@ -410,7 +412,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=62">
+  <link rel="stylesheet" href="/styles.css?v=63">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -917,7 +919,7 @@ function workerJobs({ matches, filters = {}, jobsGeo = null, needZip = false }) 
 }
 
 // ---------- worker: job detail ----------
-function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance = null, rules = null, empRating = {avg:0,count:0}, workAuth = '', empPay = {}, myQuote = null }) {
+function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance = null, rules = null, empRating = {avg:0,count:0}, workAuth = '', empPay = {}, myQuote = null, payFloor = 0 }) {
   const belowMin = rules && job.pay_min && job.pay_min < rules.minWage;
   const spon = (job.sponsorship)||'authorized';
   const sponMatch = (spon==='h2a'&&workAuth==='need_h2a')||(spon==='h2b'&&workAuth==='need_h2b');
@@ -931,6 +933,7 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
           ${job.employment_type?`<span class="jtype">${esc(T(job.employment_type))}</span>`:''}${job.duration?`<span class="jtype dur">${esc(T(job.duration))}</span>`:''}${job.crew_ok?`<span class="jtype crew">${icon('truck')} ${T('Open to crews')}</span>`:''}${job.quotes_ok?`<span class="jtype quote">${T('Accepting quotes')}</span>`:''}${job.fair_chance?`<span class="jtype fair">${T('Fair-chance')}</span>`:''}${job.veteran_ok?`<span class="jtype vet">${T('Veteran-friendly')}</span>`:''}${job.transport_provided?`<span class="jtype transp">${icon('truck')} ${T('Transport provided')}</span>`:''}
           <div class="job-c">${job.poster_kind==='individual'?`${icon('pin')} ${T('Posted by a homeowner / small business')} · `:''}${esc(job.company||'')} · ${esc(job.city)} ${esc(job.zip)} · ${esc(T(job.shift))}${distance!=null?` · <b class="dist">${distance} ${T('mi away')}</b>`:''}</div>
           <div class="pay big">${job.quotes_ok&&!job.pay_min?T('Name your price'):`$${job.pay_min}–${job.pay_max}/hr`}</div>
+          ${payFitBadge(payFloor, job, 'worker')}
         </div>
         <div class="score-pill ${scoreClass(match.score)}">${match.score}<small>${T('match')}</small></div>
       </div>
@@ -1424,6 +1427,16 @@ function renewalRadar(creds){
     </div>`; }).join('')}
   </div>`;
 }
+// Payscale fit: how the worker's ask ($/hr floor) lines up with the job's pay.
+function payFitBadge(floor, job, side = 'worker'){
+  floor = Number(floor)||0;
+  if(job.quotes_ok && !job.pay_max) return `<span class="payfit q">${T('Worker sets the price')}</span>`;
+  if(!floor || !job.pay_max) return '';
+  if(job.pay_max >= floor)
+    return `<span class="payfit good">${icon('dot')} ${side==='recruiter'?`${T('Asks')} $${floor}/hr · ${T('within your range')}`:`${T('Meets your')} $${floor} ${T('floor')}`}</span>`;
+  const gap = floor - job.pay_max;
+  return `<span class="payfit low">${icon('dot')} ${side==='recruiter'?`${T('Asks')} $${floor}/hr · $${gap} ${T('over budget')}`:`$${gap}/hr ${T('below your')} $${floor} ${T('floor')}`}</span>`;
+}
 // recruiter-side interview block for a given job/worker
 function interviewEmp(iv){
   if(!iv) return '';
@@ -1898,13 +1911,14 @@ function empCandidate({ worker, profile, creds, matches, apps, messages, meId, n
       ${mediaGallery(portfolio) || '<p class="muted sm">No portfolio pieces yet.</p>'}
     </div>
     <div class="card">
-      <div class="sec-h" style="margin-top:0">Fit for your jobs</div>
+      <div class="sec-h" style="margin-top:0">${T('Fit for your jobs')}</div>
       ${matches.length ? matches.map(m=>`<div class="cand-fit">
         <div class="cf-top">
           <div><b>${esc(m.job.title)}</b> <span class="muted sm">$${m.job.pay_min}–${m.job.pay_max}/hr · ${esc(m.job.city)} · ${esc(m.job.shift)}</span></div>
           <span class="score-pill ${scoreClass(m.score)}">${m.score}<small>match</small></span>
         </div>
-        <div class="breakdown sm">${bd('Trade fit',m.breakdown.trade,45)}${bd('Pay',m.breakdown.pay,20)}${bd('Location',m.breakdown.loc,20)}${bd('Credentials',m.breakdown.cred,15)}</div>
+        ${payFitBadge(profile.pay_floor, m.job, 'recruiter')}
+        <div class="breakdown sm">${bd(T('Trade fit'),m.breakdown.trade,45)}${bd(T('Pay'),m.breakdown.pay,20)}${bd(T('Location'),m.breakdown.loc,20)}${bd(T('Credentials'),m.breakdown.cred,15)}</div>
         ${m.missing.length?`<div class="muted sm">Missing: ${m.missing.map(k=>CRED_KINDS[k]||k).join(', ')}</div>`:''}
         <div class="cf-act">${stageByJob[m.job.id]
           ? `<span class="stage-pill">In pipeline · ${esc(stageByJob[m.job.id])}</span>`

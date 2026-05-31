@@ -561,6 +561,12 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .jtype.transp svg{width:12px;height:12px}
 .incl-badge.transp{background:rgba(43,73,112,.12);color:#2e547e}
 .far-hint{color:#b7322a;font-weight:700;font-size:11px}
+/* payscale fit */
+.payfit{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;margin:4px 0}
+.payfit svg{width:11px;height:11px}
+.payfit.good{color:#157a52}
+.payfit.low{color:#b7322a}
+.payfit.q{color:var(--muted)}
 
 /* ---- training & certifications ---- */
 .info-card{background:rgba(23,99,166,.06);border:1px solid rgba(23,99,166,.18);color:var(--slate);font-size:14px}
