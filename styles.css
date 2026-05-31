@@ -349,3 +349,6 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .exp .x:hover{background:var(--paper);color:var(--red)}
 .exp-form{margin-top:14px;border-top:1px dashed var(--line);padding-top:14px}
 .exp-form textarea,.exp-form input,.exp-form select{width:100%}
+
+/* ---- employment type badge ---- */
+.jtype{display:inline-block;margin:2px 0 4px;padding:2px 9px;border-radius:6px;background:var(--steel);color:#fff;font-size:11px;font-weight:700;letter-spacing:.02em;text-transform:uppercase}

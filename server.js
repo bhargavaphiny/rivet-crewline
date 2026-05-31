@@ -387,6 +387,7 @@ const server = http.createServer(async (req,res)=>{
           city:(url.searchParams.get('city')||'').trim(),
           minpay:Number(url.searchParams.get('minpay'))||0,
           shift:url.searchParams.get('shift')||'',
+          jtype:url.searchParams.get('jtype')||'',
           maxmi:Number(url.searchParams.get('maxmi'))||0,
           sort:url.searchParams.get('sort')||'',
         };
@@ -396,6 +397,7 @@ const server = http.createServer(async (req,res)=>{
         if(f.city){ const c=f.city.toLowerCase(); matches=matches.filter(m=>(m.job.city||'').toLowerCase().includes(c)); }
         if(f.minpay) matches=matches.filter(m=>(m.job.pay_max||0)>=f.minpay);
         if(f.shift) matches=matches.filter(m=>m.job.shift===f.shift);
+        if(f.jtype) matches=matches.filter(m=>(m.job.employment_type||'Full-time')===f.jtype);
         // distance from the worker's ZIP (cached; graceful if geo unavailable)
         const home = await geocodeZip(prof.zip);
         if(home){
@@ -563,8 +565,9 @@ const server = http.createServer(async (req,res)=>{
         const b = await readBody(req);
         if(!b.title) return send(res, V.layout({title:'Post a job',user,active:'jobs',body:V.empJobForm('Title is required.')}));
         const reqCreds = [].concat(b.req_creds||[]).filter(Boolean).join(',');
-        const info = await db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr)
-          VALUES(?,?,?,?,?,?,?,?,?,?)`).run(user.id,b.title,b.trade,Number(b.pay_min)||0,Number(b.pay_max)||0,b.city||'',b.zip||'',b.shift||'Day',reqCreds,b.descr||'');
+        const empType = V.JOB_TYPES.includes(b.employment_type) ? b.employment_type : 'Full-time';
+        const info = await db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(user.id,b.title,b.trade,Number(b.pay_min)||0,Number(b.pay_max)||0,b.city||'',b.zip||'',b.shift||'Day',reqCreds,b.descr||'',empType);
         const jobId = info.lastInsertRowid;
         // SMS job alerts to matching, opted-in, available workers who have a phone
         let alerted = 0;

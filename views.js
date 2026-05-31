@@ -157,7 +157,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=19">
+  <link rel="stylesheet" href="/styles.css?v=20">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -391,6 +391,7 @@ function jobCard(m){
       <div class="badge">${tradeEmoji(j.trade)}</div>
       <div class="job-main">
         <a class="job-t" href="/app/jobs/${j.id}">${esc(j.title)}</a>
+        ${j.employment_type?`<span class="jtype">${esc(j.employment_type)}</span>`:''}
         <div class="job-c">${esc(j.company||'')} · ${esc(j.city)} · ${esc(j.shift)} shift${m.distance!=null?` · <b class="dist">${m.distance} mi away</b>`:''}</div>
         <div class="pay">$${j.pay_min}–${j.pay_max}/hr</div>
         <div class="mrow">${fitTags.join('')}</div>
@@ -418,7 +419,8 @@ function workerJobs({ matches, filters = {} }) {
   const tradeOpts = `<option value="">All trades</option>`+Object.entries(TRADES).map(([k,v])=>`<option value="${k}" ${filters.trade===k?'selected':''}>${v}</option>`).join('');
   const shifts = ['Day','Night','4x10','Any'];
   const shiftOpts = `<option value="">Any shift</option>`+shifts.map(s=>`<option value="${s}" ${filters.shift===s?'selected':''}>${s}</option>`).join('');
-  const active = (filters.q||filters.trade||filters.city||filters.minpay||filters.shift);
+  const typeOpts = `<option value="">Any type</option>`+JOB_TYPES.map(t=>`<option value="${t}" ${filters.jtype===t?'selected':''}>${t}</option>`).join('');
+  const active = (filters.q||filters.trade||filters.city||filters.minpay||filters.shift||filters.jtype);
   return `<section class="wrap">
     <div class="sec-h big">Find work <span class="muted">${matches.length} job${matches.length===1?'':'s'}${active?' · filtered':' · ranked by fit'}</span></div>
     <form class="jobfilters" method="get" action="/app/jobs">
@@ -428,6 +430,7 @@ function workerJobs({ matches, filters = {} }) {
       <input name="minpay" type="number" min="0" inputmode="numeric" value="${filters.minpay||''}" placeholder="Min $/hr" aria-label="Minimum pay">
       <input name="maxmi" type="number" min="0" inputmode="numeric" value="${filters.maxmi||''}" placeholder="Within mi" aria-label="Within miles">
       <select name="shift" aria-label="Shift">${shiftOpts}</select>
+      <select name="jtype" aria-label="Employment type">${typeOpts}</select>
       <label class="chk"><input type="checkbox" name="sort" value="distance" ${filters.sort==='distance'?'checked':''}> Nearest first</label>
       <button class="btn-sm">Search</button>
       ${active?`<a class="nav-link" style="color:var(--brand-d)" href="/app/jobs">Clear</a>`:''}
@@ -445,6 +448,7 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [] }) {
         <div class="badge big">${tradeEmoji(job.trade)}</div>
         <div class="job-main">
           <h2>${esc(job.title)}</h2>
+          ${job.employment_type?`<span class="jtype">${esc(job.employment_type)}</span>`:''}
           <div class="job-c">${esc(job.company||'')} · ${esc(job.city)} ${esc(job.zip)} · ${esc(job.shift)} shift</div>
           <div class="pay big">$${job.pay_min}–${job.pay_max}/hr</div>
         </div>
@@ -711,15 +715,18 @@ function empJobs({ jobs }) {
   </section>`;
 }
 
+const JOB_TYPES = ['Full-time','Part-time','Contract','Temp','Apprenticeship','Outcome-based'];
 function empJobForm(error='') {
   const opts = Object.entries(TRADES).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
   const cred = Object.entries(CRED_KINDS).map(([k,v])=>`<label class="ck"><input type="checkbox" name="req_creds" value="${k}"> ${v}</label>`).join('');
+  const typeOpts = JOB_TYPES.map(t=>`<option>${t}</option>`).join('');
   return `<section class="wrap narrow"><div class="card">
     <h2>Post a job</h2><p class="muted">It's matched against the verified talent pool instantly.</p>
     ${error?`<div class="err">${esc(error)}</div>`:''}
     <form method="post" action="/console/jobs/new">
       <label>Title <input name="title" required placeholder="Commercial Electrician"></label>
-      <label>Trade <select name="trade">${opts}</select></label>
+      <div class="row2"><label>Trade <select name="trade">${opts}</select></label>
+        <label>Employment type <select name="employment_type">${typeOpts}</select></label></div>
       <div class="row2"><label>Pay min ($/hr) <input type="number" name="pay_min" value="36"></label>
         <label>Pay max ($/hr) <input type="number" name="pay_max" value="48"></label></div>
       <div class="row2"><label>City <input name="city" value="Phoenix"></label>
@@ -914,4 +921,4 @@ function ogImage() {
 }
 
 module.exports = { setLang, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES };
+  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES };

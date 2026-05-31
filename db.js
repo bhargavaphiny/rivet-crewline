@@ -430,6 +430,22 @@ async function seedExperience(){
   console.log('[db] demo work history + multi-trade profiles seeded');
 }
 
+// ---- give demo jobs varied employment types (idempotent) ----
+async function seedJobTypes(){
+  if (await metaGet('jobtypes_v1')) return;
+  const map = {
+    'Solar Installer':'Contract',
+    'Equipment Driver (CDL)':'Temp',
+    'Pipefitter':'Contract',
+    'Structural Welder':'Outcome-based',
+  };
+  for (const [title, type] of Object.entries(map)){
+    try { await db.prepare('UPDATE jobs SET employment_type=? WHERE title=?').run(type, title); } catch(e){}
+  }
+  await metaSet('jobtypes_v1','1');
+  console.log('[db] demo job employment types seeded');
+}
+
 async function migrate() {
   // additive column migrations (idempotent — errors swallowed when already applied)
   try { await db.exec('ALTER TABLE users ADD COLUMN phone TEXT'); } catch (e) { /* column exists */ }
@@ -440,6 +456,7 @@ async function migrate() {
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN trades TEXT'); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN headline TEXT'); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN about TEXT'); } catch (e) { /* column exists */ }
+  try { await db.exec("ALTER TABLE jobs ADD COLUMN employment_type TEXT DEFAULT 'Full-time'"); } catch (e) { /* column exists */ }
 }
 
 async function seedZips() {
@@ -487,6 +504,7 @@ async function init() {
   try { await seedRealism(); } catch (e) { console.error('[db] realism skipped (non-fatal):', e.message); }
   try { await seedMedia(); } catch (e) { console.error('[db] media seed skipped (non-fatal):', e.message); }
   try { await seedExperience(); } catch (e) { console.error('[db] experience seed skipped (non-fatal):', e.message); }
+  try { await seedJobTypes(); } catch (e) { console.error('[db] job-types seed skipped (non-fatal):', e.message); }
 }
 
 module.exports = { db, init, hashPassword, verifyPassword, recomputeReadiness };
