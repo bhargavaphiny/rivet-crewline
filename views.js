@@ -286,6 +286,14 @@ const BUILTIN_ES = {
   'Trades, location & details':'Oficios, ubicación y detalles','ZIP code':'Código postal','Years of experience':'Años de experiencia',
   'Lowest pay you’d take ($/hr)':'Pago mínimo que aceptarías ($/hr)',
   'Your ZIP powers distance to each job and the map — add it to see how far jobs are.':'Tu código postal calcula la distancia a cada empleo y el mapa — agrégalo para ver qué tan lejos están.',
+  // job detail + talent search (i18n pass)
+  'All matches':'Todas las coincidencias','match':'coincidencia','The work':'El trabajo','Why you match':'Por qué coincides',
+  'Trade fit':'Afinidad de oficio','Pay':'Pago','Location':'Ubicación','Credentials':'Credenciales','Missing':'Falta',
+  'see how to earn it':'ver cómo obtenerla','to boost this match.':'para mejorar esta coincidencia.',
+  '✓ Applied — the employer can see your verified Work Card.':'✓ Postulado — el empleador puede ver tu tarjeta de trabajo verificada.',
+  'Apply with verified Work Card':'Postular con tarjeta verificada','★ Saved — remove':'★ Guardado — quitar','☆ Save this job':'☆ Guardar este empleo',
+  'employees':'empleados','Candidate':'Candidato','Trade':'Oficio','Exp':'Exp.','Readiness':'Preparación','Pay floor':'Pago mínimo','yr':'años',
+  'No matches for these filters.':'No hay coincidencias para estos filtros.',
 };
 function T(s){
   if(LANG !== 'es' || !s) return s;
@@ -368,7 +376,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=54">
+  <link rel="stylesheet" href="/styles.css?v=55">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -862,19 +870,19 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
   const spon = (job.sponsorship)||'authorized';
   const sponMatch = (spon==='h2a'&&workAuth==='need_h2a')||(spon==='h2b'&&workAuth==='need_h2b');
   return `<section class="wrap narrow">
-    <a class="back" href="/app/jobs">← All matches</a>
+    <a class="back" href="/app/jobs">← ${T('All matches')}</a>
     <div class="card">
       <div class="job-row">
         <div class="badge big">${tradeEmoji(job.trade)}</div>
         <div class="job-main">
-          <h2>${esc(T(job.title))}</h2>
+          <h2>${esc(job.title)}</h2>
           ${job.employment_type?`<span class="jtype">${esc(T(job.employment_type))}</span>`:''}
           <div class="job-c">${esc(job.company||'')} · ${esc(job.city)} ${esc(job.zip)} · ${esc(T(job.shift))}${distance!=null?` · <b class="dist">${distance} ${T('mi away')}</b>`:''}</div>
           <div class="pay big">$${job.pay_min}–${job.pay_max}/hr</div>
         </div>
-        <div class="score-pill ${scoreClass(match.score)}">${match.score}<small>match</small></div>
+        <div class="score-pill ${scoreClass(match.score)}">${match.score}<small>${T('match')}</small></div>
       </div>
-      <p class="descr">${esc(T(job.descr))}</p>
+      <p class="descr">${esc(job.descr)}</p>
       ${rules?`<div class="rules">
         <div class="rules-h">${T('Local pay & rules')} · ${esc(rules.level)}</div>
         <div class="rules-grid">
@@ -891,28 +899,28 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
           : `<p>${T('Requires existing U.S. work authorization (Form I-9).')}</p>`}
         <p class="rules-note">${T('Informational only — not legal advice.')} <a href="/work-authorization" target="_blank" rel="noopener">${T('Work in the U.S. — your rights & options ↗')}</a></p>
       </div>
-      ${jobMedia.length?`<div class="sec-h" style="margin-top:4px">The work</div>${mediaGallery(jobMedia)}`:''}
+      ${jobMedia.length?`<div class="sec-h" style="margin-top:4px">${T('The work')}</div>${mediaGallery(jobMedia)}`:''}
       <div class="breakdown">
-        <h4>Why you match</h4>
-        ${bd('Trade fit',match.breakdown.trade,45)}
-        ${bd('Pay',match.breakdown.pay,20)}
-        ${bd('Location',match.breakdown.loc,20)}
-        ${bd('Credentials',match.breakdown.cred,15)}
+        <h4>${T('Why you match')}</h4>
+        ${bd(T('Trade fit'),match.breakdown.trade,45)}
+        ${bd(T('Pay'),match.breakdown.pay,20)}
+        ${bd(T('Location'),match.breakdown.loc,20)}
+        ${bd(T('Credentials'),match.breakdown.cred,15)}
       </div>
-      ${match.missing.length?`<div class="warn-card">Missing: ${match.missing.map(k=>CRED_KINDS[k]||k).join(', ')} — <a href="/app/training" style="font-weight:700;color:inherit;text-decoration:underline">see how to earn it</a> to boost this match.</div>`:''}
+      ${match.missing.length?`<div class="warn-card">${T('Missing')}: ${match.missing.map(k=>CRED_KINDS[k]||k).join(', ')} — <a href="/app/training" style="font-weight:700;color:inherit;text-decoration:underline">${T('see how to earn it')}</a> ${T('to boost this match.')}</div>`:''}
       ${isExternal(job)
         ? `<a class="btn full" href="${esc(job.apply_url)}" target="_blank" rel="noopener noreferrer">${T('Apply on')} ${esc(job.source)} ↗</a>
            <p class="muted sm" style="text-align:center;margin-top:8px">${T('This opening is listed on')} ${esc(job.source)}. ${T('You’ll finish applying on their site.')}</p>`
         : (applied
-          ? `<div class="ok-card">✓ Applied — the employer can see your verified Work Card.</div>`
-          : `<form method="post" action="/app/jobs/${job.id}/apply"><button class="btn full">Apply with verified Work Card</button></form>`)}
-      <form method="post" action="/app/jobs/${job.id}/save"><button class="btn full ghost">${saved?'★ Saved — remove':'☆ Save this job'}</button></form>
+          ? `<div class="ok-card">${T('✓ Applied — the employer can see your verified Work Card.')}</div>`
+          : `<form method="post" action="/app/jobs/${job.id}/apply"><button class="btn full">${T('Apply with verified Work Card')}</button></form>`)}
+      <form method="post" action="/app/jobs/${job.id}/save"><button class="btn full ghost">${saved?T('★ Saved — remove'):T('☆ Save this job')}</button></form>
     </div>
     ${(job.company_about||job.company_website||job.company_size||empRating.count)?`<div class="card">
       <div class="sec-h" style="margin-top:0">${T('About the employer')}</div>
       <div class="job-row"><div class="big-av c sm">${initials(job.company||'')}</div>
         <div class="job-main"><b>${esc(job.company||'')}</b>
-          <div class="muted sm">${esc(job.company_city||'')}${job.company_size?` · ${esc(job.company_size)} employees`:''}</div>
+          <div class="muted sm">${esc(job.company_city||'')}${job.company_size?` · ${esc(job.company_size)} ${T('employees')}`:''}</div>
           ${empRating.count?`<div class="rating-row sm">${ratingHead(empRating)}</div>`:''}</div></div>
       ${job.company_about?`<p class="descr" style="margin-top:10px">${esc(job.company_about)}</p>`:''}
       ${job.company_website?`<a class="nav-link" style="color:var(--brand-d)" href="${esc(job.company_website)}" target="_blank" rel="noopener">${esc(job.company_website)} ↗</a>`:''}
@@ -1689,12 +1697,12 @@ function empSearch({ rows, filters }) {
       <label class="chk"><input type="checkbox" name="bilingual" value="1" ${filters.bilingual?'checked':''} onchange="this.form.submit()"> ${icon('globe')} ${T('Bilingual')}</label>
     </form>
     <div class="card" style="padding:0">
-      <table class="tbl wide"><tr><th>Candidate</th><th>Trade</th><th>Exp</th><th>Credentials</th><th>Readiness</th><th>Pay floor</th></tr>
-      ${rows.map(w=>`<tr><td><a class="cand-link" href="/console/candidates/${w.id}"><span class="av-t">${initials(w.name)}</span> ${esc(w.name)}</a>${w.available?`<span class="avail-dot" title="Available for work">${icon('dot')}</span>`:''}${w.work_today?`<span class="today-chip" title="Can work today">${icon('bolt')}</span>`:''}${w.relocate?`<span class="today-chip" title="Open to relocate">${icon('send')}</span>`:''}</td>
-        <td>${TRADES[w.trade]||w.trade}</td><td>${w.years_exp} yr</td>
+      <table class="tbl wide"><tr><th>${T('Candidate')}</th><th>${T('Trade')}</th><th>${T('Exp')}</th><th>${T('Credentials')}</th><th>${T('Readiness')}</th><th>${T('Pay floor')}</th></tr>
+      ${rows.map(w=>`<tr><td><a class="cand-link" href="/console/candidates/${w.id}"><span class="av-t">${initials(w.name)}</span> ${esc(w.name)}</a>${w.available?`<span class="avail-dot" title="${T('Available for work')}">${icon('dot')}</span>`:''}${w.work_today?`<span class="today-chip" title="${T('Can work today')}">${icon('bolt')}</span>`:''}${w.relocate?`<span class="today-chip" title="${T('Open to relocate')}">${icon('send')}</span>`:''}</td>
+        <td>${esc(T(TRADES[w.trade]||w.trade))}</td><td>${w.years_exp} ${T('yr')}</td>
         <td>${w.creds.map(c=>`<span class="cred-chip">${esc(c.name)}</span>`).join('')||'<span class="muted">—</span>'}</td>
         <td><span class="score-tag ${scoreClass(w.readiness)}">${w.readiness}</span></td>
-        <td>$${w.pay_floor}/hr</td></tr>`).join('') || '<tr><td colspan=6 class="muted">No matches for these filters.</td></tr>'}
+        <td>$${w.pay_floor}/hr</td></tr>`).join('') || `<tr><td colspan=6 class="muted">${T('No matches for these filters.')}</td></tr>`}
       </table>
     </div>
   </section>`;

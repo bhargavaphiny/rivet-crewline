@@ -13,7 +13,10 @@ const V = require('./views');
 const LLM = require('./llm');
 
 const PORT = process.env.PORT || 3000;
-const SECRET = process.env.RIVET_SECRET || 'dev-secret-change-me';
+// Never ship a known default: if RIVET_SECRET is unset, use a random per-process
+// secret (sessions reset on restart, but the signing key is never guessable).
+const SECRET = process.env.RIVET_SECRET || crypto.randomBytes(32).toString('hex');
+if(!process.env.RIVET_SECRET) console.warn('[security] RIVET_SECRET not set — using a random per-process secret (sessions will not survive restarts).');
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const googleEnabled = !!(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET);
@@ -225,10 +228,17 @@ async function jobGeoForWorker(prof){
   })).sort((a,b)=>b.n-a.n);
   return { points };
 }
-async function rankWorkersForJob(job){
+// Load all credentials once, grouped by user_id — avoids an N+1 query per worker.
+async function allCredsByUser(){
+  const rows = await db.prepare('SELECT * FROM credentials ORDER BY id').all();
+  const m = {}; for(const c of rows){ (m[c.user_id]=m[c.user_id]||[]).push(c); }
+  return m;
+}
+async function rankWorkersForJob(job, credsByUser){
   const workers = await db.prepare(`SELECT u.id user_id,u.name,p.* FROM users u JOIN worker_profiles p ON p.user_id=u.id`).all();
+  const cbu = credsByUser || await allCredsByUser();
   const out = [];
-  for(const w of workers){ const creds=await getCreds(w.user_id); const r=bestMatch(w,creds,job);
+  for(const w of workers){ const creds=cbu[w.user_id]||[]; const r=bestMatch(w,creds,job);
     out.push({...w, score:r.score, readiness:w.readiness}); }
   return out.sort((a,b)=>b.score-a.score);
 }
@@ -359,20 +369,22 @@ function haversineMi(a, b){
   const s=Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLon/2)**2;
   return Math.round(2*R*Math.asin(Math.sqrt(s)));
 }
+const _geoMiss = new Set(); // ZIPs that failed to resolve — don't re-hit the network each request
 async function geocodeZip(zip){
   zip = String(zip||'').trim().slice(0,5);
   if(!/^\d{5}$/.test(zip)) return null;
+  if(_geoMiss.has(zip)) return null;
   try {
     const cached = await db.prepare('SELECT lat,lon FROM zip_geo WHERE zip=?').get(zip);
     if(cached && cached.lat!=null) return { lat:cached.lat, lon:cached.lon };
     const opts = (typeof AbortSignal!=='undefined' && AbortSignal.timeout) ? { signal: AbortSignal.timeout(2500) } : {};
     const r = await fetch(`https://api.zippopotam.us/us/${zip}`, opts);
-    if(!r.ok) return null;
+    if(!r.ok){ _geoMiss.add(zip); return null; }
     const j = await r.json();
     const place = j.places && j.places[0];
-    if(!place) return null;
+    if(!place){ _geoMiss.add(zip); return null; }
     const lat = parseFloat(place.latitude), lon = parseFloat(place.longitude);
-    if(isNaN(lat) || isNaN(lon)) return null;
+    if(isNaN(lat) || isNaN(lon)){ _geoMiss.add(zip); return null; }
     try { await db.prepare('INSERT OR IGNORE INTO zip_geo(zip,lat,lon,city) VALUES(?,?,?,?)').run(zip, lat, lon, place['place name']||''); } catch(e){}
     return { lat, lon };
   } catch(e){ return null; }
@@ -1032,12 +1044,19 @@ const server = http.createServer(async (req,res)=>{
 
       if(p==='/console/jobs' && method==='GET'){
         const jobsRaw = await db.prepare(`SELECT * FROM jobs WHERE employer_id=? ORDER BY created_at DESC`).all(user.id);
-        const jobs = [];
-        for(const j of jobsRaw){
-          const applicants = (await db.prepare('SELECT COUNT(*) c FROM applications WHERE job_id=?').get(j.id)).c;
-          const matched = (await rankWorkersForJob(j)).filter(w=>w.score>=70).length;
-          jobs.push({...j, applicants, matched});
+        const ids = jobsRaw.map(j=>j.id);
+        const counts = {};
+        if(ids.length){
+          const ph = ids.map(()=>'?').join(',');
+          for(const r of await db.prepare(`SELECT job_id, COUNT(*) c FROM applications WHERE job_id IN (${ph}) GROUP BY job_id`).all(...ids)) counts[r.job_id]=r.c;
         }
+        // load workers + creds once, score each job against the shared set
+        const cbu = await allCredsByUser();
+        const workers = await db.prepare(`SELECT u.id user_id, p.* FROM users u JOIN worker_profiles p ON p.user_id=u.id`).all();
+        const jobs = jobsRaw.map(j=>{
+          const matched = workers.filter(w=>bestMatch(w, cbu[w.user_id]||[], j).score>=70).length;
+          return {...j, applicants: counts[j.id]||0, matched};
+        });
         return send(res, V.layout({title:'Jobs',user,active:'jobs',body:V.empJobs({jobs})}));
       }
       if(p==='/console/jobs/new' && method==='GET')
@@ -1150,8 +1169,8 @@ const server = http.createServer(async (req,res)=>{
       if(p==='/console/search' && method==='GET'){
         const filters = {trade:url.searchParams.get('trade')||'', verified:!!url.searchParams.get('verified'), ready:!!url.searchParams.get('ready'), avail:!!url.searchParams.get('avail'), today:!!url.searchParams.get('today'), relocate:!!url.searchParams.get('relocate'), tools:!!url.searchParams.get('tools'), transport:!!url.searchParams.get('transport'), bilingual:!!url.searchParams.get('bilingual')};
         const rowsRaw = await db.prepare(`SELECT u.id,u.name,p.* FROM users u JOIN worker_profiles p ON p.user_id=u.id`).all();
-        let rows = [];
-        for(const w of rowsRaw){ const creds=(await getCreds(w.id)).filter(c=>!filters.verified||c.verified); rows.push({...w, creds}); }
+        const cbu = await allCredsByUser();
+        let rows = rowsRaw.map(w=>({...w, creds:(cbu[w.id]||[]).filter(c=>!filters.verified||c.verified)}));
         if(filters.trade) rows = rows.filter(w=>w.trade===filters.trade);
         if(filters.ready) rows = rows.filter(w=>w.readiness>=85);
         if(filters.avail) rows = rows.filter(w=>w.available);
@@ -1316,7 +1335,7 @@ const server = http.createServer(async (req,res)=>{
     return send(res, V.layout({title:'Not found',user,body:'<section class="wrap"><div class="card"><h2>404</h2><p>Page not found. <a href="/">Home</a></p></div></section>'}),404);
   } catch (err) {
     console.error(err);
-    return send(res, V.layout({title:'Error',user,body:`<section class="wrap"><div class="card"><h2>Something went wrong</h2><pre>${String(err.message)}</pre></div></section>`}),500);
+    return send(res, V.layout({title:'Error',user,body:`<section class="wrap"><div class="card"><h2>Something went wrong</h2><p class="muted">Please try again. If it keeps happening, contact us.</p></div></section>`}),500);
   }
 });
 

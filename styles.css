@@ -162,6 +162,12 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--brand)}
 .wa-links{display:flex;flex-direction:column;gap:8px;margin-top:10px}
 .wa-link{color:var(--brand-d,#7a3b22);font-weight:700;font-size:13.5px;text-decoration:none}
 .wa-link:hover{text-decoration:underline}
+/* a11y: visible keyboard focus */
+a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,.seg-opt:focus-visible,.nav-link:focus-visible,[tabindex]:focus-visible,[role=button]:focus-visible{outline:2px solid var(--brand,#9A4B2E);outline-offset:2px;border-radius:5px}
+/* mobile: wide tables scroll instead of overflowing the card */
+@media(max-width:680px){
+  .tbl{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap}
+}
 .cred-chip{display:inline-block;font-size:10.5px;background:rgba(46,111,183,.1);color:var(--blue);font-weight:700;padding:2px 8px;border-radius:12px;margin:2px}
 
 .profile-head{text-align:center}
