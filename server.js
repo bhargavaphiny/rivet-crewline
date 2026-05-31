@@ -155,7 +155,8 @@ async function rankJobsForWorker(uid){
     const r = bestMatch(prof, creds, j);
     let distance = null;
     if(home && j.zip){ if(!(j.zip in zc)) zc[j.zip] = await geocodeZip(j.zip); distance = zc[j.zip] ? haversineMi(home, zc[j.zip]) : null; }
-    out.push({job:j, score:r.score, missing:r.missing, distance, needZip});
+    const beyondCommute = (prof && prof.commute_mi>0 && distance!=null && distance>prof.commute_mi);
+    out.push({job:j, score:r.score, missing:r.missing, distance, needZip, beyondCommute});
   }
   // Default ranking blends fit with proximity so intra-metro work surfaces first
   // (without hiding strong far matches). Pure fit/distance sorts still available via filters.
@@ -821,9 +822,10 @@ const server = http.createServer(async (req,res)=>{
         const tradesCsv = (trades.length?trades:[trade]).join(',');
         const zip = (String(b.zip||'').match(/\d{5}/)||[''])[0];
         const shift = ['Any','Day','Night','4x10'].includes(b.shift) ? b.shift : (prof.shift||'Any');
-        await db.prepare('UPDATE worker_profiles SET trade=?,trades=?,headline=?,about=?,custom_trade=?,city=?,zip=?,years_exp=?,pay_floor=?,shift=? WHERE user_id=?')
+        const commute = Math.max(0, Math.min(500, Number(b.commute_mi)||0));
+        await db.prepare('UPDATE worker_profiles SET trade=?,trades=?,headline=?,about=?,custom_trade=?,city=?,zip=?,years_exp=?,pay_floor=?,shift=?,commute_mi=? WHERE user_id=?')
           .run(trade, tradesCsv, String(b.headline||'').slice(0,80), String(b.about||'').slice(0,600), String(b.custom_trade||'').slice(0,60),
-               String(b.city||'').slice(0,60), zip, Number(b.years_exp)||0, Number(b.pay_floor)||0, shift, user.id);
+               String(b.city||'').slice(0,60), zip, Number(b.years_exp)||0, Number(b.pay_floor)||0, shift, commute, user.id);
         await recomputeReadiness(user.id);
         try { await geocodeZip(zip); } catch(e){} // pin on the map + enable distance immediately
         return redirect(res,'/app/profile');
@@ -1132,9 +1134,9 @@ const server = http.createServer(async (req,res)=>{
         const posterKind = b.poster_kind==='individual' ? 'individual' : 'company';
         const quotesOk = b.quotes_ok ? 1 : 0;
         const dur = V.DURATIONS.includes(b.duration) ? b.duration : null;
-        const fairChance = b.fair_chance ? 1 : 0, vetOk = b.veteran_ok ? 1 : 0;
-        const info = await db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type,sponsorship,crew_ok,poster_kind,quotes_ok,duration,fair_chance,veteran_ok)
-          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(user.id,b.title,b.trade,Number(b.pay_min)||0,Number(b.pay_max)||0,b.city||'',b.zip||'',b.shift||'Day',reqCreds,b.descr||'',empType,spon,crewOk,posterKind,quotesOk,dur,fairChance,vetOk);
+        const fairChance = b.fair_chance ? 1 : 0, vetOk = b.veteran_ok ? 1 : 0, transp = b.transport_provided ? 1 : 0;
+        const info = await db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type,sponsorship,crew_ok,poster_kind,quotes_ok,duration,fair_chance,veteran_ok,transport_provided)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(user.id,b.title,b.trade,Number(b.pay_min)||0,Number(b.pay_max)||0,b.city||'',b.zip||'',b.shift||'Day',reqCreds,b.descr||'',empType,spon,crewOk,posterKind,quotesOk,dur,fairChance,vetOk,transp);
         const jobId = info.lastInsertRowid;
         try { await geocodeZip(b.zip); } catch(e){} // pin new job on the demand map immediately
         // SMS job alerts to matching, opted-in, available workers who have a phone
@@ -1254,9 +1256,9 @@ const server = http.createServer(async (req,res)=>{
         const posterKind = b.poster_kind==='individual' ? 'individual' : 'company';
         const quotesOk = b.quotes_ok ? 1 : 0;
         const dur = V.DURATIONS.includes(b.duration) ? b.duration : null;
-        const fairChance = b.fair_chance ? 1 : 0, vetOk = b.veteran_ok ? 1 : 0;
-        await db.prepare(`UPDATE jobs SET title=?,trade=?,pay_min=?,pay_max=?,city=?,zip=?,shift=?,req_creds=?,descr=?,employment_type=?,sponsorship=?,crew_ok=?,poster_kind=?,quotes_ok=?,duration=?,fair_chance=?,veteran_ok=? WHERE id=? AND employer_id=?`)
-          .run(String(b.title).slice(0,120), b.trade||job.trade, Number(b.pay_min)||0, Number(b.pay_max)||0, b.city||'', b.zip||'', b.shift||'Day', reqCreds, String(b.descr||'').slice(0,2000), empType, spon, crewOk, posterKind, quotesOk, dur, fairChance, vetOk, jobId, user.id);
+        const fairChance = b.fair_chance ? 1 : 0, vetOk = b.veteran_ok ? 1 : 0, transp = b.transport_provided ? 1 : 0;
+        await db.prepare(`UPDATE jobs SET title=?,trade=?,pay_min=?,pay_max=?,city=?,zip=?,shift=?,req_creds=?,descr=?,employment_type=?,sponsorship=?,crew_ok=?,poster_kind=?,quotes_ok=?,duration=?,fair_chance=?,veteran_ok=?,transport_provided=? WHERE id=? AND employer_id=?`)
+          .run(String(b.title).slice(0,120), b.trade||job.trade, Number(b.pay_min)||0, Number(b.pay_max)||0, b.city||'', b.zip||'', b.shift||'Day', reqCreds, String(b.descr||'').slice(0,2000), empType, spon, crewOk, posterKind, quotesOk, dur, fairChance, vetOk, transp, jobId, user.id);
         return redirect(res, `/console/jobs/${jobId}`);
       }
 

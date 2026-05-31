@@ -557,6 +557,10 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .jtype.vet,.incl-badge.vet{background:rgba(43,73,112,.13);color:#2e547e}
 .incl-badge{display:inline-flex;align-items:center;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px}
 .avail-badge.vet{background:rgba(43,73,112,.12);color:#2e547e}
+.jtype.transp{background:rgba(43,73,112,.1);color:#2e547e;display:inline-flex;align-items:center;gap:4px}
+.jtype.transp svg{width:12px;height:12px}
+.incl-badge.transp{background:rgba(43,73,112,.12);color:#2e547e}
+.far-hint{color:#b7322a;font-weight:700;font-size:11px}
 
 /* ---- training & certifications ---- */
 .info-card{background:rgba(23,99,166,.06);border:1px solid rgba(23,99,166,.18);color:var(--slate);font-size:14px}

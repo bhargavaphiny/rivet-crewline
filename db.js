@@ -1025,6 +1025,8 @@ async function migrate() {
   try { await db.exec('ALTER TABLE jobs ADD COLUMN fair_chance INTEGER DEFAULT 0'); } catch (e) { /* considers applicants with records */ }
   try { await db.exec('ALTER TABLE jobs ADD COLUMN veteran_ok INTEGER DEFAULT 0'); } catch (e) { /* veteran-friendly */ }
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN veteran INTEGER DEFAULT 0'); } catch (e) { /* worker is a veteran */ }
+  try { await db.exec('ALTER TABLE jobs ADD COLUMN transport_provided INTEGER DEFAULT 0'); } catch (e) { /* employer offers a ride/shuttle */ }
+  try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN commute_mi INTEGER DEFAULT 0'); } catch (e) { /* max miles willing to travel; 0 = no limit */ }
 }
 
 async function seedZips() {
@@ -1097,6 +1099,13 @@ async function init() {
       await metaSet('inclusion_v1','1');
     }
   } catch (e) { console.error('[db] inclusion seed skipped (non-fatal):', e.message); }
+  try {
+    if(!(await metaGet('transport_v1'))){
+      // ag / seasonal / event / warehouse roles that commonly shuttle workers to the site
+      await db.exec("UPDATE jobs SET transport_provided=1 WHERE trade IN ('fruit_picker','farmworker','packing_shed','event_setup','irrigation_tech','nursery_worker','ranch_hand','warehouse')");
+      await metaSet('transport_v1','1');
+    }
+  } catch (e) { console.error('[db] transport seed skipped (non-fatal):', e.message); }
   try {
     if(!(await metaGet('duration_v1'))){
       await db.exec("UPDATE jobs SET duration='3 months' WHERE employment_type='Contract' AND duration IS NULL");

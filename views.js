@@ -325,6 +325,9 @@ const BUILTIN_ES = {
   'Fair-chance friendly — we consider applicants with a record':'Apto para segunda oportunidad — consideramos a personas con antecedentes',
   'Veteran-friendly — military experience valued':'Apto para veteranos — se valora la experiencia militar',
   'Fair-chance':'Segunda oportunidad','Veteran-friendly':'Apto para veteranos','Veteran':'Veterano','Veteran ✓':'Veterano ✓','I’m a veteran':'Soy veterano',
+  // get-there / transport
+  'Transport provided — we get workers to the site':'Transporte incluido — llevamos a los trabajadores al sitio','Transport provided':'Transporte incluido','Ride provided':'Con transporte',
+  'Farthest you’ll travel (miles, 0 = no limit)':'Distancia máxima que viajarías (millas, 0 = sin límite)','past your commute':'fuera de tu rango',
 };
 function T(s){
   if(LANG !== 'es' || !s) return s;
@@ -407,7 +410,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=61">
+  <link rel="stylesheet" href="/styles.css?v=62">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -823,7 +826,7 @@ function jobCard(m, bare = false){
       <div class="badge">${tradeEmoji(j.trade)}</div>
       <div class="job-main">
         <div class="job-t">${esc(T(j.title))}</div>
-        <div class="job-c">${j.poster_kind==='individual'?`${T('Homeowner')} · `:`${esc(j.company||'')} · `}${esc(j.city)}${m.distance!=null?` · <b class="dist">${m.distance} ${T('mi away')}</b>`:(!bare && m.needZip?` · <span class="zip-hint">${T('add ZIP for distance')}</span>`:'')}</div>
+        <div class="job-c">${j.poster_kind==='individual'?`${T('Homeowner')} · `:`${esc(j.company||'')} · `}${esc(j.city)}${m.distance!=null?` · <b class="dist">${m.distance} ${T('mi away')}</b>${m.beyondCommute?` <span class="far-hint">${T('past your commute')}</span>`:''}`:(!bare && m.needZip?` · <span class="zip-hint">${T('add ZIP for distance')}</span>`:'')}</div>
       </div>
       ${bare?`<span class="mtag fit" style="margin-left:auto">${esc(tl(j.trade))}</span>`:`<span class="score-chip ${scoreClass(m.score)}">${m.score}</span>`}
     </div>
@@ -837,6 +840,7 @@ function jobCard(m, bare = false){
       ${j.crew_ok?`<span class="crew-badge">${icon('truck')} ${T('Crews ok')}</span>`:''}
       ${j.fair_chance?`<span class="incl-badge fair">${T('Fair-chance')}</span>`:''}
       ${j.veteran_ok?`<span class="incl-badge vet">${T('Veteran-friendly')}</span>`:''}
+      ${j.transport_provided?`<span class="incl-badge transp">${T('Ride provided')}</span>`:''}
       ${bare?'':fit}
     </div>
     ${bare?'':`<div class="matchbar"><i style="width:${m.score}%"></i></div>`}
@@ -924,7 +928,7 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
         <div class="badge big">${tradeEmoji(job.trade)}</div>
         <div class="job-main">
           <h2>${esc(job.title)}</h2>
-          ${job.employment_type?`<span class="jtype">${esc(T(job.employment_type))}</span>`:''}${job.duration?`<span class="jtype dur">${esc(T(job.duration))}</span>`:''}${job.crew_ok?`<span class="jtype crew">${icon('truck')} ${T('Open to crews')}</span>`:''}${job.quotes_ok?`<span class="jtype quote">${T('Accepting quotes')}</span>`:''}${job.fair_chance?`<span class="jtype fair">${T('Fair-chance')}</span>`:''}${job.veteran_ok?`<span class="jtype vet">${T('Veteran-friendly')}</span>`:''}
+          ${job.employment_type?`<span class="jtype">${esc(T(job.employment_type))}</span>`:''}${job.duration?`<span class="jtype dur">${esc(T(job.duration))}</span>`:''}${job.crew_ok?`<span class="jtype crew">${icon('truck')} ${T('Open to crews')}</span>`:''}${job.quotes_ok?`<span class="jtype quote">${T('Accepting quotes')}</span>`:''}${job.fair_chance?`<span class="jtype fair">${T('Fair-chance')}</span>`:''}${job.veteran_ok?`<span class="jtype vet">${T('Veteran-friendly')}</span>`:''}${job.transport_provided?`<span class="jtype transp">${icon('truck')} ${T('Transport provided')}</span>`:''}
           <div class="job-c">${job.poster_kind==='individual'?`${icon('pin')} ${T('Posted by a homeowner / small business')} · `:''}${esc(job.company||'')} · ${esc(job.city)} ${esc(job.zip)} · ${esc(T(job.shift))}${distance!=null?` · <b class="dist">${distance} ${T('mi away')}</b>`:''}</div>
           <div class="pay big">${job.quotes_ok&&!job.pay_min?T('Name your price'):`$${job.pay_min}–${job.pay_max}/hr`}</div>
         </div>
@@ -1138,6 +1142,7 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [],
           <label>${T('Years of experience')} <input name="years_exp" type="number" min="0" max="60" inputmode="numeric" value="${profile.years_exp||0}"></label>
           <label>${T('Lowest pay you’d take ($/hr)')} <input name="pay_floor" type="number" min="0" inputmode="numeric" value="${profile.pay_floor||0}"></label>
         </div>
+        <label>${T('Farthest you’ll travel (miles, 0 = no limit)')} <input name="commute_mi" type="number" min="0" max="500" inputmode="numeric" value="${profile.commute_mi||0}"></label>
         <label>${T('Shift')} <select name="shift">${['Any','Day','Night','4x10'].map(s=>`<option value="${s}" ${(profile.shift||'Any')===s?'selected':''}>${T(s)}</option>`).join('')}</select></label>
         <label>${T('About you')} <textarea name="about" rows="3" maxlength="600" placeholder="${T("Where you've worked, what you're great at, what you're looking for.")}">${esc(profile.about||'')}</textarea></label>
         <button class="btn-sm">${T('Save details')}</button>
@@ -1735,6 +1740,7 @@ function empJobForm(error='', job=null) {
       <label class="ck"><input type="checkbox" name="crew_ok" value="1" ${editing&&job.crew_ok?'checked':''}> ${T('Open to crews — a worker can bring vetted teammates')}</label>
       <label class="ck"><input type="checkbox" name="fair_chance" value="1" ${editing&&job.fair_chance?'checked':''}> ${T('Fair-chance friendly — we consider applicants with a record')}</label>
       <label class="ck"><input type="checkbox" name="veteran_ok" value="1" ${editing&&job.veteran_ok?'checked':''}> ${T('Veteran-friendly — military experience valued')}</label>
+      <label class="ck"><input type="checkbox" name="transport_provided" value="1" ${editing&&job.transport_provided?'checked':''}> ${T('Transport provided — we get workers to the site')}</label>
       <label>${T('Required credentials')}</label><div class="ckrow">${cred}</div>
       <label>${T('Description')} <textarea name="descr" rows="3">${v('descr')}</textarea></label>
       <button class="btn full">${editing?T('Save changes'):T('Post & match')}</button>
