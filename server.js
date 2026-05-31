@@ -412,6 +412,11 @@ const server = http.createServer(async (req,res)=>{
         await db.prepare('UPDATE worker_profiles SET work_today=? WHERE user_id=?').run(cur?0:1, user.id);
         return redirect(res, '/app/profile');
       }
+      if(p==='/app/alerts' && method==='POST'){
+        const cur = prof && prof.alerts ? 1 : 0;
+        await db.prepare('UPDATE worker_profiles SET alerts=? WHERE user_id=?').run(cur?0:1, user.id);
+        return redirect(res, '/app/profile');
+      }
       if(p==='/app/applications' && method==='GET'){
         const apps = await db.prepare(`SELECT a.*, j.title,j.trade,j.pay_min,j.pay_max,j.city,u.company
           FROM applications a JOIN jobs j ON j.id=a.job_id JOIN users u ON u.id=j.employer_id
@@ -497,7 +502,21 @@ const server = http.createServer(async (req,res)=>{
         const reqCreds = [].concat(b.req_creds||[]).filter(Boolean).join(',');
         const info = await db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr)
           VALUES(?,?,?,?,?,?,?,?,?,?)`).run(user.id,b.title,b.trade,Number(b.pay_min)||0,Number(b.pay_max)||0,b.city||'',b.zip||'',b.shift||'Day',reqCreds,b.descr||'');
-        return redirect(res, `/console/jobs/${info.lastInsertRowid}`);
+        const jobId = info.lastInsertRowid;
+        // SMS job alerts to matching, opted-in, available workers who have a phone
+        let alerted = 0;
+        try {
+          const trades = [b.trade, ...((M.ADJACENT && M.ADJACENT[b.trade]) || [])];
+          const ph = trades.map(()=>'?').join(',');
+          const targets = await db.prepare(`SELECT u.phone FROM users u JOIN worker_profiles p ON p.user_id=u.id
+            WHERE p.alerts=1 AND p.available=1 AND u.phone IS NOT NULL AND p.trade IN (${ph})`).all(...trades);
+          const label = (M.TRADES && M.TRADES[b.trade]) || b.trade || 'trades';
+          for(const t of targets){
+            await sendSms(t.phone, `New ${label} job on Rivet: ${b.title} · $${Number(b.pay_min)||0}-${Number(b.pay_max)||0}/hr · ${b.city||''}. Open the app to apply.`);
+            alerted++;
+          }
+        } catch(e){ console.error('job alerts', e); }
+        return redirect(res, `/console/jobs/${jobId}?alerted=${alerted}`);
       }
 
       // pipeline add / stage move
@@ -552,7 +571,8 @@ const server = http.createServer(async (req,res)=>{
         const inPipe = new Set(); for(const a of apps){ (columns[a.stage]=columns[a.stage]||[]).push(a); inPipe.add(a.name); }
         const candidates = (await rankWorkersForJob(job)).filter(w=>!inPipe.has(w.name)).slice(0,5);
         const jobMedia = await db.prepare("SELECT * FROM media WHERE job_id=? AND target='job' ORDER BY created_at DESC, id DESC").all(jid);
-        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.empPipeline({job,columns,candidates,jobMedia})}));
+        const alerted = Number(url.searchParams.get('alerted'))||0;
+        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.empPipeline({job,columns,candidates,jobMedia,alerted})}));
       }
 
       if(p==='/console/search' && method==='GET'){

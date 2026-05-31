@@ -386,6 +386,7 @@ async function migrate() {
   try { await db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone) WHERE phone IS NOT NULL'); } catch (e) {}
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN available INTEGER DEFAULT 1'); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN work_today INTEGER DEFAULT 0'); } catch (e) { /* column exists */ }
+  try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN alerts INTEGER DEFAULT 0'); } catch (e) { /* column exists */ }
 }
 
 async function seedZips() {
@@ -417,6 +418,18 @@ async function init() {
       await metaSet('today_v1','1');
     }
   } catch (e) { console.error('[db] today seed skipped (non-fatal):', e.message); }
+  try {
+    if(!(await metaGet('alerts_v1'))){
+      const setAlert = async (email, phone)=>{
+        const u = await db.prepare('SELECT id FROM users WHERE email=?').get(email);
+        if(u){ await db.prepare('UPDATE users SET phone=COALESCE(phone,?) WHERE id=?').run(phone, u.id);
+               await db.prepare('UPDATE worker_profiles SET alerts=1 WHERE user_id=?').run(u.id); }
+      };
+      await setAlert('marcus@rivet.test','+15550101001');
+      await setAlert('andre@rivet.test','+15550101002');
+      await metaSet('alerts_v1','1');
+    }
+  } catch (e) { console.error('[db] alerts seed skipped (non-fatal):', e.message); }
   try { await enrichDemo(); } catch (e) { console.error('[db] enrich skipped (non-fatal):', e.message); }
   try { await seedRealism(); } catch (e) { console.error('[db] realism skipped (non-fatal):', e.message); }
   try { await seedMedia(); } catch (e) { console.error('[db] media seed skipped (non-fatal):', e.message); }

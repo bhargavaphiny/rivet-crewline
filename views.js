@@ -425,6 +425,9 @@ function workerProfile({ user, profile, creds, error, portfolio = [] }) {
       <form method="post" action="/app/work-today" class="avail-form" style="margin-top:8px">
         <button class="btn-sm ${profile.work_today?'':'ghost'}">${profile.work_today?'⚡ Can work TODAY — tap to clear':'⚡ I can work today'}</button>
       </form>
+      <form method="post" action="/app/alerts" class="avail-form" style="margin-top:8px">
+        <button class="btn-sm ${profile.alerts?'':'ghost'}">${profile.alerts?'🔔 Job alerts ON — tap to stop':'🔔 Text me new job alerts'}</button>
+      </form>
     </div>
     <div class="card">
       <div class="sec-h" style="margin-top:0">Credential Wallet</div>
@@ -579,7 +582,7 @@ function empJobForm(error='') {
 }
 
 const STAGES = ['Sourced','Screened','Interview','Offer','Hired'];
-function empPipeline({ job, columns, candidates, jobMedia = [] }) {
+function empPipeline({ job, columns, candidates, jobMedia = [], alerted = 0 }) {
   const cols = STAGES.map(st=>`<div class="col"><div class="col-h">${st} <span>${(columns[st]||[]).length}</span></div>
     ${(columns[st]||[]).map(a=>`<div class="pcard">
         <a class="pc-nm cand-link" href="/console/candidates/${a.worker_id}"><span class="av-t">${initials(a.name)}</span>${esc(a.name)}</a>
@@ -593,6 +596,7 @@ function empPipeline({ job, columns, candidates, jobMedia = [] }) {
   return `<section class="wrap">
     <a class="back" href="/console/jobs">← All jobs</a>
     <div class="page-h"><h2>${esc(job.title)}</h2><p class="muted">$${job.pay_min}–${job.pay_max}/hr · ${esc(job.city)}</p></div>
+    ${alerted>0?`<div class="ok-card">🔔 ${alerted} matching worker${alerted===1?'':'s'} with alerts on ${alerted===1?'was':'were'} notified about this job.</div>`:''}
     <div class="card">
       <div class="sec-h" style="margin-top:0">Photos of the work <span class="muted sm">candidates see these on the job</span></div>
       ${mediaGallery(jobMedia, {deletable:true, base:`/console/jobs/${job.id}/media`}) || '<p class="muted sm">Add photos or a video of the site / work to be done — it helps candidates self-qualify.</p>'}
