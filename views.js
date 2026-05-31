@@ -31,6 +31,8 @@ const ICONS = {
   shield:  { f:0, p:'<path d="M12 3 5 6v5c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6z"/>' },
   zoomin:  { f:0, p:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4M11 8v6M8 11h6"/>' },
   zoomout: { f:0, p:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4M8 11h6"/>' },
+  toolbox: { f:0, p:'<path d="M3 9h18v11H3z"/><path d="M8 9V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v3"/><path d="M3 13h18"/>' },
+  globe:   { f:0, p:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>' },
 };
 function icon(name, cls=''){
   const ic = ICONS[name] || ICONS.wrench;
@@ -104,6 +106,8 @@ const I18N = {
     st_readiness:'READINESS', st_verified:'VERIFIED', st_years:'YEARS',
     x_avail_on:'Available for work', x_avail_off:'Tap: Available', x_today_on:'Can work today', x_today_off:'Tap: Work today',
     x_relo_on:'Open to relocate', x_relo_off:'Tap: Relocate', x_alert_on:'Job alerts on', x_alert_off:'Tap: Job alerts',
+    x_tools_on:'I have my own tools', x_tools_off:'Tap: Own tools', x_transport_on:'Have reliable transport', x_transport_off:'Tap: Own transport',
+    x_bilingual_on:'Bilingual (EN/ES)', x_bilingual_off:'Tap: Bilingual',
   },
   es: {
     nav_login:'Entrar', nav_get_started:'Empezar', nav_home:'Inicio', nav_find_work:'Empleos',
@@ -148,6 +152,8 @@ const I18N = {
     st_readiness:'PREPARACIÓN', st_verified:'VERIFICADAS', st_years:'AÑOS',
     x_avail_on:'Disponible para trabajar', x_avail_off:'Toca: Disponible', x_today_on:'Puedo trabajar hoy', x_today_off:'Toca: Trabajar hoy',
     x_relo_on:'Dispuesto a mudarme', x_relo_off:'Toca: Mudarme', x_alert_on:'Alertas activadas', x_alert_off:'Toca: Alertas de empleo',
+    x_tools_on:'Tengo mis herramientas', x_tools_off:'Toca: Herramientas', x_transport_on:'Tengo transporte', x_transport_off:'Toca: Transporte',
+    x_bilingual_on:'Bilingüe (EN/ES)', x_bilingual_off:'Toca: Bilingüe',
   },
 };
 function t(k){ return (I18N[LANG] && I18N[LANG][k] != null) ? I18N[LANG][k] : (I18N.en[k] != null ? I18N.en[k] : k); }
@@ -234,7 +240,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=31">
+  <link rel="stylesheet" href="/styles.css?v=32">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -433,6 +439,9 @@ function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 
       ${xToggle('/app/work-today', profile.work_today, 'bolt', t('x_today_on'), t('x_today_off'), '/app')}
       ${xToggle('/app/relocate', profile.relocate, 'send', t('x_relo_on'), t('x_relo_off'), '/app')}
       ${xToggle('/app/alerts', profile.alerts, 'bell', t('x_alert_on'), t('x_alert_off'), '/app')}
+      ${xToggle('/app/tools', profile.has_tools, 'toolbox', t('x_tools_on'), t('x_tools_off'), '/app')}
+      ${xToggle('/app/transport', profile.has_transport, 'truck', t('x_transport_on'), t('x_transport_off'), '/app')}
+      ${xToggle('/app/bilingual', profile.bilingual, 'globe', t('x_bilingual_on'), t('x_bilingual_off'), '/app')}
     </div>
     ${jobsGeo && jobsGeo.points.length ? usMap(jobsGeo.points, {title:t('home_top'), noun:T('job'), cta:T('Apply'),
         legend:`<span class="lg"><i class="d-direct"></i> ${T('Your trades')}</span><span class="lg"><i class="d-related"></i> ${T('Related trades')}</span>`,
@@ -1066,6 +1075,9 @@ function empSearch({ rows, filters }) {
       <label class="chk"><input type="checkbox" name="avail" value="1" ${filters.avail?'checked':''} onchange="this.form.submit()"> ${icon('dot')} ${T('Available now')}</label>
       <label class="chk"><input type="checkbox" name="today" value="1" ${filters.today?'checked':''} onchange="this.form.submit()"> ${icon('bolt')} ${T('Work today')}</label>
       <label class="chk"><input type="checkbox" name="relocate" value="1" ${filters.relocate?'checked':''} onchange="this.form.submit()"> ${icon('send')} ${T('Open to relocate')}</label>
+      <label class="chk"><input type="checkbox" name="tools" value="1" ${filters.tools?'checked':''} onchange="this.form.submit()"> ${icon('toolbox')} ${T('Own tools')}</label>
+      <label class="chk"><input type="checkbox" name="transport" value="1" ${filters.transport?'checked':''} onchange="this.form.submit()"> ${icon('truck')} ${T('Own transport')}</label>
+      <label class="chk"><input type="checkbox" name="bilingual" value="1" ${filters.bilingual?'checked':''} onchange="this.form.submit()"> ${icon('globe')} ${T('Bilingual')}</label>
     </form>
     <div class="card" style="padding:0">
       <table class="tbl wide"><tr><th>Candidate</th><th>Trade</th><th>Exp</th><th>Credentials</th><th>Readiness</th><th>Pay floor</th></tr>

@@ -415,7 +415,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .train p{font-size:13px;color:var(--slate);line-height:1.5;margin-bottom:10px}
 
 /* ---- Home X-factor action bar + boost checklist ---- */
-.xbar{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:22px 0 4px}
+.xbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:22px 0 4px}
 .xf{margin:0}
 .xbtn{width:100%;font-family:inherit;cursor:pointer;font-size:13px;font-weight:700;padding:13px 10px;border-radius:12px;border:1.5px solid var(--line);background:#fff;color:var(--slate);transition:.12s}
 .xbtn:hover{border-color:var(--brand)}

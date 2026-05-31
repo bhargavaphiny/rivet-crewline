@@ -689,6 +689,9 @@ async function migrate() {
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN about TEXT'); } catch (e) { /* column exists */ }
   try { await db.exec("ALTER TABLE jobs ADD COLUMN employment_type TEXT DEFAULT 'Full-time'"); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN relocate INTEGER DEFAULT 0'); } catch (e) { /* column exists */ }
+  try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN has_tools INTEGER DEFAULT 0'); } catch (e) { /* column exists */ }
+  try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN has_transport INTEGER DEFAULT 0'); } catch (e) { /* column exists */ }
+  try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN bilingual INTEGER DEFAULT 0'); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE users ADD COLUMN company_about TEXT'); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE users ADD COLUMN company_website TEXT'); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE users ADD COLUMN company_city TEXT'); } catch (e) { /* column exists */ }
@@ -746,6 +749,18 @@ async function init() {
   try { await seedBig(); } catch (e) { console.error('[db] big seed skipped (non-fatal):', e.message); }
   try { await seedCategories(); } catch (e) { console.error('[db] category seed skipped (non-fatal):', e.message); }
   try { await seedPosts(); } catch (e) { console.error('[db] posts seed skipped (non-fatal):', e.message); }
+  try {
+    if(!(await metaGet('xfactor_v1'))){
+      // own tools (most trades), reliable transport, bilingual — high-signal flags for recruiters
+      await db.exec("UPDATE worker_profiles SET has_tools=1 WHERE trade IN ('electrician','plumber','hvac','carpenter','welder','pipefitter','tile','painter','locksmith','appliance_repair')");
+      await db.exec("UPDATE worker_profiles SET has_transport=1 WHERE trade IN ('electrician','hvac','plumber','cdl_driver','delivery_driver','caregiver','cna','pest_control','appliance_repair','heavy_equipment')");
+      for(const email of ['marcus@rivet.test','gloria.mendez@rivet.test','luis.fuentes@rivet.test','sofia.reyes@rivet.test','mina.patel@rivet.test','marisol.vega@rivet.test']){
+        const u = await db.prepare('SELECT id FROM users WHERE email=?').get(email);
+        if(u) await db.prepare('UPDATE worker_profiles SET bilingual=1 WHERE user_id=?').run(u.id);
+      }
+      await metaSet('xfactor_v1','1');
+    }
+  } catch (e) { console.error('[db] xfactor seed skipped (non-fatal):', e.message); }
   try {
     if(!(await metaGet('relocate_v1'))){
       for(const email of ['omar@rivet.test','will@rivet.test','sam@rivet.test']){

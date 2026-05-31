@@ -597,8 +597,8 @@ const server = http.createServer(async (req,res)=>{
         await db.prepare("DELETE FROM media WHERE id=? AND user_id=? AND target='portfolio'").run(Number(pDel[1]), user.id);
         return redirect(res,'/app/profile');
       }
-      if(['/app/available','/app/work-today','/app/alerts','/app/relocate'].includes(p) && method==='POST'){
-        const col = { '/app/available':'available', '/app/work-today':'work_today', '/app/alerts':'alerts', '/app/relocate':'relocate' }[p];
+      if(['/app/available','/app/work-today','/app/alerts','/app/relocate','/app/tools','/app/transport','/app/bilingual'].includes(p) && method==='POST'){
+        const col = { '/app/available':'available', '/app/work-today':'work_today', '/app/alerts':'alerts', '/app/relocate':'relocate', '/app/tools':'has_tools', '/app/transport':'has_transport', '/app/bilingual':'bilingual' }[p];
         const b = await readBody(req);
         const cur = prof && prof[col] ? 1 : 0;
         await db.prepare(`UPDATE worker_profiles SET ${col}=? WHERE user_id=?`).run(cur?0:1, user.id);
@@ -794,7 +794,7 @@ const server = http.createServer(async (req,res)=>{
       }
 
       if(p==='/console/search' && method==='GET'){
-        const filters = {trade:url.searchParams.get('trade')||'', verified:!!url.searchParams.get('verified'), ready:!!url.searchParams.get('ready'), avail:!!url.searchParams.get('avail'), today:!!url.searchParams.get('today'), relocate:!!url.searchParams.get('relocate')};
+        const filters = {trade:url.searchParams.get('trade')||'', verified:!!url.searchParams.get('verified'), ready:!!url.searchParams.get('ready'), avail:!!url.searchParams.get('avail'), today:!!url.searchParams.get('today'), relocate:!!url.searchParams.get('relocate'), tools:!!url.searchParams.get('tools'), transport:!!url.searchParams.get('transport'), bilingual:!!url.searchParams.get('bilingual')};
         const rowsRaw = await db.prepare(`SELECT u.id,u.name,p.* FROM users u JOIN worker_profiles p ON p.user_id=u.id`).all();
         let rows = [];
         for(const w of rowsRaw){ const creds=(await getCreds(w.id)).filter(c=>!filters.verified||c.verified); rows.push({...w, creds}); }
@@ -803,6 +803,9 @@ const server = http.createServer(async (req,res)=>{
         if(filters.avail) rows = rows.filter(w=>w.available);
         if(filters.today) rows = rows.filter(w=>w.work_today);
         if(filters.relocate) rows = rows.filter(w=>w.relocate);
+        if(filters.tools) rows = rows.filter(w=>w.has_tools);
+        if(filters.transport) rows = rows.filter(w=>w.has_transport);
+        if(filters.bilingual) rows = rows.filter(w=>w.bilingual);
         rows.sort((a,b)=>b.readiness-a.readiness);
         return send(res, V.layout({title:'Talent Search',user,active:'search',body:V.empSearch({rows,filters})}));
       }
