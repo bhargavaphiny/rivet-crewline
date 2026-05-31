@@ -423,8 +423,12 @@ const server = http.createServer(async (req,res)=>{
 
       if(!prof) return redirect(res,'/app/onboard');
 
-      if(p==='/app' && method==='GET')
-        return send(res, V.layout({title:'Home',user,active:'home',body:V.workerHome({user,profile:prof,creds:await getCreds(user.id),matches:await rankJobsForWorker(user.id)})}));
+      if(p==='/app' && method==='GET'){
+        const creds = await getCreds(user.id);
+        const workCount = (await db.prepare('SELECT COUNT(*) c FROM work_history WHERE user_id=?').get(user.id)).c;
+        const portCount = (await db.prepare("SELECT COUNT(*) c FROM media WHERE user_id=? AND target='portfolio'").get(user.id)).c;
+        return send(res, V.layout({title:'Home',user,active:'home',body:V.workerHome({user,profile:prof,creds,matches:await rankJobsForWorker(user.id),workCount,portCount})}));
+      }
       if(p==='/app/jobs' && method==='GET'){
         const f = {
           q:(url.searchParams.get('q')||'').trim(),
@@ -504,25 +508,12 @@ const server = http.createServer(async (req,res)=>{
         await db.prepare("DELETE FROM media WHERE id=? AND user_id=? AND target='portfolio'").run(Number(pDel[1]), user.id);
         return redirect(res,'/app/profile');
       }
-      if(p==='/app/available' && method==='POST'){
-        const cur = prof && prof.available ? 1 : 0;
-        await db.prepare('UPDATE worker_profiles SET available=? WHERE user_id=?').run(cur?0:1, user.id);
-        return redirect(res, '/app/profile');
-      }
-      if(p==='/app/work-today' && method==='POST'){
-        const cur = prof && prof.work_today ? 1 : 0;
-        await db.prepare('UPDATE worker_profiles SET work_today=? WHERE user_id=?').run(cur?0:1, user.id);
-        return redirect(res, '/app/profile');
-      }
-      if(p==='/app/alerts' && method==='POST'){
-        const cur = prof && prof.alerts ? 1 : 0;
-        await db.prepare('UPDATE worker_profiles SET alerts=? WHERE user_id=?').run(cur?0:1, user.id);
-        return redirect(res, '/app/profile');
-      }
-      if(p==='/app/relocate' && method==='POST'){
-        const cur = prof && prof.relocate ? 1 : 0;
-        await db.prepare('UPDATE worker_profiles SET relocate=? WHERE user_id=?').run(cur?0:1, user.id);
-        return redirect(res, '/app/profile');
+      if(['/app/available','/app/work-today','/app/alerts','/app/relocate'].includes(p) && method==='POST'){
+        const col = { '/app/available':'available', '/app/work-today':'work_today', '/app/alerts':'alerts', '/app/relocate':'relocate' }[p];
+        const b = await readBody(req);
+        const cur = prof && prof[col] ? 1 : 0;
+        await db.prepare(`UPDATE worker_profiles SET ${col}=? WHERE user_id=?`).run(cur?0:1, user.id);
+        return redirect(res, b.next==='/app' ? '/app' : '/app/profile');
       }
       if(p==='/app/profile/suggest-about' && method==='POST'){
         const tradeLabels = profTrades(prof).map(t=>M.TRADES[t]||t);

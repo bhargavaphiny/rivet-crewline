@@ -157,7 +157,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=24">
+  <link rel="stylesheet" href="/styles.css?v=25">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -336,10 +336,27 @@ function workerOnboard(error='') {
 }
 
 // ---------- worker dashboard ----------
-function workerHome({ user, profile, creds, matches }) {
+function xToggle(action, on, onLabel, offLabel, next){
+  return `<form method="post" action="${action}" class="xf"><input type="hidden" name="next" value="${next}">
+    <button class="xbtn ${on?'on':''}">${on?onLabel:offLabel}</button></form>`;
+}
+function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 0 }) {
   const top = matches.slice(0,3).map(m=>jobCard(m)).join('');
   const expiring = creds.filter(c=>c.expires && c.expires < '2026-08').length;
+  const steps = [
+    { done: creds.length>0, label:'Add a credential', href:'/app/profile' },
+    { done: !!profile.about, label:'Write your About', href:'/app/profile' },
+    { done: workCount>0, label:'Add work history', href:'/app/profile' },
+    { done: portCount>0, label:'Add portfolio photos', href:'/app/profile' },
+  ];
+  const doneN = steps.filter(s=>s.done).length;
   return `<section class="wrap">
+    <div class="xbar">
+      ${xToggle('/app/available', profile.available, '🟢 Available for work', '⚪ Tap: Available', '/app')}
+      ${xToggle('/app/work-today', profile.work_today, '⚡ Can work today', '⚡ Tap: Work today', '/app')}
+      ${xToggle('/app/relocate', profile.relocate, '✈️ Open to relocate', '✈️ Tap: Relocate', '/app')}
+      ${xToggle('/app/alerts', profile.alerts, '🔔 Job alerts on', '🔔 Tap: Job alerts', '/app')}
+    </div>
     <div class="dash-grid">
       <div>
         <div class="readiness card">
@@ -347,13 +364,17 @@ function workerHome({ user, profile, creds, matches }) {
           <div>
             <div class="r-lbl">Job-Readiness Score</div>
             <div class="r-big">${profile.readiness>=85?'Hire-ready ⚡':profile.readiness>=70?'Almost there':'Build your card'}</div>
-            <p>${creds.length} credentials · ${TRADES[profile.trade]||profile.trade} · ${esc(profile.city)}</p>
+            <p>${creds.length} credentials · ${tradesOf(profile).map(t=>TRADES[t]||t).join(', ')} · ${esc(profile.city)}</p>
           </div>
         </div>
         <div class="sec-h">Top matches near you <a href="/app/jobs">See all</a></div>
         ${top || `<div class="card muted">No matches yet — <a href="/console/jobs">employers post jobs here</a>.</div>`}
       </div>
       <aside>
+        ${doneN<4?`<div class="card">
+          <div class="sec-h" style="margin-top:0">Boost your card <span class="muted">${doneN}/4</span></div>
+          <div class="checklist">${steps.map(s=>`<a class="chk-step ${s.done?'done':''}" href="${s.href}"><span class="cb">${s.done?'✓':''}</span>${s.label}</a>`).join('')}</div>
+        </div>`:''}
         <div class="card">
           <div class="sec-h" style="margin-top:0">Credential Wallet <a href="/app/profile">Manage</a></div>
           ${creds.slice(0,4).map(credRow).join('') || '<p class="muted">No credentials yet.</p>'}
