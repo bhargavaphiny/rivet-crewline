@@ -453,7 +453,8 @@ const server = http.createServer(async (req,res)=>{
         const creds = await getCreds(user.id);
         const workCount = (await db.prepare('SELECT COUNT(*) c FROM work_history WHERE user_id=?').get(user.id)).c;
         const portCount = (await db.prepare("SELECT COUNT(*) c FROM media WHERE user_id=? AND target='portfolio'").get(user.id)).c;
-        return send(res, V.layout({title:'Home',user,active:'home',body:V.workerHome({user,profile:prof,creds,matches:await rankJobsForWorker(user.id),workCount,portCount})}));
+        const jobsGeo = await jobGeoForWorker(prof);
+        return send(res, V.layout({title:'Home',user,active:'home',body:V.workerHome({user,profile:prof,creds,matches:await rankJobsForWorker(user.id),workCount,portCount,jobsGeo})}));
       }
       if(p==='/app/jobs' && method==='GET'){
         const f = {

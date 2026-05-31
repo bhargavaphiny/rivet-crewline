@@ -185,7 +185,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=27">
+  <link rel="stylesheet" href="/styles.css?v=28">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -368,7 +368,7 @@ function xToggle(action, on, onLabel, offLabel, next){
   return `<form method="post" action="${action}" class="xf"><input type="hidden" name="next" value="${next}">
     <button class="xbtn ${on?'on':''}">${on?onLabel:offLabel}</button></form>`;
 }
-function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 0 }) {
+function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 0, jobsGeo = null }) {
   const top = matches.slice(0,3).map(m=>jobCard(m)).join('');
   const expiring = creds.filter(c=>c.expires && c.expires < '2026-08').length;
   const steps = [
@@ -418,6 +418,9 @@ function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 
         </div>
       </aside>
     </div>
+    ${jobsGeo && jobsGeo.points.length ? usMap(jobsGeo.points, {title:T('Where the work is'), noun:T('job'),
+        legend:`<span class="lg"><i class="d-direct"></i> ${T('Your trades')}</span><span class="lg"><i class="d-related"></i> ${T('Related trades')}</span>`,
+        emptyMsg:T('No mapped openings yet.')}) : ''}
   </section>`;
 }
 
@@ -432,23 +435,26 @@ function ring(score){
 
 function jobCard(m){
   const j = m.job;
-  const fitTags = [`<span class="mtag fit">${m.score}% match</span>`];
-  if (m.missing && m.missing.length) fitTags.push(`<span class="mtag warn">Needs ${CRED_KINDS[m.missing[0]]||m.missing[0]}</span>`);
-  else fitTags.push(`<span class="mtag fit">Credentials ✓</span>`);
-  return `<div class="card job">
+  const fit = (m.missing && m.missing.length)
+    ? `<span class="mtag warn">${T('Needs')} ${CRED_KINDS[m.missing[0]]||m.missing[0]}</span>`
+    : `<span class="mtag fit">${T('Credentials ✓')}</span>`;
+  return `<a class="card job" href="/app/jobs/${j.id}">
     <div class="job-row">
       <div class="badge">${tradeEmoji(j.trade)}</div>
       <div class="job-main">
-        <a class="job-t" href="/app/jobs/${j.id}">${esc(j.title)}</a>
-        ${j.employment_type?`<span class="jtype">${esc(j.employment_type)}</span>`:''}
-        <div class="job-c">${esc(j.company||'')} · ${esc(j.city)} · ${esc(j.shift)} shift${m.distance!=null?` · <b class="dist">${m.distance} mi away</b>`:''}</div>
-        <div class="pay">$${j.pay_min}–${j.pay_max}/hr</div>
-        <div class="mrow">${fitTags.join('')}</div>
-        <div class="matchbar"><i style="width:${m.score}%"></i></div>
+        <div class="job-t">${esc(j.title)}</div>
+        <div class="job-c">${esc(j.company||'')} · ${esc(j.city)}${m.distance!=null?` · <b class="dist">${m.distance} ${T('mi away')}</b>`:''}</div>
       </div>
+      <span class="score-chip ${scoreClass(m.score)}">${m.score}</span>
     </div>
-    <a class="btn full" href="/app/jobs/${j.id}">View & apply</a>
-  </div>`;
+    <div class="job-foot">
+      <span class="pay">$${j.pay_min}–${j.pay_max}<small>/hr</small></span>
+      ${j.employment_type?`<span class="jtype">${esc(j.employment_type)}</span>`:''}
+      <span class="js-shift">${esc(j.shift)}</span>
+      ${fit}
+    </div>
+    <div class="matchbar"><i style="width:${m.score}%"></i></div>
+  </a>`;
 }
 
 function tradeEmoji(t){return {electrician:'⚡',hvac:'🔧',plumber:'🚰',pipefitter:'🔩',welder:'🔥',sheet_metal:'🛠️',carpenter:'🪚',framer:'🏗️',drywall:'🧱',painter:'🎨',roofer:'🏠',mason:'🧱',concrete:'🪨',flooring:'🪵',tile:'◻️',glazier:'🪟',insulation:'🧤',ironworker:'⛓️',millwright:'⚙️',boilermaker:'♨️',controls:'🏭',solar:'☀️',low_voltage:'🔌',fire_sprinkler:'🚿',elevator_tech:'🛗',heavy_equipment:'🚜',crane_operator:'🏗️',cdl_driver:'🚛',diesel_mechanic:'🔧',automotive_tech:'🚗',machinist:'⚙️',landscaper:'🌳',locksmith:'🔑',facilities:'🧰'}[t]||'🧰';}
