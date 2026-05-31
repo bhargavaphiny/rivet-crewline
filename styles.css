@@ -26,6 +26,8 @@ nav{display:flex;align-items:center;gap:18px}
 .nav-link{color:#c3cfd6;font-weight:600;font-size:13.5px}
 .nav-link:hover,.nav-link.on{color:#fff}
 .nav-link.on{border-bottom:2px solid var(--orange);padding-bottom:2px}
+.nav-link.switch{border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:5px 10px;font-size:12px}
+.nav-link.switch:hover{background:rgba(255,255,255,.08);color:#fff}
 .who{width:32px;height:32px;border-radius:9px;background:var(--orange);display:grid;place-items:center;font-weight:800;font-size:12px}
 .flash{margin:14px auto;padding:10px 14px;background:#fff;border-left:3px solid var(--orange);border-radius:8px}
 .site-foot{text-align:center;color:var(--muted);font-size:12px;padding:30px}

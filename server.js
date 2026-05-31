@@ -119,6 +119,7 @@ const server = http.createServer(async (req,res)=>{
   const url = new URL(req.url, `http://${req.headers.host}`);
   const p = url.pathname, method = req.method;
   const user = await getUser(req);
+  if(user) user.mode = p.startsWith('/console') ? 'employer' : (p.startsWith('/app') ? 'worker' : user.role);
 
   try {
     setSecurityHeaders(res);
@@ -221,7 +222,6 @@ const server = http.createServer(async (req,res)=>{
     // ---- worker (Rivet) ----
     if(p.startsWith('/app')){
       if(!user) return redirect(res,'/login');
-      if(user.role!=='worker') return redirect(res,'/console');
       const prof = await getProfile(user.id);
 
       if(p==='/app/onboard' && method==='GET') return send(res, V.layout({title:'Set up',user,active:'',body:V.workerOnboard()}));
@@ -297,7 +297,6 @@ const server = http.createServer(async (req,res)=>{
     // ---- employer (Crewline) ----
     if(p.startsWith('/console')){
       if(!user) return redirect(res,'/login');
-      if(user.role!=='employer') return redirect(res,'/app');
 
       if(p==='/console' && method==='GET'){
         const jobs = await db.prepare(`SELECT * FROM jobs WHERE employer_id=?`).all(user.id);

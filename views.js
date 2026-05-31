@@ -18,20 +18,22 @@ function layout({ title, user, body, active = '', flash = '' }) {
   if (!user) {
     nav = `<a class="nav-link" href="/login">Log in</a>
            <a class="btn-sm" href="/signup">Get started</a>`;
-  } else if (user.role === 'worker') {
+  } else if ((user.mode || user.role) === 'worker') {
     const L = (h,l,k)=>`<a class="nav-link ${active===k?'on':''}" href="${h}">${l}</a>`;
     const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/app/messages">Messages${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
     nav = `${L('/app','Home','home')}${L('/app/jobs','Matches','jobs')}${L('/app/profile','Work Card','profile')}${L('/app/applications','Applications','apps')}${msg}
+           <a class="nav-link switch" href="/console" title="Switch to hiring">Hiring →</a>
            <span class="who">${initials(user.name)}</span>
            <a class="nav-link" href="/logout">Log out</a>`;
   } else {
     const L = (h,l,k)=>`<a class="nav-link ${active===k?'on':''}" href="${h}">${l}</a>`;
     const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/console/messages">Messages${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
     nav = `${L('/console','Overview','ov')}${L('/console/search','Talent','search')}${L('/console/jobs','Jobs','jobs')}${msg}
+           <a class="nav-link switch" href="/app" title="Switch to working">Working →</a>
            <span class="who">${initials(user.company||user.name)}</span>
            <a class="nav-link" href="/logout">Log out</a>`;
   }
-  const brand = user && user.role==='employer'
+  const brand = user && (user.mode || user.role)==='employer'
     ? `<a class="brand" href="/console"><span class="logo c">C</span> Crewline</a>`
     : `<a class="brand" href="${user?'/app':'/'}"><span class="logo">R</span> Rivet${user?'':' <small>× Crewline</small>'}</a>`;
 
@@ -54,7 +56,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=10">
+  <link rel="stylesheet" href="/styles.css?v=11">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
