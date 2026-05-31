@@ -34,8 +34,9 @@ function setSecurityHeaders(res){
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Content-Security-Policy',
-    "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; " +
-    "script-src 'self' 'unsafe-inline'; form-action 'self'; base-uri 'self'; frame-ancestors 'none'");
+    "default-src 'self'; img-src 'self' data: https:; media-src 'self' https:; style-src 'self' 'unsafe-inline'; " +
+    "script-src 'self' 'unsafe-inline'; frame-src https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com; " +
+    "form-action 'self'; base-uri 'self'; frame-ancestors 'none'");
 }
 
 // ---------- session: signed cookie holding the user id (stateless) ----------
@@ -138,6 +139,18 @@ const server = http.createServer(async (req,res)=>{
       return send(res, V.layout({title:'Sign up', user:null, body:V.authForm('signup',{role:url.searchParams.get('role')||'worker', google:googleEnabled})}));
     if(p==='/login' && method==='GET')
       return send(res, V.layout({title:'Log in', user:null, body:V.authForm('login',{google:googleEnabled})}));
+
+    // ---- public shareable portfolio ----
+    const pp = p.match(/^\/p\/(\d+)$/);
+    if(pp && method==='GET'){
+      const wid = Number(pp[1]);
+      const worker = await db.prepare('SELECT id,name FROM users WHERE id=?').get(wid);
+      const profile = worker ? await getProfile(wid) : null;
+      if(!worker || !profile) return send(res, V.layout({title:'Not found',user,body:'<section class="wrap"><div class="card"><h2>Portfolio not found</h2><p><a href="/">Home</a></p></div></section>'}),404);
+      const creds = await getCreds(wid);
+      const portfolio = await db.prepare("SELECT * FROM media WHERE user_id=? AND target='portfolio' ORDER BY created_at DESC, id DESC").all(wid);
+      return send(res, V.layout({title:`${worker.name} — Trades portfolio`, user, body:V.publicPortfolio({worker,profile,creds,portfolio})}));
+    }
 
     if(p==='/signup' && method==='POST'){
       const b = await readBody(req);
@@ -252,13 +265,31 @@ const server = http.createServer(async (req,res)=>{
         return send(res, V.layout({title:'Home',user,active:'home',body:V.workerHome({user,profile:prof,creds:await getCreds(user.id),matches:await rankJobsForWorker(user.id)})}));
       if(p==='/app/jobs' && method==='GET')
         return send(res, V.layout({title:'Matches',user,active:'jobs',body:V.workerJobs({matches:await rankJobsForWorker(user.id)})}));
-      if(p==='/app/profile' && method==='GET')
-        return send(res, V.layout({title:'Work Card',user,active:'profile',body:V.workerProfile({user,profile:prof,creds:await getCreds(user.id)})}));
+      if(p==='/app/profile' && method==='GET'){
+        const portfolio = await db.prepare("SELECT * FROM media WHERE user_id=? AND target='portfolio' ORDER BY created_at DESC, id DESC").all(user.id);
+        return send(res, V.layout({title:'Work Card',user,active:'profile',body:V.workerProfile({user,profile:prof,creds:await getCreds(user.id),portfolio})}));
+      }
       if(p==='/app/credentials' && method==='POST'){
         const b = await readBody(req);
         if(b.kind) await db.prepare('INSERT INTO credentials(user_id,kind,name,verified,expires) VALUES(?,?,?,1,?)')
           .run(user.id, b.kind, M.CRED_KINDS[b.kind]||b.kind, b.expires||null);
         await recomputeReadiness(user.id);
+        return redirect(res,'/app/profile');
+      }
+      if(p==='/app/portfolio' && method==='POST'){
+        const b = await readBody(req);
+        const url = String(b.url||'').trim().slice(0,1000);
+        const title = String(b.title||'').trim().slice(0,140);
+        const caption = String(b.caption||'').trim().slice(0,300);
+        if(/^https?:\/\//i.test(url)){
+          const kind = /youtube|youtu\.be|vimeo/i.test(url) ? 'video' : 'image';
+          await db.prepare("INSERT INTO media(user_id,target,kind,url,title,caption) VALUES(?,'portfolio',?,?,?,?)").run(user.id, kind, url, title, caption);
+        }
+        return redirect(res,'/app/profile');
+      }
+      const pDel = p.match(/^\/app\/portfolio\/(\d+)\/delete$/);
+      if(pDel && method==='POST'){
+        await db.prepare("DELETE FROM media WHERE id=? AND user_id=? AND target='portfolio'").run(Number(pDel[1]), user.id);
         return redirect(res,'/app/profile');
       }
       if(p==='/app/applications' && method==='GET'){
@@ -445,7 +476,8 @@ const server = http.createServer(async (req,res)=>{
         await db.prepare("UPDATE messages SET read_at=datetime('now') WHERE to_id=? AND from_id=? AND read_at IS NULL").run(user.id, wid);
         const notes = await db.prepare('SELECT * FROM notes WHERE author_id=? AND worker_id=? ORDER BY created_at DESC, id DESC').all(user.id, wid);
         const saved = !!(await db.prepare('SELECT 1 FROM saved_candidates WHERE employer_id=? AND worker_id=?').get(user.id, wid));
-        return send(res, V.layout({title:w.name,user,active:'search',body:V.empCandidate({worker:w,profile:prof,creds,matches,apps,messages,meId:user.id,notes,saved})}));
+        const portfolio = await db.prepare("SELECT * FROM media WHERE user_id=? AND target='portfolio' ORDER BY created_at DESC, id DESC").all(wid);
+        return send(res, V.layout({title:w.name,user,active:'search',body:V.empCandidate({worker:w,profile:prof,creds,matches,apps,messages,meId:user.id,notes,saved,portfolio})}));
       }
     }
 

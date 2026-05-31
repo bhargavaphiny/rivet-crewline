@@ -149,6 +149,18 @@ async function createSchema() {
       PRIMARY KEY(employer_id, worker_id)
     );
     CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
+    CREATE TABLE IF NOT EXISTS media (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER REFERENCES users(id),
+      target TEXT NOT NULL,
+      job_id INTEGER,
+      kind TEXT NOT NULL,
+      url TEXT NOT NULL,
+      title TEXT, caption TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_media_portfolio ON media(user_id, target);
+    CREATE INDEX IF NOT EXISTS idx_media_job ON media(job_id);
     CREATE INDEX IF NOT EXISTS idx_messages_to ON messages(to_id, read_at);
     CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_id, to_id);
     CREATE INDEX IF NOT EXISTS idx_applications_worker ON applications(worker_id);

@@ -12,6 +12,27 @@ const initials = name => esc((name||'?').split(/\s+/).map(w=>w[0]).slice(0,2).jo
 
 function scoreClass(s){ return s>=85?'s-hi':s>=70?'s-md':'s-lo'; }
 
+// ---------- media (URL / embed based) ----------
+function ytId(url){ const m=String(url).match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{6,})/); return m?m[1]:null; }
+function vimeoId(url){ const m=String(url).match(/vimeo\.com\/(?:video\/)?(\d+)/); return m?m[1]:null; }
+function isVideoUrl(url){ return !!(ytId(url) || vimeoId(url)); }
+function mediaEmbed(item){
+  const url = item.url || '';
+  const yt = ytId(url);
+  if(yt) return `<iframe class="m-frame" src="https://www.youtube-nocookie.com/embed/${esc(yt)}" title="${esc(item.title||'video')}" allow="encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>`;
+  const vm = vimeoId(url);
+  if(vm) return `<iframe class="m-frame" src="https://player.vimeo.com/video/${esc(vm)}" title="${esc(item.title||'video')}" allowfullscreen loading="lazy"></iframe>`;
+  return `<img class="m-img" src="${esc(url)}" alt="${esc(item.title||'work photo')}" loading="lazy" referrerpolicy="no-referrer">`;
+}
+function mediaGallery(items, { deletable = false, base = '' } = {}){
+  if(!items || !items.length) return '';
+  return `<div class="gallery">${items.map(it=>`<figure class="m-item">
+    <div class="m-media">${mediaEmbed(it)}</div>
+    ${(it.title||it.caption)?`<figcaption>${it.title?`<b>${esc(it.title)}</b> `:''}${it.caption?esc(it.caption):''}</figcaption>`:''}
+    ${deletable?`<form method="post" action="${base}/${it.id}/delete" class="m-del"><button class="m-x" title="Remove" aria-label="Remove">×</button></form>`:''}
+  </figure>`).join('')}</div>`;
+}
+
 // ---------- layout ----------
 function layout({ title, user, body, active = '', flash = '' }) {
   let nav = '';
@@ -56,7 +77,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=11">
+  <link rel="stylesheet" href="/styles.css?v=12">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -334,7 +355,7 @@ function workerApplications({ apps, savedJobs }) {
 function bd(label,val,max){const pct=Math.round(val/max*100);return `<div class="bd"><span>${label}</span><div class="bdbar"><i style="width:${pct}%"></i></div><b>${val}/${max}</b></div>`;}
 
 // ---------- worker: profile / work card ----------
-function workerProfile({ user, profile, creds, error }) {
+function workerProfile({ user, profile, creds, error, portfolio = [] }) {
   const kinds = Object.entries(CRED_KINDS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
   return `<section class="wrap narrow">
     <div class="card profile-head">
@@ -360,7 +381,49 @@ function workerProfile({ user, profile, creds, error }) {
         <button class="btn">Add credential</button>
       </form>
     </div>
+    <div class="card">
+      <div class="sec-h" style="margin-top:0">Portfolio — your past work <a href="/p/${user.id}" target="_blank" rel="noopener">View public page ↗</a></div>
+      ${mediaGallery(portfolio, {deletable:true, base:'/app/portfolio'}) || '<p class="muted">Add photos or videos of jobs you’ve completed — it builds your shareable portfolio and helps recruiters trust your work.</p>'}
+      <form method="post" action="/app/portfolio" class="port-form">
+        <input name="url" placeholder="Image URL or YouTube / Vimeo link" required>
+        <input name="title" placeholder="Title — e.g. Commercial panel upgrade">
+        <input name="caption" placeholder="Short caption (optional)">
+        <button class="btn-sm">Add to portfolio</button>
+      </form>
+    </div>
   </section>`;
+}
+
+// ---------- public shareable portfolio ----------
+function publicPortfolio({ worker, profile, creds, portfolio }) {
+  return `<section class="hero pub-hero"><div class="wrap">
+      <span class="tag">Verified on Rivet</span>
+      <h1>${esc(worker.name)}</h1>
+      <p class="lead">${TRADES[profile.trade]||profile.trade} · ${esc(profile.city)} · ${profile.years_exp} years experience</p>
+      <div class="pub-stats">
+        <div><b>${profile.readiness}</b><span>Job-readiness</span></div>
+        <div><b>${creds.filter(c=>c.verified).length}</b><span>Verified credentials</span></div>
+        <div><b>${portfolio.length}</b><span>Portfolio pieces</span></div>
+      </div>
+    </div></section>
+    <section class="wrap narrow">
+      ${profile.bio?`<div class="card"><p>${esc(profile.bio)}</p></div>`:''}
+      <div class="card">
+        <div class="sec-h" style="margin-top:0">Verified credentials</div>
+        ${creds.filter(c=>c.verified).map(credRow).join('') || '<p class="muted">No verified credentials listed.</p>'}
+      </div>
+      <div class="card">
+        <div class="sec-h" style="margin-top:0">Work portfolio</div>
+        ${mediaGallery(portfolio) || '<p class="muted">No portfolio pieces yet.</p>'}
+      </div>
+      <div class="card cta-card">
+        <b>${esc(worker.name.split(' ')[0])} is on Rivet — verified, job-ready trades talent.</b>
+        <div class="cta-row" style="margin-top:12px"><a class="btn" href="/signup?role=employer">Hire on Crewline</a><a class="btn ghost" href="/signup?role=worker">Build your own card</a></div>
+      </div>
+      <p class="muted" style="text-align:center;margin:18px 0">
+        <button class="btn-sm ghost" onclick="navigator.clipboard&&navigator.clipboard.writeText(location.href);this.textContent='Link copied ✓'">Copy share link</button>
+      </p>
+    </section>`;
 }
 
 // ================= EMPLOYER (Crewline) =================
@@ -529,7 +592,7 @@ function inbox({ convos, base, meId }){
 }
 
 // ---------- employer: candidate detail ----------
-function empCandidate({ worker, profile, creds, matches, apps, messages, meId, notes = [], saved = false }) {
+function empCandidate({ worker, profile, creds, matches, apps, messages, meId, notes = [], saved = false, portfolio = [] }) {
   const stageByJob = {}; for (const a of apps) stageByJob[a.job_id] = a.stage;
   return `<section class="wrap narrow">
     <div class="cand-top"><a class="back" href="/console/search">← Talent Search</a>
@@ -551,6 +614,10 @@ function empCandidate({ worker, profile, creds, matches, apps, messages, meId, n
     <div class="card">
       <div class="sec-h" style="margin-top:0">Credential wallet</div>
       ${creds.map(credRow).join('') || '<p class="muted">No credentials listed yet.</p>'}
+    </div>
+    <div class="card">
+      <div class="sec-h" style="margin-top:0">Portfolio <a href="/p/${worker.id}" target="_blank" rel="noopener">Public page ↗</a></div>
+      ${mediaGallery(portfolio) || '<p class="muted sm">No portfolio pieces yet.</p>'}
     </div>
     <div class="card">
       <div class="sec-h" style="margin-top:0">Fit for your jobs</div>
@@ -618,4 +685,4 @@ function ogImage() {
 }
 
 module.exports = { layout, landing, authForm, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, empOverview, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES };
+  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES };
