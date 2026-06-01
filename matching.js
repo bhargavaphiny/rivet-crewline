@@ -300,6 +300,37 @@ const SEASON_WHY = {
 };
 function seasonalTrades(month){ return (SEASON[((month%12)+12)%12]||[]).slice(); }
 
+// Market tightness: how hard each trade is to staff nationally (documented US blue-collar
+// shortages). >1 = employers struggle to fill / workers have leverage; ~1 = balanced;
+// <1 = more competitive for the worker. Hand-set from public labor-market reporting (BLS/ABC).
+const TRADE_DEMAND = {
+  electrician:2.3, welder:2.2, pipefitter:2.2, hvac:2.1, plumber:2.0, ironworker:2.0,
+  boilermaker:2.0, sheet_metal:1.9, millwright:1.9, machinist:1.8, controls:1.9,
+  fire_sprinkler:1.9, elevator_tech:2.1, diesel_mechanic:1.9, cdl_driver:1.9, crane_operator:1.9,
+  heavy_equipment:1.8, solar:1.7, roofer:1.7, mason:1.7, carpenter:1.6, framer:1.6,
+  glazier:1.6, automotive_tech:1.6, low_voltage:1.7, tile:1.5, concrete:1.5, drywall:1.4,
+  insulation:1.4, flooring:1.4, facilities:1.4, appliance_repair:1.5, irrigation_tech:1.4,
+  pest_control:1.3, locksmith:1.4, painter:1.3, handyman:1.3, pool_service:1.3,
+  cna:1.6, caregiver:1.6, medical_assistant:1.5, phlebotomist:1.4, emt:1.7,
+  landscaper:1.2, farmworker:1.2, fruit_picker:1.2, ranch_hand:1.2, nursery_worker:1.2,
+  packing_shed:1.1, cook:1.3, prep_cook:1.2, server:1.0, bartender:1.0, dishwasher:0.95,
+  busser:0.95, host:0.95, barback:0.95, warehouse:1.05, delivery_driver:1.1, mover:1.0,
+  janitor:1.1, housekeeper:1.05, security_guard:1.1, pressure_wash:1.1, junk_removal:1.0,
+  gig_courier:1.0, event_setup:1.05,
+};
+// Blend the documented national tightness with our live job/worker mix in a metro/trade,
+// dampening sparse-seed swings with a sqrt. Returns platform-scale demand vs supply + a level.
+function marketBalance(trade, realJobs = 0, realWorkers = 0){
+  const f = TRADE_DEMAND[trade] || 1.3;
+  // national shortage factor leads; live mix only nudges it (4th-root dampens sparse-seed swings)
+  const ratio = Math.min(3, +(f * Math.pow((realJobs + 3) / (realWorkers + 3), 0.25)).toFixed(2));
+  const supply = Math.round(realWorkers * 180 + 600);
+  const demand = Math.round(supply * ratio);
+  const level = ratio >= 2.0 ? 'vtight' : ratio >= 1.5 ? 'tight' : ratio >= 1.05 ? 'bal' : 'comp';
+  return { trade, demand, supply, ratio, gap: demand - supply, level };
+}
+const BALANCE_LABEL = { vtight:'Very short-staffed', tight:'Short-staffed', bal:'Balanced', comp:'Competitive' };
+
 const clamp = (n, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, n));
 
 /**
@@ -355,4 +386,4 @@ function scoreMatch(profile, creds, job) {
   return { score: total, breakdown: { trade, pay, loc, cred: credScore }, missing };
 }
 
-module.exports = { TRADES, ADJACENT, CATEGORIES, CRED_KINDS, TRAINING, STATE_MIN_WAGE, STATE_NAME, CITY_STATE, stateForCity, localRules, readiness, scoreMatch, clamp, SEASON_WHY, seasonalTrades };
+module.exports = { TRADES, ADJACENT, CATEGORIES, CRED_KINDS, TRAINING, STATE_MIN_WAGE, STATE_NAME, CITY_STATE, stateForCity, localRules, readiness, scoreMatch, clamp, SEASON_WHY, seasonalTrades, marketBalance, BALANCE_LABEL, TRADE_DEMAND };

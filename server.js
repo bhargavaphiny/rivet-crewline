@@ -570,7 +570,19 @@ const server = http.createServer(async (req,res)=>{
       const now = new Date();
       const season = M.seasonalTrades(now.getMonth()).map(t=>({trade:t, why:M.SEASON_WHY[t]||''}));
       const monthName = now.toLocaleString('en-US',{month:'long'});
-      return send(res, V.layout({title:'Industry Pulse', user, active:'pulse', body:V.pulsePage({user, trending, posts, totalOpen, companies, demandGeo, season, monthName})}));
+      // supply vs demand: live jobs & workers per trade → market-tightness index
+      const jobsByTrade = await db.prepare(`SELECT trade, COUNT(*) n FROM jobs WHERE status='open' GROUP BY trade`).all();
+      const wkByTrade = await db.prepare(`SELECT trade, COUNT(*) n FROM worker_profiles WHERE trade IS NOT NULL AND trade<>'' GROUP BY trade`).all();
+      const jMap = Object.fromEntries(jobsByTrade.map(r=>[r.trade, r.n]));
+      const wMap = Object.fromEntries(wkByTrade.map(r=>[r.trade, r.n]));
+      const balAll = [...new Set([...Object.keys(jMap), ...Object.keys(wMap)])]
+        .map(tr => M.marketBalance(tr, jMap[tr]||0, wMap[tr]||0))
+        .filter(b => b.demand >= 600)
+        .sort((a,b)=> b.ratio-a.ratio);
+      // lead with the tightest markets (worker leverage), but show a couple of competitive ones
+      // at the bottom so the board reflects the real spectrum rather than looking uniform.
+      const balance = balAll.length > 9 ? [...balAll.slice(0,7), ...balAll.slice(-2)] : balAll;
+      return send(res, V.layout({title:'Industry Pulse', user, active:'pulse', body:V.pulsePage({user, trending, posts, totalOpen, companies, demandGeo, season, monthName, balance})}));
     }
     if(p==='/pulse' && method==='POST'){
       if(!user) return redirect(res, '/login');

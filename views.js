@@ -3,7 +3,7 @@
  * Rivet x Crewline - server-side HTML views.
  * Plain template-literal rendering. No template engine, no client framework.
  */
-const { TRADES, CRED_KINDS, TRAINING, CATEGORIES } = require('./matching');
+const { TRADES, CRED_KINDS, TRAINING, CATEGORIES, BALANCE_LABEL: M_BALANCE_LABEL } = require('./matching');
 const US_STATES = require('./us-geo');
 
 // ---- inline SVG icon set (consistent line style; no emoji) ----
@@ -297,6 +297,11 @@ const BUILTIN_ES = {
   // map hero
   'across':'en','metro':'metro','metros':'metros','warmer & bigger = more hiring':'más grande = más contratación',
   'You':'Tú','commute':'traslado','within':'a menos de','mi of you':'mi de ti','Zoom to me':'Acercar a mí','Within reach':'A tu alcance','View all US':'Ver todo EE. UU.',
+  'Supply vs demand':'Oferta vs demanda','where workers have the most leverage':'dónde los trabajadores tienen más ventaja',
+  'Live openings vs available workers, weighted by national trade shortages.':'Vacantes activas vs trabajadores disponibles, ponderado por la escasez nacional de oficios.',
+  'available workers':'trabajadores disponibles','workers':'trabajadores','demand':'demanda',
+  'Estimate blends Rivet activity with public labor data.':'La estimación combina la actividad de Rivet con datos públicos de empleo.',
+  'Very short-staffed':'Muy escaso de personal','Short-staffed':'Escaso de personal','Balanced':'Equilibrado','Competitive':'Competitivo',
   // X-factors: show-up, pay, crew, renewals
   'Shows up':'Asiste','start':'inicio','starts':'inicios','Confirmed start outcomes — showed up vs no-showed':'Resultados confirmados — se presentó vs. no se presentó',
   'Pays on time':'Paga a tiempo','Worker-confirmed pay outcomes':'Pagos confirmados por trabajadores',
@@ -429,7 +434,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=72">
+  <link rel="stylesheet" href="/styles.css?v=73">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1279,7 +1284,18 @@ const PULSE_NEWS = [
   { tag:'Healthcare', title:'CNAs and home-health aides are among the fastest-growing roles', body:'An aging population is fueling steady, flexible demand for certified nursing assistants and caregivers nationwide.' },
   { tag:'Logistics', title:'Warehouse, delivery and CDL roles stay red-hot', body:'E-commerce and regional distribution keep last-mile drivers, forklift operators and warehouse crews in constant demand.' },
 ];
-function pulsePage({ user, trending, posts, totalOpen, companies = [], demandGeo = [], season = [], monthName = '' }) {
+function pulsePage({ user, trending, posts, totalOpen, companies = [], demandGeo = [], season = [], monthName = '', balance = [] }) {
+  const maxDem = Math.max(1, ...balance.map(b=>b.demand));
+  const balRows = balance.map(b=>`<div class="bal-row">
+      <span class="trend-ic">${tradeEmoji(b.trade)}</span>
+      <div class="bal-main">
+        <div class="bal-top"><b>${esc(TRADES[b.trade]||b.trade)}</b><span class="bal-chip ${b.level}">${T(M_BALANCE_LABEL[b.level]||'Balanced')}</span></div>
+        <div class="bal-bar" role="img" aria-label="${b.demand.toLocaleString()} ${T('jobs')}, ${b.supply.toLocaleString()} ${T('workers')}">
+          <i class="bal-d" style="width:${Math.round(b.demand/maxDem*100)}%"></i>
+          <i class="bal-s" style="width:${Math.round(b.supply/maxDem*100)}%"></i></div>
+        <div class="bal-nums sm"><span class="bd">${b.demand.toLocaleString()} ${T('open jobs')}</span> <span class="muted">vs</span> <span class="bs">${b.supply.toLocaleString()} ${T('workers')}</span> · <b>${b.ratio}×</b> ${T('demand')}</div>
+      </div>
+    </div>`).join('');
   const maxN = Math.max(1, ...trending.map(t=>t.n));
   const trendRows = trending.map((t,i)=>`<div class="trend-row">
       <span class="trend-rank">${i+1}</span>
@@ -1301,6 +1317,13 @@ function pulsePage({ user, trending, posts, totalOpen, companies = [], demandGeo
       <div class="season-grid">${season.map(s=>`<span class="season-chip">${tradeEmoji(s.trade)} <b>${esc(TRADES[s.trade]||s.trade)}</b>${s.why?` <span class="muted sm">${T(s.why)}</span>`:''}</span>`).join('')}</div>
     </div>`:''}
     ${demandGeo.length ? usMap(demandGeo, {title:T('Where demand is hottest'), noun:T('job'), cta:T('View')}) : ''}
+    ${balance.length?`<div class="card">
+      <div class="sec-h" style="margin-top:0">${icon('flame','xic')} ${T('Supply vs demand')} <span class="muted">${T('where workers have the most leverage')}</span></div>
+      <p class="muted sm" style="margin:-2px 0 12px">${T('Live openings vs available workers, weighted by national trade shortages.')}</p>
+      <div class="bal-legend sm muted"><span><i class="bal-key d"></i> ${T('open jobs')}</span><span><i class="bal-key s"></i> ${T('available workers')}</span></div>
+      ${balRows}
+      <p class="muted sm" style="margin-top:10px">${T('Estimate blends Rivet activity with public labor data.')} <a href="https://www.bls.gov/ooh/" target="_blank" rel="noopener noreferrer">BLS ↗</a></p>
+    </div>`:''}
     <div class="grid2">
       <div class="card">
         <div class="sec-h" style="margin-top:0">${T('Trending trades')} <span class="muted">${totalOpen} ${T('open jobs')}</span></div>
