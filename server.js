@@ -1082,7 +1082,7 @@ const server = http.createServer(async (req,res)=>{
         const job = await db.prepare('SELECT id,title,employer_id,quotes_ok FROM jobs WHERE id=?').get(jid);
         if(job && job.quotes_ok){
           const b = await readBody(req);
-          const amount = Math.max(1, Math.round(Number(b.amount)||0));
+          const amount = Math.min(1000000, Math.max(1, Math.round(Number(b.amount)||0)));
           const unit = ['job','hour','day'].includes(b.unit) ? b.unit : 'job';
           if(amount){
             try { await db.prepare(`INSERT INTO quotes(job_id,worker_id,amount,unit,note) VALUES(?,?,?,?,?)
@@ -1279,7 +1279,7 @@ const server = http.createServer(async (req,res)=>{
       const outMatch = p.match(/^\/console\/applications\/(\d+)\/outcome$/);
       if(outMatch && method==='POST'){
         const b = await readBody(req); const appId = Number(outMatch[1]);
-        const ok = await db.prepare(`SELECT a.id FROM applications a JOIN jobs j ON j.id=a.job_id WHERE a.id=? AND j.employer_id=?`).get(appId, user.id);
+        const ok = await db.prepare(`SELECT a.id FROM applications a JOIN jobs j ON j.id=a.job_id WHERE a.id=? AND j.employer_id=? AND a.stage='Hired'`).get(appId, user.id);
         const app = await db.prepare('SELECT job_id FROM applications WHERE id=?').get(appId);
         if(ok && ['showed','noshow','cancelled'].includes(b.outcome))
           await db.prepare('UPDATE applications SET outcome=? WHERE id=?').run(b.outcome, appId);

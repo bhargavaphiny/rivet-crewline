@@ -301,6 +301,13 @@ const BUILTIN_ES = {
   'Construction & trades':'Construcción y oficios','Drivers & logistics':'Conductores y logística','Mechanical & repair':'Mecánica y reparación',
   'Healthcare & care':'Salud y cuidado','Food service':'Servicio de comida','Agriculture':'Agricultura',
   'Cleaning & facilities':'Limpieza e instalaciones','Security':'Seguridad','Freelance & gig':'Independiente y por encargo',
+  'Sourced':'Captado','Screened':'Filtrado','Interview':'Entrevista','Offer':'Oferta','Match':'Coincidencia','Pipeline':'Flujo','All jobs':'Todos los empleos',
+  'matching worker with alerts on was notified about this job.':'trabajador compatible con alertas activas fue notificado sobre este empleo.',
+  'matching workers with alerts on were notified about this job.':'trabajadores compatibles con alertas activas fueron notificados sobre este empleo.',
+  'Add photos or a video of the site / work to be done — it helps candidates self-qualify.':'Agrega fotos o un video del sitio / trabajo a realizar — ayuda a los candidatos a autocalificarse.',
+  'Image URL or YouTube / Vimeo link':'URL de imagen o enlace de YouTube / Vimeo','Title — e.g. Rooftop unit replacement':'Título — p. ej. Reemplazo de unidad en azotea',
+  'Short caption (optional)':'Descripción breve (opcional)','Add photo / video':'Agregar foto / video',
+  'Recommended candidates (not yet in pipeline)':'Candidatos recomendados (aún no en el flujo)','No more candidates to recommend.':'No hay más candidatos para recomendar.',
   'Supply vs demand':'Oferta vs demanda','where workers have the most leverage':'dónde los trabajadores tienen más ventaja',
   'Live openings vs available workers, weighted by national trade shortages.':'Vacantes activas vs trabajadores disponibles, ponderado por la escasez nacional de oficios.',
   'available workers':'trabajadores disponibles','workers':'trabajadores','demand':'demanda',
@@ -1931,13 +1938,13 @@ function empPipeline({ job, columns, candidates, jobMedia = [], alerted = 0, sou
       <div class="quote-act">${q.status==='accepted'?`<span class="v ok">${T('Accepted')}</span>`:q.status==='declined'?`<span class="v pending">${T('Not selected')}</span>`:`<form method="post" action="/console/jobs/${job.id}/quotes/${q.id}/accept"><button class="btn-xs">${T('Accept quote')}</button></form>`}</div>
     </div>`).join('') : `<p class="muted sm">${T('No quotes yet — they’ll appear here as workers bid.')}</p>`}
   </div>` : '';
-  const cols = STAGES.map(st=>`<div class="col"><div class="col-h">${st} <span>${(columns[st]||[]).length}</span></div>
+  const cols = STAGES.map(st=>`<div class="col"><div class="col-h">${T(st)} <span>${(columns[st]||[]).length}</span></div>
     ${(columns[st]||[]).map(a=>`<div class="pcard">
         <a class="pc-nm cand-link" href="/console/candidates/${a.worker_id}"><span class="av-t">${initials(a.name)}</span>${esc(a.name)}</a>
         <div class="muted sm">${TRADES[a.trade]||a.trade}</div>
         <div class="pc-ft"><span class="score-tag ${scoreClass(a.score)}">${a.score}</span>
           <form method="post" action="/console/applications/${a.app_id}/stage" class="stageform">
-            <select name="stage" onchange="this.form.submit()">${STAGES.map(s=>`<option ${s===st?'selected':''}>${s}</option>`).join('')}</select>
+            <select name="stage" onchange="this.form.submit()">${STAGES.map(s=>`<option value="${s}" ${s===st?'selected':''}>${T(s)}</option>`).join('')}</select>
           </form></div>
         ${st==='Hired' ? (a.outcome
           ? `<div class="pc-out ${a.outcome}">${({showed:T('✓ Showed up'),noshow:T('✗ No-showed'),cancelled:T('Cancelled w/ notice')})[a.outcome]||a.outcome}</div>`
@@ -1945,14 +1952,14 @@ function empPipeline({ job, columns, candidates, jobMedia = [], alerted = 0, sou
       </div>`).join('')}
     </div>`).join('');
   return `<section class="wrap">
-    <a class="back" href="/console/jobs">← All jobs</a>
+    <a class="back" href="/console/jobs">← ${T('All jobs')}</a>
     <div class="page-h"><h2>${esc(T(job.title))} ${job.status==='closed'?`<span class="closed-tag">${T('Closed')}</span>`:''}</h2>
       <p class="muted">$${job.pay_min}–${job.pay_max}/hr · ${esc(job.city)}</p>
       <a class="btn-sm ghost right" href="/console/jobs/${job.id}/edit">${T('Edit')}</a>
       <form method="post" action="/console/jobs/${job.id}/${job.status==='closed'?'reopen':'close'}"><button class="btn-sm ${job.status==='closed'?'':'ghost'}">${job.status==='closed'?T('Reopen job'):T('Close job')}</button></form></div>
     ${marketCard}
     ${job.status==='closed'?`<div class="card warn-card">${T('This job is closed — it’s hidden from worker search and the map. Reopen it to keep matching.')}</div>`:''}
-    ${alerted>0?`<div class="ok-card">${icon('bell','xic')} ${alerted} matching worker${alerted===1?'':'s'} with alerts on ${alerted===1?'was':'were'} notified about this job.</div>`:''}
+    ${alerted>0?`<div class="ok-card">${icon('bell','xic')} ${alerted} ${alerted===1?T('matching worker with alerts on was notified about this job.'):T('matching workers with alerts on were notified about this job.')}</div>`:''}
     ${sourced>0?`<div class="ok-card">${icon('spark','xic')} ${T('Sourcing Agent added')} ${sourced} ${sourced===1?T('candidate'):T('candidates')} ${T('to your pipeline.')}</div>`:''}
     <div class="card agent-card row">
       <div><div class="agent-h">${icon('spark','xic')} ${T('Sourcing Agent')}</div>
@@ -1962,24 +1969,24 @@ function empPipeline({ job, columns, candidates, jobMedia = [], alerted = 0, sou
     ${quotesCard}
     <div class="card">
       <div class="sec-h" style="margin-top:0">${T('Photos of the work')} <span class="muted sm">${T('candidates see these on the job')}</span></div>
-      ${mediaGallery(jobMedia, {deletable:true, base:`/console/jobs/${job.id}/media`}) || '<p class="muted sm">Add photos or a video of the site / work to be done — it helps candidates self-qualify.</p>'}
+      ${mediaGallery(jobMedia, {deletable:true, base:`/console/jobs/${job.id}/media`}) || `<p class="muted sm">${T('Add photos or a video of the site / work to be done — it helps candidates self-qualify.')}</p>`}
       <form method="post" action="/console/jobs/${job.id}/media" class="port-form">
-        <input name="url" placeholder="Image URL or YouTube / Vimeo link" required>
-        <input name="title" placeholder="Title — e.g. Rooftop unit replacement">
-        <input name="caption" placeholder="Short caption (optional)">
-        <button class="btn-sm">Add photo / video</button>
+        <input name="url" placeholder="${T('Image URL or YouTube / Vimeo link')}" required>
+        <input name="title" placeholder="${T('Title — e.g. Rooftop unit replacement')}">
+        <input name="caption" placeholder="${T('Short caption (optional)')}">
+        <button class="btn-sm">${T('Add photo / video')}</button>
       </form>
     </div>
     <div class="kanban">${cols}</div>
     <div class="card" style="margin-top:18px">
-      <div class="sec-h" style="margin-top:0">Recommended candidates (not yet in pipeline)</div>
-      <table class="tbl"><tr><th>Candidate</th><th>Trade</th><th>Match</th><th>Readiness</th><th></th></tr>
+      <div class="sec-h" style="margin-top:0">${T('Recommended candidates (not yet in pipeline)')}</div>
+      <table class="tbl"><tr><th>${T('Candidate')}</th><th>${T('Trade')}</th><th>${T('Match')}</th><th>${T('Readiness')}</th><th></th></tr>
       ${candidates.map(c=>`<tr><td><a class="cand-link" href="/console/candidates/${c.user_id}"><span class="av-t">${initials(c.name)}</span> ${esc(c.name)}</a></td>
         <td>${TRADES[c.trade]||c.trade}</td>
         <td><span class="score-tag ${scoreClass(c.score)}">${c.score}</span></td>
         <td>${c.readiness}</td>
-        <td><form method="post" action="/console/jobs/${job.id}/add"><input type="hidden" name="worker_id" value="${c.user_id}"><button class="btn-sm">+ Pipeline</button></form></td>
-      </tr>`).join('') || '<tr><td colspan=5 class="muted">No more candidates to recommend.</td></tr>'}
+        <td><form method="post" action="/console/jobs/${job.id}/add"><input type="hidden" name="worker_id" value="${c.user_id}"><button class="btn-sm">+ ${T('Pipeline')}</button></form></td>
+      </tr>`).join('') || `<tr><td colspan=5 class="muted">${T('No more candidates to recommend.')}</td></tr>`}
       </table>
     </div>
   </section>`;
