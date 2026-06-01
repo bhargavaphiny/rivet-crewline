@@ -296,7 +296,7 @@ const BUILTIN_ES = {
   'No matches for these filters.':'No hay coincidencias para estos filtros.',
   // map hero
   'across':'en','metro':'metro','metros':'metros','warmer & bigger = more hiring':'más grande = más contratación',
-  'You':'Tú','commute':'traslado','within':'a menos de','mi of you':'mi de ti','Zoom to me':'Acercar a mí','Within reach':'A tu alcance','View all US':'Ver todo EE. UU.',
+  'You':'Tú','commute':'traslado','within':'a menos de','mi of you':'mi de ti','Zoom to me':'Acercar a mí','Within reach':'A tu alcance','View all US':'Ver todo EE. UU.','Near me':'Cerca de mí','Opportunity map':'Mapa de oportunidades','Tap a pin to see openings there':'Toca un pin para ver las vacantes ahí','Tap any pin to see them':'Toca cualquier pin para verlos',
   'Supply vs demand':'Oferta vs demanda','where workers have the most leverage':'dónde los trabajadores tienen más ventaja',
   'Live openings vs available workers, weighted by national trade shortages.':'Vacantes activas vs trabajadores disponibles, ponderado por la escasez nacional de oficios.',
   'available workers':'trabajadores disponibles','workers':'trabajadores','demand':'demanda',
@@ -434,7 +434,9 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=73">
+  <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+  <script src="/vendor/leaflet/leaflet.js"></script>
+  <link rel="stylesheet" href="/styles.css?v=74">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1545,87 +1547,74 @@ const MAP_MTNS = [ // mountain ranges as clusters of peak points
   [-80,42],[-81,40],[-82,38],[-83.5,36],[-84,34.6],                  // Appalachians
 ];
 const MAP_FORESTS = [[-122,46.8,30],[-121,44,24],[-90,46.5,26],[-94,47.8,22],[-84,34,26],[-82,36,22],[-72,44,24],[-69,46,20]];
+let _rvMapSeq = 0;
 function usMap(points = [], opts = {}){
   const { title='Where your talent is', noun='candidate', emptyMsg='No mapped locations yet.', legend=null, cta='Open', home=null } = opts;
-  const MINLON=-125, MAXLON=-66, MINLAT=24, MAXLAT=50, VW=620, VH=350;
-  const px = lon => ((lon-MINLON)/(MAXLON-MINLON)*VW).toFixed(1);
-  const py = lat => ((MAXLAT-lat)/(MAXLAT-MINLAT)*VH).toFixed(1);
-  const PX_PER_MI = VW/((MAXLON-MINLON)*53); // ~0.2 px/mile across the lower-48 projection
-  const statePaths = US_STATES.map(s=>`<path class="us-state" d="${s.d}"><title>${esc(s.n)}</title></path>`).join('');
-  const cityLayer = MAP_CITIES.map(([nm,lo,la])=>`<g class="us-city"><circle cx="${px(lo)}" cy="${py(la)}" r="1.6"/><text x="${(+px(lo)+4).toFixed(1)}" y="${(+py(la)+3).toFixed(1)}">${esc(nm)}</text></g>`).join('');
-  const nfmt = n => n>=10000 ? Math.round(n/1000)+'k' : (n>=1000 ? (n/1000).toFixed(1).replace(/\.0$/,'')+'k' : String(n));
-  // subtle river lines only — geographic context, clearly not interactive markers.
-  const rivers = MAP_RIVERS.map(r=>`<polyline class="geo-river" points="${r.map(([lo,la])=>`${px(lo)},${py(la)}`).join(' ')}"/>`).join('');
+  const id = 'rvmap'+(++_rvMapSeq);
   const total = points.reduce((a,g)=>a+(g.n||0),0);
-  // The clickable circles ARE the heatmap: size = volume, soft glow = intensity,
-  // the busiest metros gently pulse so the map feels alive (a "real hero").
   const maxN = Math.max(1, ...points.map(g=>g.n||0));
-  const dots = points.map((g,i)=>{
-    let r = Math.min(26, 9 + Math.sqrt(g.n||1)*0.24);
-    if(g.near) r = Math.max(r, 13); // size floor so a small nearby metro still catches the eye
-    const hot = (g.n||0) >= maxN*0.6;
-    const cls = `mdot${g.kind==='related'?' related':''}${hot?' hot':''}${g.near?' near':''}`;
-    const lbl = `${g.city||''}: ${(g.n||0).toLocaleString()} ${noun}${g.n===1?'':'s'}${g.dist!=null?` · ${g.dist} mi`:''} — tap to open`;
-    return `<g class="${cls}" tabindex="0" role="button" aria-label="${esc(lbl)}" onclick="rvMapShow(${i})" onkeydown="if(event.key==='Enter')rvMapShow(${i})">
-      ${(hot||g.near)?`<circle class="mpulse" cx="${px(g.lon)}" cy="${py(g.lat)}" r="${r.toFixed(1)}"/>`:''}
-      <circle class="mdisc" cx="${px(g.lon)}" cy="${py(g.lat)}" r="${r.toFixed(1)}"><title>${esc(lbl)}</title></circle>
-      <text x="${px(g.lon)}" y="${(+py(g.lat)+3.6).toFixed(1)}" text-anchor="middle">${nfmt(g.n||0)}</text></g>`;
-  }).join('');
-  // "You are here": a distinct home marker + commute ring so the national map becomes personal
-  const hx = home && home.lat!=null ? +px(home.lon) : null, hy = home && home.lat!=null ? +py(home.lat) : null;
-  const ringR = (home && home.commute>0) ? Math.max(8, Math.min(VW, home.commute*PX_PER_MI)) : 0;
-  const homeLbl = `${T('You')}${home&&home.city?` · ${esc(home.city)}`:''}${home&&home.commute>0?` · ${T('commute')} ${home.commute} mi`:''}`;
-  const homeLayer = hx!=null ? `<g class="mhome" aria-hidden="true">
-      ${ringR? `<circle class="mhome-ring" cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="${ringR.toFixed(1)}"/>`:''}
-      <circle class="mhome-pulse" cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="6"/>
-      <circle class="mhome-dot" cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="4.5"><title>${esc(homeLbl)}</title></circle>
-    </g>` : '';
-  // default the worker straight into their local market (only when there's nearby work to show);
-  // otherwise keep the full-US view so an empty region never greets them.
-  const localView = (hx!=null && home && home.reachable>0);
-  const LVW=300, LVH=170;
-  const initVB = localView
-    ? `${Math.max(0,Math.min(VW-LVW,hx-LVW/2)).toFixed(1)} ${Math.max(0,Math.min(VH-LVH,hy-LVH/2)).toFixed(1)} ${LVW} ${LVH}`
-    : `0 0 ${VW} ${VH}`;
-  const top = points.slice(0,7).map((g,i)=>`<li class="${g.near?'near':''}" onclick="rvMapShow(${i})"><span>${g.near?'<i class="ml-pin"></i>':''}${esc(g.city||'—')}${g.dist!=null?` <em class="mi-tag">${g.dist} mi</em>`:''}</span><b>${(g.n||0).toLocaleString()}</b></li>`).join('');
-  // escaped per-point payload for the click panel (esc() makes it HTML- and </script>-safe)
-  const data = points.map(g=>({ c: esc(g.city||''), n:(g.n||0), items: (g.items||[]).slice(0,12).map(it=>({l:esc(it.label||''),s:esc(it.sub||''),h:esc(it.href||'#')})) }));
+  const top = points.slice(0,7).map((g,i)=>`<li class="${g.near?'near':''}" onclick="${id}_show(${i})"><span>${g.near?'<i class="ml-pin"></i>':''}${esc(g.city||'—')}${g.dist!=null?` <em class="mi-tag">${g.dist} mi</em>`:''}</span><b>${(g.n||0).toLocaleString()}</b></li>`).join('');
+  // per-point payload for Leaflet markers + the click panel (esc() keeps it HTML/</script>-safe)
+  const data = points.map(g=>({
+    c: esc(g.city||''), n:(g.n||0), lat:g.lat, lon:g.lon, near:!!g.near, kind:g.kind||'',
+    items:(g.items||[]).slice(0,12).map(it=>({l:esc(it.label||''),s:esc(it.sub||''),h:esc(it.href||'#')}))
+  }));
+  const homeJS = (home && home.lat!=null)
+    ? JSON.stringify({lat:home.lat, lon:home.lon, commute:home.commute||0, city:esc(home.city||''), reachable:home.reachable||0})
+    : 'null';
+  const hasHome = home && home.lat!=null;
   return `<div class="card">
     <div class="sec-h" style="margin-top:0">${esc(title)} <span class="muted">${total.toLocaleString()} ${noun}${total===1?'':'s'}</span></div>
     ${points.length ? `<div class="mapwrap">
       <div class="mapbox">
-        <svg class="usmap" id="rvsvg" viewBox="${initVB}" role="img" aria-label="US opportunity map">
-          <g class="us-states">${statePaths}</g>
-          <g class="us-geo"><clipPath id="rvclip"><rect x="0" y="0" width="${VW}" height="${VH}"/></clipPath>
-            <g clip-path="url(#rvclip)"><g class="geo-rivers">${rivers}</g></g></g>
-          <g class="us-cities">${cityLayer}</g>${dots}${homeLayer}
-        </svg>
-        ${localView?`<button type="button" class="mz-all" onclick="rvAll()">${T('View all US')}</button>`:''}
-        <div class="mapzoom">${hx!=null?`<button type="button" class="mz-home" onclick="rvHome()" aria-label="${esc(T('Zoom to me'))}">${icon('pin')}</button>`:''}<button type="button" onclick="rvZoom(.8)" aria-label="Zoom in">${icon('zoomin')}</button><button type="button" onclick="rvZoom(1.25)" aria-label="Zoom out">${icon('zoomout')}</button></div>
+        <div id="${id}" class="leafmap" role="application" aria-label="${esc(T('Opportunity map'))}"></div>
+        ${hasHome?`<button type="button" class="leaf-near" onclick="${id}_home()">${icon('pin')} ${T('Near me')}</button>`:''}
       </div>
       <div class="mapside">
         <ul class="maplist">${top}</ul>
-        <div class="mappanel" id="rvpanel"><p class="muted sm">${T('Tap a circle to see openings there')}</p></div>
+        <div class="mappanel" id="${id}_panel"><p class="muted sm">${T('Tap a pin to see openings there')}</p></div>
       </div>
     </div>
-    ${home && home.reachable>0 ? `<p class="map-near"><span class="mn-dot"></span><b>${home.reachable.toLocaleString()}</b> ${noun}${home.reachable===1?'':'s'} ${T('within')} ${home.commute>0?home.commute:40} ${T('mi of you')}${home.city?` · ${esc(home.city)}`:''} <button type="button" class="mn-link" onclick="rvHome()">${T('Zoom to me')} →</button></p>` : ''}
+    ${home && home.reachable>0 ? `<p class="map-near"><span class="mn-dot"></span><b>${home.reachable.toLocaleString()}</b> ${noun}${home.reachable===1?'':'s'} ${T('within')} ${home.commute>0?home.commute:40} ${T('mi of you')}${home.city?` · ${esc(home.city)}`:''} <button type="button" class="mn-link" onclick="${id}_home()">${T('Near me')} →</button></p>` : ''}
     <div class="maplegend">
       ${legend || `<span class="lg"><i class="lg-dot"></i> ${esc(noun)}s</span>`}
-      ${hx!=null?`<span class="lg"><i class="lg-home"></i> ${T('You')}</span><span class="lg"><i class="lg-near"></i> ${T('Within reach')}</span>`:''}
+      ${hasHome?`<span class="lg"><i class="lg-home"></i> ${T('You')}</span><span class="lg"><i class="lg-near"></i> ${T('Within reach')}</span>`:''}
       <span class="lg lg-scale"><i class="ls ls1"></i><i class="ls ls2"></i><i class="ls ls3"></i> ${T('bigger circle = more')}</span>
-      <span class="lg muted">${icon('pin')} ${T('Tap any circle to see them')}</span>
-    </div>`+`<p class="map-hint sm muted">${total.toLocaleString()} ${noun}${total===1?'':'s'} ${T('across')} ${points.length} ${points.length===1?T('metro'):T('metros')} · ${T('warmer & bigger = more hiring')}</p>`+`
+      <span class="lg muted">${icon('pin')} ${T('Tap any pin to see them')}</span>
+    </div>`+`<p class="map-hint sm muted">${total.toLocaleString()} ${noun}${total===1?'':'s'} ${T('across')} ${points.length} ${points.length===1?T('metro'):T('metros')}</p>`+`
     <script>(function(){
-      window.__RVD=${JSON.stringify(data)};window.__RVC=${JSON.stringify(esc(cta))};
-      window.__RVHOME=${hx!=null?`{x:${hx.toFixed(1)},y:${hy.toFixed(1)}}`:'null'};
-      if(window.__rvmapInit)return;window.__rvmapInit=1;
-      window.rvMapShow=function(i){var d=(window.__RVD||[])[i];var p=document.getElementById('rvpanel');if(!d||!p)return;
+      if(typeof L==='undefined'){var w=document.getElementById('${id}');if(w)w.innerHTML='<p class="muted sm" style="padding:14px">Map failed to load.</p>';return;}
+      var pts=${JSON.stringify(data)}, cta=${JSON.stringify(esc(cta))}, home=${homeJS};
+      var youTxt=${JSON.stringify(T('You'))};
+      var map=L.map('${id}',{scrollWheelZoom:false});
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:18,attribution:'&copy; OpenStreetMap, &copy; CARTO'}).addTo(map);
+      var panel=document.getElementById('${id}_panel');
+      function show(i){var d=pts[i];if(!d||!panel)return;
         var hdr='<div class="mp-h">'+d.c+(d.n?' <span class="mp-n">'+d.n.toLocaleString()+' open</span>':'')+'</div>';
-        if(!d.items.length){p.innerHTML=hdr+'<p class="muted sm">No sample roles loaded.</p>';return;}
-        p.innerHTML=hdr+d.items.map(function(it){return '<div class="mp-row"><div class="mp-info"><b>'+it.l+'</b><span>'+it.s+'</span></div><a class="mp-cta" href="'+it.h+'">'+window.__RVC+'</a></div>';}).join('')+(d.n>d.items.length?'<p class="muted sm" style="margin-top:8px">+ '+(d.n-d.items.length).toLocaleString()+' more in '+d.c+'</p>':'');};
-      window.rvZoom=function(f){var s=document.getElementById('rvsvg');if(!s)return;var vb=(s.getAttribute('viewBox')||'0 0 620 350').split(' ').map(Number);var cx=vb[0]+vb[2]/2,cy=vb[1]+vb[3]/2,nw=Math.max(150,Math.min(620,vb[2]*f)),nh=Math.max(85,Math.min(350,vb[3]*f));s.setAttribute('viewBox',(cx-nw/2).toFixed(1)+' '+(cy-nh/2).toFixed(1)+' '+nw.toFixed(1)+' '+nh.toFixed(1));};
-      window.rvHome=function(){var s=document.getElementById('rvsvg');var h=window.__RVHOME;if(!s||!h)return;var nw=260,nh=147;s.setAttribute('viewBox',Math.max(0,Math.min(620-nw,h.x-nw/2)).toFixed(1)+' '+Math.max(0,Math.min(350-nh,h.y-nh/2)).toFixed(1)+' '+nw+' '+nh);};
-      window.rvAll=function(){var s=document.getElementById('rvsvg');if(s)s.setAttribute('viewBox','0 0 620 350');};
+        panel.innerHTML=hdr+(d.items.length?d.items.map(function(it){return '<div class="mp-row"><div class="mp-info"><b>'+it.l+'</b><span>'+it.s+'</span></div><a class="mp-cta" href="'+it.h+'">'+cta+'</a></div>';}).join(''):'<p class="muted sm">No sample roles.</p>')+(d.n>d.items.length?'<p class="muted sm" style="margin-top:8px">+ '+(d.n-d.items.length).toLocaleString()+' more in '+d.c+'</p>':'');}
+      window['${id}_show']=show;
+      var bounds=[], cont=[];
+      pts.forEach(function(d,i){ if(d.lat==null)return;
+        var r=Math.min(18,6+Math.sqrt(d.n||1)*0.42); if(d.near)r=Math.max(r,11);
+        var color=d.near?'#1FA971':(d.kind==='related'?'#C9B79A':'#E8923A');
+        var m=L.circleMarker([d.lat,d.lon],{radius:r,color:'#fff',weight:1.6,fillColor:color,fillOpacity:.9}).addTo(map);
+        m.bindTooltip(d.c+': '+d.n.toLocaleString()+(d.near?' · near you':''),{direction:'top'});
+        m.on('click',function(){show(i);});
+        bounds.push([d.lat,d.lon]);
+        if(d.lon>=-125&&d.lon<=-66&&d.lat>=24&&d.lat<=50) cont.push([d.lat,d.lon]); // lower-48 framing
+      });
+      if(home){
+        if(home.commute>0){L.circle([home.lat,home.lon],{radius:home.commute*1609,color:'#2B6EC9',weight:1.2,dashArray:'5 5',fillColor:'#2B6EC9',fillOpacity:.06}).addTo(map);}
+        L.circleMarker([home.lat,home.lon],{radius:7,color:'#fff',weight:2.5,fillColor:'#2B6EC9',fillOpacity:1}).addTo(map).bindTooltip(youTxt,{direction:'top',permanent:false});
+      }
+      window['${id}_home']=function(){ if(home) map.setView([home.lat,home.lon], 9, {animate:true}); };
+      // frame the contiguous US by default (HI/AK pins stay on the map but don't stretch the view)
+      var fit = cont.length>1 ? cont : bounds;
+      if(home && home.reachable>0){ map.setView([home.lat,home.lon], 8); }
+      else if(fit.length>1){ map.fitBounds(fit,{padding:[28,28],maxZoom:7}); }
+      else if(fit.length===1){ map.setView(fit[0], 6); }
+      else { map.setView([39.5,-98.35], 4); }
+      setTimeout(function(){map.invalidateSize();},80);
     })();</script>`
       : `<p class="muted">${esc(emptyMsg)}</p>`}
   </div>`;

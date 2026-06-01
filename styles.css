@@ -455,6 +455,15 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .mapwrap{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
 .mapbox{position:relative;flex:1;min-width:300px;max-width:680px}
 .usmap{width:100%;background:radial-gradient(120% 120% at 50% 0,#34302A,#221F1B 70%);border-radius:16px;border:1px solid #17140F;padding:8px;display:block;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+/* Leaflet (real tiled map) */
+.leafmap{width:100%;height:400px;border-radius:16px;border:1px solid var(--line);overflow:hidden;z-index:0;background:#e8e6df}
+.leafmap .leaflet-pane,.leafmap .leaflet-top,.leafmap .leaflet-bottom{z-index:1}
+.leafmap .leaflet-control-zoom a{border-radius:8px!important;color:var(--steel)}
+.leaflet-container{font:inherit}
+.leaf-near{position:absolute;top:12px;right:12px;z-index:2;display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(43,110,201,.4);background:rgba(255,255,255,.95);color:#2156a3;cursor:pointer;font-size:12.5px;font-weight:700;padding:7px 11px;border-radius:9px;box-shadow:var(--shadow-sm)}
+.leaf-near:hover{background:#fff;border-color:#2B6EC9}
+.leaf-near svg{width:14px;height:14px}
+@media(max-width:560px){.leafmap{height:300px}}
 .us-states .us-state{fill:#44403A;stroke:rgba(217,138,30,.22);stroke-width:.7;stroke-linejoin:round;transition:fill .12s}
 .us-states .us-state:hover{fill:#544E45}
 .us-cities circle{fill:rgba(255,255,255,.45)}
