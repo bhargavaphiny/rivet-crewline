@@ -224,10 +224,17 @@ async function jobGeoForWorker(prof){
     b.n++; if(isDirect) b.anyDirect = true;
     b.items.push({ label:`${r.title} · $${r.pay_min}–${r.pay_max}/hr`, sub:`${r.company||''} · ${M.TRADES[r.trade]||r.trade}`, href:`/app/jobs/${r.id}` });
   }
-  const points = Object.values(byZip).map(b=>({
-    city:b.city, lat:b.lat, lon:b.lon, n:b.n, kind:b.anyDirect?'direct':'related', items:b.items
-  })).sort((a,b)=>b.n-a.n);
-  return { points };
+  // worker's own location anchors the map — "you are here" + commute ring
+  const home = await geocodeZip(prof.zip);
+  const commute = (prof.commute_mi>0) ? prof.commute_mi : 0;
+  let reachable = 0; // real sample jobs within the worker's commute radius
+  const points = Object.values(byZip).map(b=>{
+    const dist = (home && b.lat!=null) ? Math.round(haversineMi(home, {lat:b.lat, lon:b.lon})) : null;
+    if(dist!=null && (commute? dist<=commute : dist<=40)) reachable += b.n;
+    return { city:b.city, lat:b.lat, lon:b.lon, n:b.n, kind:b.anyDirect?'direct':'related', dist, items:b.items };
+  }).sort((a,b)=>b.n-a.n);
+  const homePin = home ? { lat:home.lat, lon:home.lon, zip:prof.zip, city:prof.city||'', commute, reachable } : null;
+  return { points, home: homePin };
 }
 // Load all credentials once, grouped by user_id — avoids an N+1 query per worker.
 async function allCredsByUser(){

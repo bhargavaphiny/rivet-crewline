@@ -296,6 +296,7 @@ const BUILTIN_ES = {
   'No matches for these filters.':'No hay coincidencias para estos filtros.',
   // map hero
   'across':'en','metro':'metro','metros':'metros','warmer & bigger = more hiring':'más grande = más contratación',
+  'You':'Tú','commute':'traslado','within':'a menos de','mi of you':'mi de ti','Zoom to me':'Acercar a mí',
   // X-factors: show-up, pay, crew, renewals
   'Shows up':'Asiste','start':'inicio','starts':'inicios','Confirmed start outcomes — showed up vs no-showed':'Resultados confirmados — se presentó vs. no se presentó',
   'Pays on time':'Paga a tiempo','Worker-confirmed pay outcomes':'Pagos confirmados por trabajadores',
@@ -428,7 +429,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=69">
+  <link rel="stylesheet" href="/styles.css?v=70">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -652,7 +653,7 @@ function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 
       ${xToggle('/app/subcontract', profile.self_employed, 'hammer', T('Subcontract-ready ✓'), T('I take subcontract work'), '/app')}
     </div>
     ${welcome}
-    ${jobsGeo && jobsGeo.points.length ? usMap(jobsGeo.points, {title:isNew?T('Where the work is'):t('home_top'), noun:T('job'), cta:T('Apply'),
+    ${jobsGeo && jobsGeo.points.length ? usMap(jobsGeo.points, {title:isNew?T('Where the work is'):t('home_top'), noun:T('job'), cta:T('Apply'), home:jobsGeo.home,
         legend:isNew?null:`<span class="lg"><i class="d-direct"></i> ${T('Your trades')}</span><span class="lg"><i class="d-related"></i> ${T('Related trades')}</span>`,
         emptyMsg:T('No mapped openings yet.')}) : ''}
     <div class="dash-grid">
@@ -930,7 +931,7 @@ function workerJobs({ matches, filters = {}, jobsGeo = null, needZip = false }) 
       <button class="btn-sm">${T('Search')}</button>
       ${active?`<a class="nav-link" style="color:var(--brand-d)" href="/app/jobs">${T('Clear')}</a>`:''}
     </form>
-    ${jobsGeo && jobsGeo.points.length ? usMap(jobsGeo.points, {title:T('Where the work is'), noun:T('job'), cta:T('Apply'),
+    ${jobsGeo && jobsGeo.points.length ? usMap(jobsGeo.points, {title:T('Where the work is'), noun:T('job'), cta:T('Apply'), home:jobsGeo.home,
         legend:`<span class="lg"><i class="d-direct"></i> ${T('Your trades')}</span><span class="lg"><i class="d-related"></i> ${T('Related trades')}</span>`,
         emptyMsg:T('No mapped openings yet.')}) : ''}
     ${zipBanner}
@@ -1522,10 +1523,11 @@ const MAP_MTNS = [ // mountain ranges as clusters of peak points
 ];
 const MAP_FORESTS = [[-122,46.8,30],[-121,44,24],[-90,46.5,26],[-94,47.8,22],[-84,34,26],[-82,36,22],[-72,44,24],[-69,46,20]];
 function usMap(points = [], opts = {}){
-  const { title='Where your talent is', noun='candidate', emptyMsg='No mapped locations yet.', legend=null, cta='Open' } = opts;
+  const { title='Where your talent is', noun='candidate', emptyMsg='No mapped locations yet.', legend=null, cta='Open', home=null } = opts;
   const MINLON=-125, MAXLON=-66, MINLAT=24, MAXLAT=50, VW=620, VH=350;
   const px = lon => ((lon-MINLON)/(MAXLON-MINLON)*VW).toFixed(1);
   const py = lat => ((MAXLAT-lat)/(MAXLAT-MINLAT)*VH).toFixed(1);
+  const PX_PER_MI = VW/((MAXLON-MINLON)*53); // ~0.2 px/mile across the lower-48 projection
   const statePaths = US_STATES.map(s=>`<path class="us-state" d="${s.d}"><title>${esc(s.n)}</title></path>`).join('');
   const cityLayer = MAP_CITIES.map(([nm,lo,la])=>`<g class="us-city"><circle cx="${px(lo)}" cy="${py(la)}" r="1.6"/><text x="${(+px(lo)+4).toFixed(1)}" y="${(+py(la)+3).toFixed(1)}">${esc(nm)}</text></g>`).join('');
   const nfmt = n => n>=10000 ? Math.round(n/1000)+'k' : (n>=1000 ? (n/1000).toFixed(1).replace(/\.0$/,'')+'k' : String(n));
@@ -1545,7 +1547,16 @@ function usMap(points = [], opts = {}){
       <circle class="mdisc" cx="${px(g.lon)}" cy="${py(g.lat)}" r="${r.toFixed(1)}"><title>${esc(lbl)}</title></circle>
       <text x="${px(g.lon)}" y="${(+py(g.lat)+3.6).toFixed(1)}" text-anchor="middle">${nfmt(g.n||0)}</text></g>`;
   }).join('');
-  const top = points.slice(0,7).map((g,i)=>`<li onclick="rvMapShow(${i})"><span>${esc(g.city||'—')}</span><b>${(g.n||0).toLocaleString()}</b></li>`).join('');
+  // "You are here": a distinct home marker + commute ring so the national map becomes personal
+  const hx = home && home.lat!=null ? +px(home.lon) : null, hy = home && home.lat!=null ? +py(home.lat) : null;
+  const ringR = (home && home.commute>0) ? Math.max(8, Math.min(VW, home.commute*PX_PER_MI)) : 0;
+  const homeLbl = `${T('You')}${home&&home.city?` · ${esc(home.city)}`:''}${home&&home.commute>0?` · ${T('commute')} ${home.commute} mi`:''}`;
+  const homeLayer = hx!=null ? `<g class="mhome" aria-hidden="true">
+      ${ringR? `<circle class="mhome-ring" cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="${ringR.toFixed(1)}"/>`:''}
+      <circle class="mhome-pulse" cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="6"/>
+      <circle class="mhome-dot" cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="4.5"><title>${esc(homeLbl)}</title></circle>
+    </g>` : '';
+  const top = points.slice(0,7).map((g,i)=>`<li onclick="rvMapShow(${i})"><span>${esc(g.city||'—')}${g.dist!=null?` <em class="mi-tag">${g.dist} mi</em>`:''}</span><b>${(g.n||0).toLocaleString()}</b></li>`).join('');
   // escaped per-point payload for the click panel (esc() makes it HTML- and </script>-safe)
   const data = points.map(g=>({ c: esc(g.city||''), n:(g.n||0), items: (g.items||[]).slice(0,12).map(it=>({l:esc(it.label||''),s:esc(it.sub||''),h:esc(it.href||'#')})) }));
   return `<div class="card">
@@ -1556,28 +1567,32 @@ function usMap(points = [], opts = {}){
           <g class="us-states">${statePaths}</g>
           <g class="us-geo"><clipPath id="rvclip"><rect x="0" y="0" width="${VW}" height="${VH}"/></clipPath>
             <g clip-path="url(#rvclip)"><g class="geo-rivers">${rivers}</g></g></g>
-          <g class="us-cities">${cityLayer}</g>${dots}
+          <g class="us-cities">${cityLayer}</g>${dots}${homeLayer}
         </svg>
-        <div class="mapzoom"><button type="button" onclick="rvZoom(.8)" aria-label="Zoom in">${icon('zoomin')}</button><button type="button" onclick="rvZoom(1.25)" aria-label="Zoom out">${icon('zoomout')}</button></div>
+        <div class="mapzoom">${hx!=null?`<button type="button" class="mz-home" onclick="rvHome()" aria-label="${esc(T('Zoom to me'))}">${icon('pin')}</button>`:''}<button type="button" onclick="rvZoom(.8)" aria-label="Zoom in">${icon('zoomin')}</button><button type="button" onclick="rvZoom(1.25)" aria-label="Zoom out">${icon('zoomout')}</button></div>
       </div>
       <div class="mapside">
         <ul class="maplist">${top}</ul>
         <div class="mappanel" id="rvpanel"><p class="muted sm">${T('Tap a circle to see openings there')}</p></div>
       </div>
     </div>
+    ${home && home.reachable>0 ? `<p class="map-near"><span class="mn-dot"></span><b>${home.reachable.toLocaleString()}</b> ${noun}${home.reachable===1?'':'s'} ${T('within')} ${home.commute>0?home.commute:40} ${T('mi of you')}${home.city?` · ${esc(home.city)}`:''} <button type="button" class="mn-link" onclick="rvHome()">${T('Zoom to me')} →</button></p>` : ''}
     <div class="maplegend">
       ${legend || `<span class="lg"><i class="lg-dot"></i> ${esc(noun)}s</span>`}
+      ${hx!=null?`<span class="lg"><i class="lg-home"></i> ${T('You')}</span>`:''}
       <span class="lg lg-scale"><i class="ls ls1"></i><i class="ls ls2"></i><i class="ls ls3"></i> ${T('bigger circle = more')}</span>
       <span class="lg muted">${icon('pin')} ${T('Tap any circle to see them')}</span>
     </div>`+`<p class="map-hint sm muted">${total.toLocaleString()} ${noun}${total===1?'':'s'} ${T('across')} ${points.length} ${points.length===1?T('metro'):T('metros')} · ${T('warmer & bigger = more hiring')}</p>`+`
     <script>(function(){
       window.__RVD=${JSON.stringify(data)};window.__RVC=${JSON.stringify(esc(cta))};
+      window.__RVHOME=${hx!=null?`{x:${hx.toFixed(1)},y:${hy.toFixed(1)}}`:'null'};
       if(window.__rvmapInit)return;window.__rvmapInit=1;
       window.rvMapShow=function(i){var d=(window.__RVD||[])[i];var p=document.getElementById('rvpanel');if(!d||!p)return;
         var hdr='<div class="mp-h">'+d.c+(d.n?' <span class="mp-n">'+d.n.toLocaleString()+' open</span>':'')+'</div>';
         if(!d.items.length){p.innerHTML=hdr+'<p class="muted sm">No sample roles loaded.</p>';return;}
         p.innerHTML=hdr+d.items.map(function(it){return '<div class="mp-row"><div class="mp-info"><b>'+it.l+'</b><span>'+it.s+'</span></div><a class="mp-cta" href="'+it.h+'">'+window.__RVC+'</a></div>';}).join('')+(d.n>d.items.length?'<p class="muted sm" style="margin-top:8px">+ '+(d.n-d.items.length).toLocaleString()+' more in '+d.c+'</p>':'');};
       window.rvZoom=function(f){var s=document.getElementById('rvsvg');if(!s)return;var vb=(s.getAttribute('viewBox')||'0 0 620 350').split(' ').map(Number);var cx=vb[0]+vb[2]/2,cy=vb[1]+vb[3]/2,nw=Math.max(150,Math.min(620,vb[2]*f)),nh=Math.max(85,Math.min(350,vb[3]*f));s.setAttribute('viewBox',(cx-nw/2).toFixed(1)+' '+(cy-nh/2).toFixed(1)+' '+nw.toFixed(1)+' '+nh.toFixed(1));};
+      window.rvHome=function(){var s=document.getElementById('rvsvg');var h=window.__RVHOME;if(!s||!h)return;var nw=260,nh=147;s.setAttribute('viewBox',Math.max(0,Math.min(620-nw,h.x-nw/2)).toFixed(1)+' '+Math.max(0,Math.min(350-nh,h.y-nh/2)).toFixed(1)+' '+nw+' '+nh);};
     })();</script>`
       : `<p class="muted">${esc(emptyMsg)}</p>`}
   </div>`;

@@ -506,6 +506,21 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .maplegend .ls{background:var(--amber);border-radius:50%;display:inline-block}
 .maplegend .ls1{width:7px;height:7px}.maplegend .ls2{width:11px;height:11px}.maplegend .ls3{width:15px;height:15px;margin-right:4px}
 .map-hint{margin:8px 0 0;font-size:12px}
+/* "You are here" home marker + commute ring */
+.mhome-ring{fill:rgba(43,110,201,.07);stroke:rgba(43,110,201,.5);stroke-width:1.2;stroke-dasharray:5 4;pointer-events:none}
+.mhome-dot{fill:#2B6EC9;stroke:#fff;stroke-width:2;filter:drop-shadow(0 0 5px rgba(43,110,201,.9))}
+.mhome-pulse{fill:#2B6EC9;opacity:.35;transform-box:fill-box;transform-origin:center;animation:mhomepulse 2.6s ease-out infinite;pointer-events:none}
+@keyframes mhomepulse{0%{transform:scale(.6);opacity:.5}70%{opacity:0}100%{transform:scale(2.4);opacity:0}}
+@media(prefers-reduced-motion:reduce){.mhome-pulse{display:none}}
+.mapzoom .mz-home{color:#2B6EC9;border-color:rgba(43,110,201,.4)}
+.mapzoom .mz-home:hover{border-color:#2B6EC9}
+.maplegend i.lg-home{background:#2B6EC9;box-shadow:0 0 0 2px #fff,0 0 5px rgba(43,110,201,.6)}
+.maplist .mi-tag{font-style:normal;font-size:11px;color:var(--muted);font-weight:600;margin-left:5px}
+.map-near{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin:12px 0 0;padding:9px 13px;border-radius:11px;background:rgba(43,110,201,.07);border:1px solid rgba(43,110,201,.18);font-size:13.5px;color:var(--steel)}
+.map-near b{color:#2156a3;font-size:15px}
+.map-near .mn-dot{width:9px;height:9px;border-radius:50%;background:#2B6EC9;box-shadow:0 0 0 3px rgba(43,110,201,.18);flex:none}
+.map-near .mn-link{margin-left:auto;background:none;border:0;color:#2156a3;font-weight:800;font-size:12.5px;cursor:pointer;padding:0}
+.map-near .mn-link:hover{text-decoration:underline}
 /* X-factors: reliability / pay / crew / renewals */
 .rep-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;padding:3px 9px;border-radius:11px}
 .rep-badge svg{width:11px;height:11px}
