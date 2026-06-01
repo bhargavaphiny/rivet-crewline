@@ -296,7 +296,7 @@ const BUILTIN_ES = {
   'No matches for these filters.':'No hay coincidencias para estos filtros.',
   // map hero
   'across':'en','metro':'metro','metros':'metros','warmer & bigger = more hiring':'más grande = más contratación',
-  'You':'Tú','commute':'traslado','within':'a menos de','mi of you':'mi de ti','Zoom to me':'Acercar a mí','Within reach':'A tu alcance','View all US':'Ver todo EE. UU.','Near me':'Cerca de mí','Opportunity map':'Mapa de oportunidades','Tap a pin to see openings there':'Toca un pin para ver las vacantes ahí','Tap any pin to see them':'Toca cualquier pin para verlos',
+  'You':'Tú','commute':'traslado','within':'a menos de','mi of you':'mi de ti','Zoom to me':'Acercar a mí','Within reach':'A tu alcance','View all US':'Ver todo EE. UU.','Near me':'Cerca de mí','Opportunity map':'Mapa de oportunidades','Tap a pin to see openings there':'Toca un pin para ver las vacantes ahí','Tap any pin to see them':'Toca cualquier pin para verlos','Number on a pin = openings · tap to see them':'El número en el pin = vacantes · toca para verlas',
   'Supply vs demand':'Oferta vs demanda','where workers have the most leverage':'dónde los trabajadores tienen más ventaja',
   'Live openings vs available workers, weighted by national trade shortages.':'Vacantes activas vs trabajadores disponibles, ponderado por la escasez nacional de oficios.',
   'available workers':'trabajadores disponibles','workers':'trabajadores','demand':'demanda',
@@ -440,7 +440,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:image" content="${site}/og.svg">
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=76">
+  <link rel="stylesheet" href="/styles.css?v=77">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1584,8 +1584,7 @@ function usMap(points = [], opts = {}){
     <div class="maplegend">
       ${legend || `<span class="lg"><i class="lg-dot"></i> ${esc(noun)}s</span>`}
       ${hasHome?`<span class="lg"><i class="lg-home"></i> ${T('You')}</span><span class="lg"><i class="lg-near"></i> ${T('Within reach')}</span>`:''}
-      <span class="lg lg-scale"><i class="ls ls1"></i><i class="ls ls2"></i><i class="ls ls3"></i> ${T('bigger circle = more')}</span>
-      <span class="lg muted">${icon('pin')} ${T('Tap any pin to see them')}</span>
+      <span class="lg muted">${icon('pin')} ${T('Number on a pin = openings · tap to see them')}</span>
     </div>`+`<p class="map-hint sm muted">${total.toLocaleString()} ${noun}${total===1?'':'s'} ${T('across')} ${points.length} ${points.length===1?T('metro'):T('metros')}</p>`+`
     <script>(function(){
       if(typeof L==='undefined'){var w=document.getElementById('${id}');if(w)w.innerHTML='<p class="muted sm" style="padding:14px">Map failed to load.</p>';return;}
@@ -1599,11 +1598,14 @@ function usMap(points = [], opts = {}){
         var bal=d.bal?'<div class="mp-bal"><span class="bal-chip '+d.bal.lv+'">'+d.bal.lb+'</span> <span class="muted sm">'+d.bal.t+' · '+d.bal.r+'× '+${JSON.stringify(T('demand'))}+'</span></div>':'';
         panel.innerHTML=hdr+bal+(d.items.length?d.items.map(function(it){return '<div class="mp-row"><div class="mp-info"><b>'+it.l+'</b><span>'+it.s+'</span></div><a class="mp-cta" href="'+it.h+'">'+cta+'</a></div>';}).join(''):'<p class="muted sm">No sample roles.</p>')+(d.n>d.items.length?'<p class="muted sm" style="margin-top:8px">+ '+(d.n-d.items.length).toLocaleString()+' more in '+d.c+'</p>':'');}
       window['${id}_show']=show;
+      function nf(n){return n>=10000?Math.round(n/1000)+'k':(n>=1000?(n/1000).toFixed(1).replace(/\\.0$/,'')+'k':String(n));}
       var bounds=[], cont=[];
       pts.forEach(function(d,i){ if(d.lat==null)return;
-        var r=Math.min(18,6+Math.sqrt(d.n||1)*0.42); if(d.near)r=Math.max(r,11);
         var color=d.near?'#1FA971':(d.kind==='related'?'#C9B79A':'#E8923A');
-        var m=L.circleMarker([d.lat,d.lon],{radius:r,color:'#fff',weight:1.6,fillColor:color,fillOpacity:.9}).addTo(map);
+        var s=d.near?1.14:1, w=Math.round(32*s), h=Math.round(42*s);
+        var html='<svg width="'+w+'" height="'+h+'" viewBox="0 0 32 42"><path d="M16 0C7.2 0 0 7.2 0 16c0 11 16 26 16 26s16-15 16-26C32 7.2 24.8 0 16 0z" fill="'+color+'" stroke="#fff" stroke-width="2"/><circle cx="16" cy="16" r="10" fill="#fff" fill-opacity="0.95"/><text x="16" y="20" text-anchor="middle" font-size="11" font-weight="800" fill="#3a3a3a">'+nf(d.n||0)+'</text></svg>';
+        var icon=L.divIcon({className:'jobpin'+(d.near?' near':''),html:html,iconSize:[w,h],iconAnchor:[w/2,h]});
+        var m=L.marker([d.lat,d.lon],{icon:icon}).addTo(map);
         m.bindTooltip(d.c+': '+d.n.toLocaleString()+(d.near?' · near you':''),{direction:'top'});
         m.on('click',function(){show(i);});
         bounds.push([d.lat,d.lon]);

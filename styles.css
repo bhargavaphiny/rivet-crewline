@@ -463,6 +463,9 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .leaf-near{position:absolute;top:12px;right:12px;z-index:2;display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(43,110,201,.4);background:rgba(255,255,255,.95);color:#2156a3;cursor:pointer;font-size:12.5px;font-weight:700;padding:7px 11px;border-radius:9px;box-shadow:var(--shadow-sm)}
 .leaf-near:hover{background:#fff;border-color:#2B6EC9}
 .leaf-near svg{width:14px;height:14px}
+.jobpin{background:none!important;border:0!important}
+.jobpin svg{display:block;filter:drop-shadow(0 1.5px 2px rgba(0,0,0,.32))}
+.jobpin.near svg{filter:drop-shadow(0 0 4px rgba(31,169,113,.55)) drop-shadow(0 1.5px 2px rgba(0,0,0,.3))}
 @media(max-width:560px){.leafmap{height:300px}}
 .us-states .us-state{fill:#44403A;stroke:rgba(217,138,30,.22);stroke-width:.7;stroke-linejoin:round;transition:fill .12s}
 .us-states .us-state:hover{fill:#544E45}
