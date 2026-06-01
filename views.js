@@ -297,6 +297,10 @@ const BUILTIN_ES = {
   // map hero
   'across':'en','metro':'metro','metros':'metros','warmer & bigger = more hiring':'más grande = más contratación',
   'You':'Tú','commute':'traslado','within':'a menos de','mi of you':'mi de ti','Zoom to me':'Acercar a mí','Within reach':'A tu alcance','View all US':'Ver todo EE. UU.','Near me':'Cerca de mí','Opportunity map':'Mapa de oportunidades','Tap a pin to see openings there':'Toca un pin para ver las vacantes ahí','Tap any pin to see them':'Toca cualquier pin para verlos','Number on a pin = openings · tap to see them':'El número en el pin = vacantes · toca para verlas',
+  'Filter by type':'Filtrar por tipo','All types':'Todos los tipos','No openings in this type here.':'No hay vacantes de este tipo aquí.',
+  'Construction & trades':'Construcción y oficios','Drivers & logistics':'Conductores y logística','Mechanical & repair':'Mecánica y reparación',
+  'Healthcare & care':'Salud y cuidado','Food service':'Servicio de comida','Agriculture':'Agricultura',
+  'Cleaning & facilities':'Limpieza e instalaciones','Security':'Seguridad','Freelance & gig':'Independiente y por encargo',
   'Supply vs demand':'Oferta vs demanda','where workers have the most leverage':'dónde los trabajadores tienen más ventaja',
   'Live openings vs available workers, weighted by national trade shortages.':'Vacantes activas vs trabajadores disponibles, ponderado por la escasez nacional de oficios.',
   'available workers':'trabajadores disponibles','workers':'trabajadores','demand':'demanda',
@@ -440,7 +444,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:image" content="${site}/og.svg">
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=77">
+  <link rel="stylesheet" href="/styles.css?v=78">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1552,15 +1556,25 @@ const MAP_MTNS = [ // mountain ranges as clusters of peak points
 ];
 const MAP_FORESTS = [[-122,46.8,30],[-121,44,24],[-90,46.5,26],[-94,47.8,22],[-84,34,26],[-82,36,22],[-72,44,24],[-69,46,20]];
 let _rvMapSeq = 0;
+// distinct color per job category so pins read as "different types of work"
+const CAT_COLOR = {
+  'Construction & trades':'#E8923A','Drivers & logistics':'#2B6EC9','Mechanical & repair':'#6D5BD0',
+  'Healthcare & care':'#E0556E','Food service':'#0FA9AE','Agriculture':'#7E9B2F',
+  'Cleaning & facilities':'#C77DBB','Security':'#5A6B7B','Freelance & gig':'#D98C2B','Other':'#8A8A8A',
+};
 function usMap(points = [], opts = {}){
   const { title='Where your talent is', noun='candidate', emptyMsg='No mapped locations yet.', legend=null, cta='Open', home=null } = opts;
   const id = 'rvmap'+(++_rvMapSeq);
   const total = points.reduce((a,g)=>a+(g.n||0),0);
-  const maxN = Math.max(1, ...points.map(g=>g.n||0));
   const top = points.slice(0,7).map((g,i)=>`<li class="${g.near?'near':''}" onclick="${id}_show(${i})"><span>${g.near?'<i class="ml-pin"></i>':''}${esc(g.city||'—')}${g.dist!=null?` <em class="mi-tag">${g.dist} mi</em>`:''}</span><b>${(g.n||0).toLocaleString()}</b></li>`).join('');
+  // categories present across the map → filter options + legend
+  const catAgg = {};
+  points.forEach(g=>(g.cats||[]).forEach(c=>{ catAgg[c.k]=(catAgg[c.k]||0)+c.n; }));
+  const catList = Object.entries(catAgg).sort((a,b)=>b[1]-a[1]).map(([k])=>k);
   // per-point payload for Leaflet markers + the click panel (esc() keeps it HTML/</script>-safe)
   const data = points.map(g=>({
-    c: esc(g.city||''), n:(g.n||0), lat:g.lat, lon:g.lon, near:!!g.near, kind:g.kind||'',
+    c: esc(g.city||''), n:(g.n||0), lat:g.lat, lon:g.lon, near:!!g.near, dist:(g.dist==null?null:g.dist),
+    cats:(g.cats||[]).map(c=>({k:c.k, n:c.n})),
     bal: g.bal ? {t:esc(g.bal.trade||''), lv:g.bal.level, lb:T(g.bal.label||'Balanced'), r:g.bal.ratio} : null,
     items:(g.items||[]).slice(0,12).map(it=>({l:esc(it.label||''),s:esc(it.sub||''),h:esc(it.href||'#')}))
   }));
@@ -1568,55 +1582,76 @@ function usMap(points = [], opts = {}){
     ? JSON.stringify({lat:home.lat, lon:home.lon, commute:home.commute||0, city:esc(home.city||''), reachable:home.reachable||0})
     : 'null';
   const hasHome = home && home.lat!=null;
+  const filterUI = catList.length>1 ? `<div class="map-tools">
+      <label class="mt-label" for="${id}_filter">${T('Filter by type')}</label>
+      <select id="${id}_filter" class="map-filter" onchange="${id}_apply(this.value)">
+        <option value="">${T('All types')}</option>
+        ${catList.map(k=>`<option value="${esc(k)}">${T(k)}</option>`).join('')}
+      </select></div>` : '';
+  const catLegend = catList.length>1
+    ? catList.slice(0,7).map(k=>`<span class="lg"><i style="background:${CAT_COLOR[k]||'#8A8A8A'}"></i> ${T(k)}</span>`).join('')
+    : (legend || `<span class="lg"><i class="lg-dot"></i> ${esc(noun)}s</span>`);
   return `<div class="card">
     <div class="sec-h" style="margin-top:0">${esc(title)} <span class="muted">${total.toLocaleString()} ${noun}${total===1?'':'s'}</span></div>
-    ${points.length ? `<div class="mapwrap">
+    ${points.length ? `${filterUI}<div class="mapwrap">
       <div class="mapbox">
         <div id="${id}" class="leafmap" role="application" aria-label="${esc(T('Opportunity map'))}"></div>
         ${hasHome?`<button type="button" class="leaf-near" onclick="${id}_home()">${icon('pin')} ${T('Near me')}</button>`:''}
       </div>
       <div class="mapside">
-        <ul class="maplist">${top}</ul>
+        <ul class="maplist" id="${id}_list">${top}</ul>
         <div class="mappanel" id="${id}_panel"><p class="muted sm">${T('Tap a pin to see openings there')}</p></div>
       </div>
     </div>
     ${home && home.reachable>0 ? `<p class="map-near"><span class="mn-dot"></span><b>${home.reachable.toLocaleString()}</b> ${noun}${home.reachable===1?'':'s'} ${T('within')} ${home.commute>0?home.commute:40} ${T('mi of you')}${home.city?` · ${esc(home.city)}`:''} <button type="button" class="mn-link" onclick="${id}_home()">${T('Near me')} →</button></p>` : ''}
     <div class="maplegend">
-      ${legend || `<span class="lg"><i class="lg-dot"></i> ${esc(noun)}s</span>`}
+      ${catLegend}
       ${hasHome?`<span class="lg"><i class="lg-home"></i> ${T('You')}</span><span class="lg"><i class="lg-near"></i> ${T('Within reach')}</span>`:''}
       <span class="lg muted">${icon('pin')} ${T('Number on a pin = openings · tap to see them')}</span>
     </div>`+`<p class="map-hint sm muted">${total.toLocaleString()} ${noun}${total===1?'':'s'} ${T('across')} ${points.length} ${points.length===1?T('metro'):T('metros')}</p>`+`
     <script>(function(){
       if(typeof L==='undefined'){var w=document.getElementById('${id}');if(w)w.innerHTML='<p class="muted sm" style="padding:14px">Map failed to load.</p>';return;}
-      var pts=${JSON.stringify(data)}, cta=${JSON.stringify(esc(cta))}, home=${homeJS};
-      var youTxt=${JSON.stringify(T('You'))};
+      var pts=${JSON.stringify(data)}, cta=${JSON.stringify(esc(cta))}, home=${homeJS}, CAT=${JSON.stringify(CAT_COLOR)};
+      var youTxt=${JSON.stringify(T('You'))}, demandTxt=${JSON.stringify(T('demand'))}, emptyCat=${JSON.stringify(T('No openings in this type here.'))};
       var map=L.map('${id}',{scrollWheelZoom:false});
       L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:18,attribution:'&copy; OpenStreetMap, &copy; CARTO'}).addTo(map);
       var panel=document.getElementById('${id}_panel');
+      function nf(n){return n>=10000?Math.round(n/1000)+'k':(n>=1000?(n/1000).toFixed(1).replace(/\\.0$/,'')+'k':String(n));}
+      function catCount(d,cat){ if(!cat) return d.n||0; var e=(d.cats||[]).filter(function(c){return c.k===cat;})[0]; return e?e.n:0; }
+      function pinColor(d){ return (d.cats&&d.cats[0]&&CAT[d.cats[0].k])||'#E8923A'; }
+      function makeIcon(d,cnt,col){
+        var s=d.near?1.14:1, w=Math.round(32*s), h=Math.round(42*s);
+        var html='<svg width="'+w+'" height="'+h+'" viewBox="0 0 32 42"><path d="M16 0C7.2 0 0 7.2 0 16c0 11 16 26 16 26s16-15 16-26C32 7.2 24.8 0 16 0z" fill="'+col+'" stroke="#fff" stroke-width="2"/><circle cx="16" cy="16" r="10" fill="#fff" fill-opacity="0.95"/><text x="16" y="20" text-anchor="middle" font-size="11" font-weight="800" fill="#3a3a3a">'+nf(cnt)+'</text></svg>';
+        return L.divIcon({className:'jobpin'+(d.near?' near':''),html:html,iconSize:[w,h],iconAnchor:[w/2,h]});
+      }
       function show(i){var d=pts[i];if(!d||!panel)return;
         var hdr='<div class="mp-h">'+d.c+(d.n?' <span class="mp-n">'+d.n.toLocaleString()+' open</span>':'')+'</div>';
-        var bal=d.bal?'<div class="mp-bal"><span class="bal-chip '+d.bal.lv+'">'+d.bal.lb+'</span> <span class="muted sm">'+d.bal.t+' · '+d.bal.r+'× '+${JSON.stringify(T('demand'))}+'</span></div>':'';
+        var bal=d.bal?'<div class="mp-bal"><span class="bal-chip '+d.bal.lv+'">'+d.bal.lb+'</span> <span class="muted sm">'+d.bal.t+' · '+d.bal.r+'× '+demandTxt+'</span></div>':'';
         panel.innerHTML=hdr+bal+(d.items.length?d.items.map(function(it){return '<div class="mp-row"><div class="mp-info"><b>'+it.l+'</b><span>'+it.s+'</span></div><a class="mp-cta" href="'+it.h+'">'+cta+'</a></div>';}).join(''):'<p class="muted sm">No sample roles.</p>')+(d.n>d.items.length?'<p class="muted sm" style="margin-top:8px">+ '+(d.n-d.items.length).toLocaleString()+' more in '+d.c+'</p>':'');}
       window['${id}_show']=show;
-      function nf(n){return n>=10000?Math.round(n/1000)+'k':(n>=1000?(n/1000).toFixed(1).replace(/\\.0$/,'')+'k':String(n));}
-      var bounds=[], cont=[];
+      function rebuildList(cat){var ul=document.getElementById('${id}_list');if(!ul)return;
+        var arr=[];pts.forEach(function(d,i){var c=catCount(d,cat);if(c>0)arr.push({d:d,i:i,c:c});});
+        arr.sort(function(a,b){return (b.d.near?1:0)-(a.d.near?1:0) || (a.d.near?(a.d.dist-b.d.dist):(b.c-a.c));});
+        ul.innerHTML=arr.slice(0,8).map(function(o){return '<li class="'+(o.d.near?'near':'')+'" onclick="${id}_show('+o.i+')"><span>'+(o.d.near?'<i class="ml-pin"></i>':'')+o.d.c+(o.d.dist!=null?' <em class="mi-tag">'+o.d.dist+' mi</em>':'')+'</span><b>'+o.c.toLocaleString()+'</b></li>';}).join('')||'<li class="muted">'+emptyCat+'</li>';}
+      var markers=[], bounds=[], cont=[];
       pts.forEach(function(d,i){ if(d.lat==null)return;
-        var color=d.near?'#1FA971':(d.kind==='related'?'#C9B79A':'#E8923A');
-        var s=d.near?1.14:1, w=Math.round(32*s), h=Math.round(42*s);
-        var html='<svg width="'+w+'" height="'+h+'" viewBox="0 0 32 42"><path d="M16 0C7.2 0 0 7.2 0 16c0 11 16 26 16 26s16-15 16-26C32 7.2 24.8 0 16 0z" fill="'+color+'" stroke="#fff" stroke-width="2"/><circle cx="16" cy="16" r="10" fill="#fff" fill-opacity="0.95"/><text x="16" y="20" text-anchor="middle" font-size="11" font-weight="800" fill="#3a3a3a">'+nf(d.n||0)+'</text></svg>';
-        var icon=L.divIcon({className:'jobpin'+(d.near?' near':''),html:html,iconSize:[w,h],iconAnchor:[w/2,h]});
-        var m=L.marker([d.lat,d.lon],{icon:icon}).addTo(map);
-        m.bindTooltip(d.c+': '+d.n.toLocaleString()+(d.near?' · near you':''),{direction:'top'});
+        var m=L.marker([d.lat,d.lon],{icon:makeIcon(d,d.n||0,pinColor(d))}).addTo(map);
+        m.bindTooltip(d.c+': '+(d.n||0).toLocaleString()+(d.near?' · near you':''),{direction:'top'});
         m.on('click',function(){show(i);});
+        markers.push({m:m,d:d});
         bounds.push([d.lat,d.lon]);
         if(d.lon>=-125&&d.lon<=-66&&d.lat>=24&&d.lat<=50) cont.push([d.lat,d.lon]); // lower-48 framing
       });
+      window['${id}_apply']=function(cat){
+        markers.forEach(function(o){var d=o.d,cnt=catCount(d,cat),vis=!cat||cnt>0,col=cat?(CAT[cat]||'#E8923A'):pinColor(d);
+          if(vis){o.m.setIcon(makeIcon(d,cnt,col));o.m.addTo(map);}else{map.removeLayer(o.m);}});
+        rebuildList(cat);
+      };
       if(home){
         if(home.commute>0){L.circle([home.lat,home.lon],{radius:home.commute*1609,color:'#2B6EC9',weight:1.2,dashArray:'5 5',fillColor:'#2B6EC9',fillOpacity:.06}).addTo(map);}
         L.circleMarker([home.lat,home.lon],{radius:7,color:'#fff',weight:2.5,fillColor:'#2B6EC9',fillOpacity:1}).addTo(map).bindTooltip(youTxt,{direction:'top',permanent:false});
       }
       window['${id}_home']=function(){ if(home) map.setView([home.lat,home.lon], 9, {animate:true}); };
-      // frame the contiguous US by default (HI/AK pins stay on the map but don't stretch the view)
       var fit = cont.length>1 ? cont : bounds;
       if(home && home.reachable>0){ map.setView([home.lat,home.lon], 8); }
       else if(fit.length>1){ map.fitBounds(fit,{padding:[28,28],maxZoom:7}); }

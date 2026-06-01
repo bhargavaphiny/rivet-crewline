@@ -189,11 +189,15 @@ async function candidateGeo(){
     ORDER BY p.readiness DESC`).all();
   const byZip = {};
   for(const r of rows){
-    const _k=r.city||r.zip; const b = byZip[_k] || (byZip[_k] = {city:r.city, lat:r.lat, lon:r.lon, real:0, items:[]});
-    b.real++;
+    const _k=r.city||r.zip; const b = byZip[_k] || (byZip[_k] = {city:r.city, lat:r.lat, lon:r.lon, real:0, catReal:{}, items:[]});
+    b.real++; const c=M.tradeCategory(r.trade); b.catReal[c]=(b.catReal[c]||0)+1;
     if(b.items.length<12) b.items.push({ label:r.name, sub:`${M.TRADES[r.trade]||r.trade} · readiness ${r.readiness}`, href:`/console/candidates/${r.id}` });
   }
-  return Object.values(byZip).map(b=>({...b, n: metroTalent(b.city, b.real)})).sort((a,b)=>b.n-a.n);
+  return Object.values(byZip).map(b=>{
+    const n = metroTalent(b.city, b.real);
+    const cats = Object.entries(b.catReal).map(([k,rc])=>({k, n:Math.max(1,Math.round(n*rc/b.real))})).sort((a,b)=>b.n-a.n);
+    return {...b, n, cats};
+  }).sort((a,b)=>b.n-a.n);
 }
 // ALL open-job locations (for the Pulse demand heat map)
 async function jobGeoAll(){
@@ -201,11 +205,15 @@ async function jobGeoAll(){
     FROM jobs j JOIN zip_geo z ON z.zip=j.zip JOIN users u ON u.id=j.employer_id WHERE j.status='open'`).all();
   const byZip = {};
   for(const r of rows){
-    const _k=r.city||r.zip; const b = byZip[_k] || (byZip[_k] = {city:r.city, lat:r.lat, lon:r.lon, real:0, items:[]});
-    b.real++;
+    const _k=r.city||r.zip; const b = byZip[_k] || (byZip[_k] = {city:r.city, lat:r.lat, lon:r.lon, real:0, catReal:{}, items:[]});
+    b.real++; const c=M.tradeCategory(r.trade); b.catReal[c]=(b.catReal[c]||0)+1;
     if(b.items.length<12) b.items.push({ label:`${r.title} · $${r.pay_min}–${r.pay_max}/hr`, sub:`${r.company||''} · ${M.TRADES[r.trade]||r.trade}`, href:`/jobs/${r.id}` });
   }
-  return Object.values(byZip).map(b=>({...b, n: metroDemand(b.city, b.real)})).sort((a,b)=>b.n-a.n);
+  return Object.values(byZip).map(b=>{
+    const n = metroDemand(b.city, b.real);
+    const cats = Object.entries(b.catReal).map(([k,rc])=>({k, n:Math.max(1,Math.round(n*rc/b.real))})).sort((a,b)=>b.n-a.n);
+    return {...b, n, cats};
+  }).sort((a,b)=>b.n-a.n);
 }
 // open-job locations relevant to a worker: their trades (direct) + adjacent trades (related)
 async function jobGeoForWorker(prof){
@@ -221,8 +229,9 @@ async function jobGeoForWorker(prof){
   for(const r of rows){
     const isDirect = direct.has(r.trade), isRelated = related.has(r.trade);
     if(!isDirect && !isRelated) continue;
-    const _k=r.city||r.zip; const b = byZip[_k] || (byZip[_k] = {city:r.city, lat:r.lat, lon:r.lon, n:0, primJobs:0, anyDirect:false, items:[]});
+    const _k=r.city||r.zip; const b = byZip[_k] || (byZip[_k] = {city:r.city, lat:r.lat, lon:r.lon, n:0, primJobs:0, catReal:{}, anyDirect:false, items:[]});
     b.n++; if(isDirect) b.anyDirect = true;
+    const c=M.tradeCategory(r.trade); b.catReal[c]=(b.catReal[c]||0)+1;
     if(r.trade===primary) b.primJobs++;
     b.items.push({ label:`${r.title} · $${r.pay_min}–${r.pay_max}/hr`, sub:`${r.company||''} · ${M.TRADES[r.trade]||r.trade}`, href:`/app/jobs/${r.id}` });
   }
@@ -240,7 +249,8 @@ async function jobGeoForWorker(prof){
     if(near) reachable += b.n;
     const mb = M.marketBalance(primary, b.primJobs, primWk[b.city]||0);
     const bal = { trade: M.TRADES[primary]||primary, level: mb.level, label: M.BALANCE_LABEL[mb.level], ratio: mb.ratio };
-    return { city:b.city, lat:b.lat, lon:b.lon, n:b.n, kind:b.anyDirect?'direct':'related', dist, near, bal, items:b.items };
+    const cats = Object.entries(b.catReal).map(([k,rc])=>({k, n:rc})).sort((a,b)=>b.n-a.n);
+    return { city:b.city, lat:b.lat, lon:b.lon, n:b.n, kind:b.anyDirect?'direct':'related', dist, near, bal, cats, items:b.items };
   // nearby work first (closest on top) so the worker's eye lands on jobs they can take, then the rest by volume
   }).sort((a,b)=> (b.near?1:0)-(a.near?1:0) || (a.near ? a.dist-b.dist : b.n-a.n));
   const homePin = home ? { lat:home.lat, lon:home.lon, zip:prof.zip, city:prof.city||'', commute, reachable } : null;

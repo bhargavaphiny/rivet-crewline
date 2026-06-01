@@ -386,4 +386,8 @@ function scoreMatch(profile, creds, job) {
   return { score: total, breakdown: { trade, pay, loc, cred: credScore }, missing };
 }
 
-module.exports = { TRADES, ADJACENT, CATEGORIES, CRED_KINDS, TRAINING, STATE_MIN_WAGE, STATE_NAME, CITY_STATE, stateForCity, localRules, readiness, scoreMatch, clamp, SEASON_WHY, seasonalTrades, marketBalance, BALANCE_LABEL, TRADE_DEMAND };
+const TRADE_CAT = {};
+for(const [cat, list] of Object.entries(CATEGORIES)) for(const t of list) TRADE_CAT[t] = cat;
+function tradeCategory(t){ return TRADE_CAT[t] || 'Other'; }
+
+module.exports = { TRADES, ADJACENT, CATEGORIES, CRED_KINDS, TRAINING, STATE_MIN_WAGE, STATE_NAME, CITY_STATE, stateForCity, localRules, readiness, scoreMatch, clamp, SEASON_WHY, seasonalTrades, marketBalance, BALANCE_LABEL, TRADE_DEMAND, tradeCategory, TRADE_CAT };
