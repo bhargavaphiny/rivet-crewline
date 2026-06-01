@@ -707,6 +707,133 @@ async function seedCategories(){
   console.log('[db] category expansion seeded — +5 employers, +15 jobs, +5 workers (healthcare/ag/food/logistics/security)');
 }
 
+// ---- big national seed: many jobs + workers across all categories & metros (idempotent) ----
+async function seedMoreJobs(){
+  if (await metaGet('morejobs_v1')) return;
+  const pw = hashPassword('demo1234');
+  const { CRED_KINDS } = require('./matching');
+  // metros to pin (zip, lat, lon, city) — broad US spread so the map fills out
+  const metros = [
+    ['10001',40.75,-73.99,'New York'],['90001',33.97,-118.24,'Los Angeles'],['60601',41.88,-87.62,'Chicago'],
+    ['77002',29.76,-95.37,'Houston'],['19103',39.95,-75.17,'Philadelphia'],['78205',29.42,-98.49,'San Antonio'],
+    ['92101',32.72,-117.16,'San Diego'],['78701',30.27,-97.74,'Austin'],['95113',37.33,-121.89,'San Jose'],
+    ['32202',30.33,-81.66,'Jacksonville'],['43215',39.96,-83.00,'Columbus'],['28202',35.23,-80.84,'Charlotte'],
+    ['46204',39.77,-86.16,'Indianapolis'],['98101',47.61,-122.33,'Seattle'],['80202',39.74,-104.99,'Denver'],
+    ['37203',36.16,-86.78,'Nashville'],['48226',42.33,-83.05,'Detroit'],['97204',45.52,-122.68,'Portland'],
+    ['38103',35.14,-90.05,'Memphis'],['33130',25.76,-80.19,'Miami'],['55401',44.98,-93.27,'Minneapolis'],
+    ['33602',27.95,-82.46,'Tampa'],['64106',39.10,-94.58,'Kansas City'],['95814',38.58,-121.49,'Sacramento'],
+    ['32801',28.54,-81.38,'Orlando'],['44113',41.50,-81.69,'Cleveland'],['15222',40.44,-79.99,'Pittsburgh'],
+    ['63101',38.63,-90.20,'St. Louis'],['84101',40.76,-111.89,'Salt Lake City'],['29401',32.78,-79.93,'Charleston'],
+  ];
+  for(const [zip,lat,lon,city] of metros){ try { await db.prepare('INSERT OR IGNORE INTO zip_geo(zip,lat,lon,city) VALUES(?,?,?,?)').run(zip,lat,lon,city); } catch(e){} }
+  const cities = metros.map(m=>m[3]);
+  const cityZip = Object.fromEntries(metros.map(m=>[m[3],m[0]]));
+  // employers across sectors (reuse by email if they already exist)
+  const insEmp = db.prepare('INSERT INTO users(email,pass,role,name,company,company_city,company_size,company_about) VALUES(?,?,?,?,?,?,?,?)');
+  const emps = [
+    ['hr@apexmechanical.test','Dana Ruiz','Apex Mechanical','Houston, TX','500+','Commercial HVAC, electrical and plumbing contractor across the Sun Belt. Tools, truck and OT.'],
+    ['jobs@summitbuilders.test','Carl Boateng','Summit Builders','Denver, CO','201–500','Commercial GC — concrete, framing, finish. Per-diem on travel jobs, weekly pay.'],
+    ['careers@nationwidefreight.test','Priya Shah','Nationwide Freight','Chicago, IL','500+','Regional carriers and DCs nationwide. Home-daily routes, sign-on bonus, benefits.'],
+    ['staff@meridianhealth.test','Joan Webb','Meridian Health','Atlanta, GA','500+','Hospitals, clinics and home health. CNA→RN ladder, tuition help, weekly pay.'],
+    ['hr@harborhospitality.test','Leo Marchetti','Harbor Hospitality','Miami, FL','201–500','Hotels and restaurants in 9 cities. Cooks, servers, housekeeping — shift meals, tips, growth.'],
+    ['crew@goldenfields.test','Maria Solis','Golden Fields Ag','Fresno, CA','500+','Row crops and orchards. H-2A program, safe transport, housing assistance.'],
+    ['hr@brightfacility.test','Sam Okafor','Bright Facility Services','Columbus, OH','201–500','Janitorial and facilities for offices and schools. Steady nights, paid training.'],
+    ['jobs@drivetrain.test','Nate Cole','DriveTrain Auto','Dallas, TX','51–200','Fleet and dealership service. Diesel and auto techs — tool allowance, ASE bonuses.'],
+  ];
+  const eid = {};
+  for(const [email,name,co,city,size,about] of emps){
+    const u = await db.prepare('SELECT id FROM users WHERE email=?').get(email);
+    if(u){ eid[email]=u.id; continue; }
+    try { eid[email]=(await insEmp.run(email,pw,'employer',name,co,city,size,about)).lastInsertRowid; } catch(e){}
+  }
+  // role templates: [email, title, trade, payLo, payHi, shift, reqCred, employmentType]
+  const R = [
+    ['hr@apexmechanical.test','Commercial Electrician','electrician',32,46,'Day','osha10','Full-time'],
+    ['hr@apexmechanical.test','HVAC Service Tech','hvac',28,42,'Day','epa608','Full-time'],
+    ['hr@apexmechanical.test','Journeyman Plumber','plumber',30,44,'Day','backflow','Full-time'],
+    ['hr@apexmechanical.test','Pipefitter','pipefitter',30,45,'Day','osha10','Full-time'],
+    ['hr@apexmechanical.test','Sheet Metal Worker','sheet_metal',26,38,'Day','osha10','Full-time'],
+    ['jobs@summitbuilders.test','Carpenter','carpenter',26,38,'Day','osha10','Full-time'],
+    ['jobs@summitbuilders.test','Concrete Finisher','concrete',24,34,'Day','','Full-time'],
+    ['jobs@summitbuilders.test','Structural Welder','welder',28,42,'Day','aws_welding','Full-time'],
+    ['jobs@summitbuilders.test','Ironworker','ironworker',30,44,'Day','fall_protection','Full-time'],
+    ['jobs@summitbuilders.test','Heavy Equipment Operator','heavy_equipment',28,40,'Day','osha10','Full-time'],
+    ['jobs@summitbuilders.test','Roofer','roofer',22,32,'Day','fall_protection','Full-time'],
+    ['jobs@summitbuilders.test','Commercial Painter','painter',20,30,'Day','','Full-time'],
+    ['careers@nationwidefreight.test','CDL-A Truck Driver','cdl_driver',28,40,'Any','cdl','Full-time'],
+    ['careers@nationwidefreight.test','Warehouse Associate','warehouse',18,24,'Any','forklift','Full-time'],
+    ['careers@nationwidefreight.test','Forklift Operator','warehouse',20,26,'Day','forklift','Full-time'],
+    ['careers@nationwidefreight.test','Delivery Driver','delivery_driver',20,27,'Day','','Full-time'],
+    ['jobs@drivetrain.test','Diesel Mechanic','diesel_mechanic',28,42,'Day','ase','Full-time'],
+    ['jobs@drivetrain.test','Automotive Technician','automotive_tech',24,38,'Day','ase','Full-time'],
+    ['jobs@drivetrain.test','CNC Machinist','machinist',26,40,'Day','','Full-time'],
+    ['staff@meridianhealth.test','Certified Nursing Assistant','cna',19,27,'Any','cna_cert','Full-time'],
+    ['staff@meridianhealth.test','Home Health Aide','caregiver',18,24,'Day','hha','Part-time'],
+    ['staff@meridianhealth.test','Medical Assistant','medical_assistant',19,26,'Day','bls','Full-time'],
+    ['staff@meridianhealth.test','EMT','emt',20,28,'Any','cpr','Full-time'],
+    ['hr@harborhospitality.test','Line Cook','cook',18,25,'Night','food_handler','Full-time'],
+    ['hr@harborhospitality.test','Prep Cook','prep_cook',16,21,'Day','food_handler','Full-time'],
+    ['hr@harborhospitality.test','Server','server',12,14,'Night','food_handler','Part-time'],
+    ['hr@harborhospitality.test','Housekeeper','housekeeper',16,21,'Day','','Full-time'],
+    ['crew@goldenfields.test','Farm Laborer','farmworker',16,21,'Day','','Full-time'],
+    ['crew@goldenfields.test','Fruit Picker','fruit_picker',16,22,'Day','','Temp'],
+    ['crew@goldenfields.test','Irrigation Tech','irrigation_tech',18,24,'Day','','Full-time'],
+    ['hr@brightfacility.test','Janitor / Custodian','janitor',16,21,'Night','','Full-time'],
+    ['hr@brightfacility.test','Maintenance Technician','facilities',20,30,'Day','','Full-time'],
+  ];
+  const startRow = await db.prepare('SELECT COALESCE(MAX(id),0) m FROM jobs').get();
+  const startId = (startRow.m||0) + 1; // enrich only the rows we are about to insert
+  const insJob = db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type) VALUES(?,?,?,?,?,?,?,?,?,?,?)`);
+  let made=0;
+  for(let ri=0; ri<R.length; ri++){
+    const [email,title,trade,lo,hi,shift,creds,etype] = R[ri];
+    const id = eid[email]; if(!id) continue;
+    for(let k=0;k<5;k++){ // each role across 5 rotating metros → volume + geographic spread
+      const city = cities[(ri*3 + k*6) % cities.length];
+      const descr = `${title} in ${city}. Competitive pay, steady hours, and real room to grow.`;
+      try { await insJob.run(id,title,trade,lo,hi,city,cityZip[city],shift,creds,descr,etype); made++; } catch(e){}
+    }
+  }
+  // workers across categories/metros so supply, candidate map & supply-vs-demand fill in
+  const insUser = db.prepare('INSERT INTO users(email,pass,role,name) VALUES(?,?,?,?)');
+  const insProf = db.prepare(`INSERT INTO worker_profiles(user_id,trade,trades,headline,about,years_exp,city,zip,pay_floor,shift,available,work_today,relocate,alerts) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+  const firsts=['James','Maria','Robert','Linda','David','Carlos','Ashley','Kevin','Dwayne','Tanya','Andre','Sofia','Derek','Nina','Hector','Grace','Tyrone','Rosa','Brandon','Aisha'];
+  const lasts=['Johnson','Garcia','Lee','Nguyen','Brooks','Rivera','Patel','Walker','Diaz','Coleman','Reed','Ortiz','Hayes','Khan','Flores','Bauer','Greene','Mendez','Pace','Cole'];
+  const WT=[
+    ['electrician',30,'Day',[['osha10','2028-01']]],['hvac',28,'Day',[['epa608','2028-03']]],['plumber',29,'Day',[['backflow','2028-04']]],
+    ['welder',28,'Day',[['aws_welding','2027-12']]],['carpenter',25,'Day',[['osha10','2027-11']]],['cdl_driver',27,'Any',[['cdl','2028-06']]],
+    ['warehouse',18,'Any',[['forklift','2028-02']]],['diesel_mechanic',28,'Day',[['ase','2027-10']]],['cna',20,'Any',[['cna_cert','2027-09']]],
+    ['cook',18,'Night',[['food_handler','2027-05']]],['farmworker',16,'Day',[]],['security_guard',18,'Any',[['guard_card','2027-11']]],
+    ['heavy_equipment',28,'Day',[['osha10','2028-05']]],['automotive_tech',24,'Day',[['ase','2027-08']]],['janitor',16,'Night',[]],['caregiver',18,'Day',[['hha','2027-07']]],
+  ];
+  let wmade=0;
+  for(let i=0;i<48;i++){
+    const wt = WT[i % WT.length];
+    const city = cities[(i*5) % cities.length];
+    const name = firsts[i%firsts.length]+' '+lasts[(i*7)%lasts.length];
+    const email = name.toLowerCase().replace(/[^a-z]+/g,'.')+'.'+i+'@rivet.test';
+    let uid; try { uid=(await insUser.run(email,pw,'worker',name)).lastInsertRowid; } catch(e){ continue; }
+    const yrs = 2 + (i%12), label = wt[0].replace(/_/g,' ');
+    try { await insProf.run(uid, wt[0], wt[0], `${label} in ${city}`, `${yrs}-year ${label}. Reliable, safety-first, ready to start.`, yrs, city, cityZip[city], wt[1], wt[2], 1, i%4===0?1:0, i%5===0?1:0, 1); } catch(e){ continue; }
+    for(const [k,exp] of wt[3]){ try { await db.prepare('INSERT INTO credentials(user_id,kind,name,verified,expires) VALUES(?,?,?,?,?)').run(uid,k,CRED_KINDS[k]||k,1,exp); } catch(e){} }
+    try { await recomputeReadiness(uid); } catch(e){}
+    wmade++;
+  }
+  // enrich ONLY the new jobs (id >= startId) the way the one-off passes enriched the originals
+  await db.exec(`UPDATE jobs SET pay_cadence='weekly' WHERE id>=${startId} AND trade IN ('electrician','hvac','plumber','welder','pipefitter','carpenter','concrete','warehouse','delivery_driver','cdl_driver')`);
+  await db.exec(`UPDATE jobs SET pay_cadence='daily' WHERE id>=${startId} AND trade IN ('fruit_picker','farmworker','irrigation_tech')`);
+  await db.exec(`UPDATE jobs SET pay_cadence='biweekly' WHERE id>=${startId} AND (pay_cadence IS NULL OR pay_cadence='')`);
+  await db.exec(`UPDATE jobs SET duration='Ongoing' WHERE id>=${startId} AND employment_type IN ('Full-time','Part-time')`);
+  await db.exec(`UPDATE jobs SET duration='2 weeks' WHERE id>=${startId} AND employment_type='Temp'`);
+  await db.exec(`UPDATE jobs SET sponsorship='authorized' WHERE id>=${startId}`);
+  await db.exec(`UPDATE jobs SET sponsorship='h2a' WHERE id>=${startId} AND trade IN ('fruit_picker','farmworker','irrigation_tech')`);
+  await db.exec(`UPDATE jobs SET fair_chance=1 WHERE id>=${startId} AND trade IN ('warehouse','janitor','concrete','prep_cook','delivery_driver','welder','pipefitter','painter')`);
+  await db.exec(`UPDATE jobs SET veteran_ok=1 WHERE id>=${startId} AND trade IN ('electrician','hvac','welder','diesel_mechanic','heavy_equipment','security_guard','cdl_driver','facilities')`);
+  await db.exec(`UPDATE jobs SET transport_provided=1 WHERE id>=${startId} AND trade IN ('fruit_picker','farmworker','irrigation_tech','warehouse')`);
+  await metaSet('morejobs_v1','1');
+  console.log(`[db] more-jobs seed — +${made} jobs, +${wmade} workers across ${metros.length} metros`);
+}
+
 // ---- seed a few community board posts (idempotent) ----
 async function seedPosts(){
   if (await metaGet('posts_v1')) return;
@@ -1090,6 +1217,7 @@ async function init() {
   try { await seedCompanies(); } catch (e) { console.error('[db] company seed skipped (non-fatal):', e.message); }
   try { await seedBig(); } catch (e) { console.error('[db] big seed skipped (non-fatal):', e.message); }
   try { await seedCategories(); } catch (e) { console.error('[db] category seed skipped (non-fatal):', e.message); }
+  try { await seedMoreJobs(); } catch (e) { console.error('[db] more-jobs seed skipped (non-fatal):', e.message); }
   try { await seedPosts(); } catch (e) { console.error('[db] posts seed skipped (non-fatal):', e.message); }
   try { await seedLocalGig(); } catch (e) { console.error('[db] localgig seed skipped (non-fatal):', e.message); }
   try { await seedExternal(); } catch (e) { console.error('[db] external seed skipped (non-fatal):', e.message); }
