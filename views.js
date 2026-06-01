@@ -340,6 +340,11 @@ const BUILTIN_ES = {
   'Site safety':'Seguridad del sitio','Site safety?':'¿Seguridad del sitio?','Safety':'Seguridad','Worker-rated site safety':'Seguridad del sitio calificada por trabajadores',
   // pay cadence
   'Pay cadence':'Frecuencia de pago','Daily pay':'Pago diario','Weekly pay':'Pago semanal','Biweekly pay':'Pago quincenal','Monthly pay':'Pago mensual',
+  // seasonality
+  'In season this':'En temporada este','hiring climbs for these trades now':'la contratación sube para estos oficios ahora','is in season':'está en temporada','Demand is climbing now.':'La demanda está subiendo ahora.',
+  'AC + heating season':'temporada de aire y calefacción','dry-weather roofing':'techado en clima seco','pour season':'temporada de concreto','growing season':'temporada de jardinería','install season':'temporada de instalación',
+  'harvest':'cosecha','harvest packing':'empaque de cosecha','retail peak':'pico minorista','event & holiday season':'temporada de eventos y fiestas','event season':'temporada de eventos',
+  'winter building loads':'cargas de invierno en edificios','build season':'temporada de construcción','exterior season':'temporada de exteriores','frozen-pipe season':'temporada de tuberías congeladas','winter demand':'demanda de invierno',
 };
 function T(s){
   if(LANG !== 'es' || !s) return s;
@@ -422,7 +427,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=67">
+  <link rel="stylesheet" href="/styles.css?v=68">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -617,7 +622,7 @@ function xToggle(action, on, iconName, onLabel, offLabel, next){
   return `<form method="post" action="${action}" class="xf"><input type="hidden" name="next" value="${next}">
     <button class="xbtn ${on?'on':''}">${icon(iconName,'xic')}<span>${on?onLabel:offLabel}</span></button></form>`;
 }
-function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 0, jobsGeo = null, isNew = false, coach = null, needZip = false }) {
+function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 0, jobsGeo = null, isNew = false, coach = null, needZip = false, seasonHint = null }) {
   const top = matches.slice(0,3).map(m=>jobCard(m, isNew)).join('');
   const zipBanner = (!isNew && needZip) ? `<a class="zip-banner" href="/app/profile">${icon('pin','xic')} ${T('Add your ZIP to your Work Card to see how far each job is.')}</a>` : '';
   const expiring = creds.filter(c=>c.expires && c.expires < '2026-08').length;
@@ -664,6 +669,7 @@ function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 
         ${top || `<div class="card muted">${t('home_nomatch')}</div>`}
       </div>
       <aside>
+        ${seasonHint?`<div class="card season-hint">${icon('flame','xic')} <span><b>${esc(TRADES[seasonHint.trade]||seasonHint.trade)}</b> ${T('is in season')}${seasonHint.why?` — ${T(seasonHint.why)}`:''}. ${T('Demand is climbing now.')}</span></div>`:''}
         ${coach ? `<div class="card agent-card">
           <div class="agent-h">${icon('spark','xic')} ${T('Career Coach')}</div>
           <p class="agent-line">${esc(coach.line)}</p>
@@ -1269,7 +1275,7 @@ const PULSE_NEWS = [
   { tag:'Healthcare', title:'CNAs and home-health aides are among the fastest-growing roles', body:'An aging population is fueling steady, flexible demand for certified nursing assistants and caregivers nationwide.' },
   { tag:'Logistics', title:'Warehouse, delivery and CDL roles stay red-hot', body:'E-commerce and regional distribution keep last-mile drivers, forklift operators and warehouse crews in constant demand.' },
 ];
-function pulsePage({ user, trending, posts, totalOpen, companies = [], demandGeo = [] }) {
+function pulsePage({ user, trending, posts, totalOpen, companies = [], demandGeo = [], season = [], monthName = '' }) {
   const maxN = Math.max(1, ...trending.map(t=>t.n));
   const trendRows = trending.map((t,i)=>`<div class="trend-row">
       <span class="trend-rank">${i+1}</span>
@@ -1286,6 +1292,10 @@ function pulsePage({ user, trending, posts, totalOpen, companies = [], demandGeo
     </div>`).join('');
   return `<section class="wrap">
     <div class="sec-h big">${T('Industry Pulse')} <span class="muted">${T("What's in demand right now")}</span></div>
+    ${season.length?`<div class="card season-card">
+      <div class="sec-h" style="margin-top:0">${icon('flame','xic')} ${T('In season this')} ${esc(monthName)} <span class="muted sm">${T('hiring climbs for these trades now')}</span></div>
+      <div class="season-grid">${season.map(s=>`<span class="season-chip">${tradeEmoji(s.trade)} <b>${esc(TRADES[s.trade]||s.trade)}</b>${s.why?` <span class="muted sm">${T(s.why)}</span>`:''}</span>`).join('')}</div>
+    </div>`:''}
     ${demandGeo.length ? usMap(demandGeo, {title:T('Where demand is hottest'), noun:T('job'), cta:T('View')}) : ''}
     <div class="grid2">
       <div class="card">

@@ -281,6 +281,25 @@ function localRules(city){
   };
 }
 
+// Seasonal demand: which trades heat up each month (hand-built, US blue-collar patterns).
+// month index 0=Jan … 11=Dec.
+const SEASON = {
+  0:['hvac','facilities','appliance_repair'], 1:['hvac','facilities','plumber'],
+  2:['landscaper','concrete','carpenter','painter'], 3:['landscaper','roofer','concrete','solar'],
+  4:['roofer','concrete','hvac','solar'], 5:['hvac','roofer','event_setup','fruit_picker'],
+  6:['hvac','roofer','fruit_picker','farmworker'], 7:['hvac','fruit_picker','farmworker','packing_shed'],
+  8:['farmworker','fruit_picker','packing_shed','carpenter'], 9:['farmworker','packing_shed','warehouse','roofer'],
+  10:['warehouse','delivery_driver','security_guard','event_setup'], 11:['hvac','facilities','warehouse','delivery_driver'],
+};
+const SEASON_WHY = {
+  hvac:'AC + heating season', roofer:'dry-weather roofing', concrete:'pour season', landscaper:'growing season',
+  solar:'install season', fruit_picker:'harvest', farmworker:'harvest', packing_shed:'harvest packing',
+  warehouse:'retail peak', delivery_driver:'retail peak', security_guard:'event & holiday season',
+  event_setup:'event season', facilities:'winter building loads', carpenter:'build season',
+  painter:'exterior season', plumber:'frozen-pipe season', appliance_repair:'winter demand',
+};
+function seasonalTrades(month){ return (SEASON[((month%12)+12)%12]||[]).slice(); }
+
 const clamp = (n, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, n));
 
 /**
@@ -336,4 +355,4 @@ function scoreMatch(profile, creds, job) {
   return { score: total, breakdown: { trade, pay, loc, cred: credScore }, missing };
 }
 
-module.exports = { TRADES, ADJACENT, CATEGORIES, CRED_KINDS, TRAINING, STATE_MIN_WAGE, STATE_NAME, CITY_STATE, stateForCity, localRules, readiness, scoreMatch, clamp };
+module.exports = { TRADES, ADJACENT, CATEGORIES, CRED_KINDS, TRAINING, STATE_MIN_WAGE, STATE_NAME, CITY_STATE, stateForCity, localRules, readiness, scoreMatch, clamp, SEASON_WHY, seasonalTrades };

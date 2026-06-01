@@ -557,7 +557,10 @@ const server = http.createServer(async (req,res)=>{
       const companies = await db.prepare(`SELECT u.company, u.company_city, COUNT(*) n FROM jobs j JOIN users u ON u.id=j.employer_id
         WHERE j.status='open' AND u.company IS NOT NULL AND u.company<>'' GROUP BY u.id ORDER BY n DESC LIMIT 8`).all();
       const demandGeo = await jobGeoAll();
-      return send(res, V.layout({title:'Industry Pulse', user, active:'pulse', body:V.pulsePage({user, trending, posts, totalOpen, companies, demandGeo})}));
+      const now = new Date();
+      const season = M.seasonalTrades(now.getMonth()).map(t=>({trade:t, why:M.SEASON_WHY[t]||''}));
+      const monthName = now.toLocaleString('en-US',{month:'long'});
+      return send(res, V.layout({title:'Industry Pulse', user, active:'pulse', body:V.pulsePage({user, trending, posts, totalOpen, companies, demandGeo, season, monthName})}));
     }
     if(p==='/pulse' && method==='POST'){
       if(!user) return redirect(res, '/login');
@@ -767,7 +770,10 @@ const server = http.createServer(async (req,res)=>{
         let coach = null;
         if(!isNewWorker){ try { const r = await coachReco(user.id); if(r && r.topCred) coach = { line: coachLineFallback(r.topCred), url: r.topCred.url }; } catch(e){} }
         const needZip = matches.length ? !!matches[0].needZip : false;
-        return send(res, V.layout({title:'Home',user,active:'home',body:V.workerHome({user,profile:prof,creds,matches,workCount,portCount,jobsGeo,isNew:isNewWorker,coach,needZip})}));
+        const seasonTrades = M.seasonalTrades(new Date().getMonth());
+        const myInSeason = profTrades(prof).find(t=>seasonTrades.includes(t));
+        const seasonHint = myInSeason ? {trade:myInSeason, why:M.SEASON_WHY[myInSeason]||''} : null;
+        return send(res, V.layout({title:'Home',user,active:'home',body:V.workerHome({user,profile:prof,creds,matches,workCount,portCount,jobsGeo,isNew:isNewWorker,coach,needZip,seasonHint})}));
       }
       if(p==='/app/agents' && method==='GET')
         return send(res, V.layout({title:'Agents',user,active:'agents',body:V.agentsHub({mode:'worker'})}));
