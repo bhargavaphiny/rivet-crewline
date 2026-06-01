@@ -444,7 +444,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:image" content="${site}/og.svg">
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=78">
+  <link rel="stylesheet" href="/styles.css?v=79">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -904,7 +904,8 @@ function tradeOptionsGrouped(sel=''){
 function credRow(c, editable = false){
   const st = c.verify_status || (c.verified ? 'verified' : 'unverified');
   const soon = c.verified && c.expires && c.expires < '2026-08';
-  const ic = st==='verified' ? '✅' : (st==='review' ? '⏳' : '⬜');
+  const ic = st==='verified' ? `<span class="cred-st ok">${icon('check')}</span>`
+    : (st==='review' ? `<span class="cred-st rev"></span>` : `<span class="cred-st un"></span>`);
   const badge = st==='verified'
     ? `<span class="v ${soon?'soon':'ok'}">${soon?T('Expiring'):T('Verified')}</span>`
     : (st==='review' ? `<span class="v review">${T('In review')}</span>` : `<span class="v pending">${T('Self-reported')}</span>`);
@@ -1588,7 +1589,7 @@ function usMap(points = [], opts = {}){
         <option value="">${T('All types')}</option>
         ${catList.map(k=>`<option value="${esc(k)}">${T(k)}</option>`).join('')}
       </select></div>` : '';
-  const catLegend = catList.length>1
+  const catLegend = catList.length
     ? catList.slice(0,7).map(k=>`<span class="lg"><i style="background:${CAT_COLOR[k]||'#8A8A8A'}"></i> ${T(k)}</span>`).join('')
     : (legend || `<span class="lg"><i class="lg-dot"></i> ${esc(noun)}s</span>`);
   return `<div class="card">

@@ -140,7 +140,12 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--brand)}
 /* credentials */
 .cred{display:flex;align-items:center;gap:11px;padding:10px 0;border-bottom:1px solid var(--line)}
 .cred:last-child{border:0}
-.cred-ic{font-size:18px}
+.cred-ic{display:flex;align-items:center}
+.cred-st{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;flex:none}
+.cred-st.ok{background:rgba(31,169,113,.16);color:#157a52}
+.cred-st.ok svg{width:13px;height:13px;stroke-width:3}
+.cred-st.rev{background:rgba(204,138,51,.16);box-shadow:inset 0 0 0 2px rgba(204,138,51,.5)}
+.cred-st.un{background:#ece6da;box-shadow:inset 0 0 0 2px #d9d1c1}
 .cred-main{flex:1}
 .cred-nm{font-size:13px;font-weight:700}
 .cred-ex{font-size:11px;color:var(--muted)}
