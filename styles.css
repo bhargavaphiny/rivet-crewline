@@ -470,6 +470,10 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .leaf-near svg{width:14px;height:14px}
 .jobpin{background:none!important;border:0!important}
 .jobpin svg{display:block;filter:drop-shadow(0 1.5px 2px rgba(0,0,0,.32))}
+.jpin-in{position:relative;line-height:0}
+.jpin-ct{position:absolute;top:-4px;right:-7px;background:#2B3338;color:#fff;font-size:9px;font-weight:800;line-height:1;padding:2px 4px;border-radius:8px;border:1.5px solid #fff;min-width:7px;text-align:center;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.jclust{background:none!important}
+.jc-b{display:grid;place-items:center;border-radius:50%;background:rgba(43,51,56,.92);color:#fff;font-weight:800;font-size:12.5px;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.34)}
 .jobpin.near svg{filter:drop-shadow(0 0 4px rgba(31,169,113,.55)) drop-shadow(0 1.5px 2px rgba(0,0,0,.3))}
 .map-tools{display:flex;align-items:center;gap:9px;margin:0 0 12px;flex-wrap:wrap}
 .map-tools .mt-label{font-size:12.5px;font-weight:800;color:var(--steel)}

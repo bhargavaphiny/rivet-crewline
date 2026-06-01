@@ -541,11 +541,11 @@ const server = http.createServer(async (req,res)=>{
     }
     // static & utility
     if(p==='/styles.css'){ res.writeHead(200,{'Content-Type':'text/css','Cache-Control':'no-cache'}); return res.end(fs.readFileSync(path.join(__dirname,'styles.css'))); }
-    // self-hosted Leaflet (no external CDN dependency for the map library)
-    if(p.startsWith('/vendor/leaflet/')){
-      const rel = p.slice('/vendor/'.length).replace(/\.\./g,'');
-      const fp = path.join(__dirname, 'vendor', rel);
-      if(fp.startsWith(path.join(__dirname,'vendor','leaflet')) && fs.existsSync(fp) && fs.statSync(fp).isFile()){
+    // self-hosted map libraries (Leaflet + markercluster) — no external CDN dependency
+    if(p.startsWith('/vendor/')){
+      const base = path.join(__dirname, 'vendor');
+      const fp = path.join(base, p.slice('/vendor/'.length).replace(/\.\./g,''));
+      if(fp.startsWith(base) && fs.existsSync(fp) && fs.statSync(fp).isFile()){
         const ct = fp.endsWith('.js')?'application/javascript':fp.endsWith('.css')?'text/css':fp.endsWith('.png')?'image/png':'application/octet-stream';
         res.writeHead(200,{'Content-Type':ct,'Cache-Control':'public, max-age=604800'});
         return res.end(fs.readFileSync(fp));

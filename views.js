@@ -443,8 +443,10 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=79">
+  <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
+  <link rel="stylesheet" href="/styles.css?v=80">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1563,6 +1565,15 @@ const CAT_COLOR = {
   'Healthcare & care':'#E0556E','Food service':'#0FA9AE','Agriculture':'#7E9B2F',
   'Cleaning & facilities':'#C77DBB','Security':'#5A6B7B','Freelance & gig':'#D98C2B','Other':'#8A8A8A',
 };
+const CAT_ICON = {
+  'Construction & trades':'hammer','Drivers & logistics':'truck','Mechanical & repair':'wrench',
+  'Healthcare & care':'heart','Food service':'utensils','Agriculture':'leaf',
+  'Cleaning & facilities':'spray','Security':'shield','Freelance & gig':'toolbox','Other':'dot',
+};
+// SVG path + fill-flag per category, embedded inside each map pin for fast type scanning
+const CAT_ICON_DATA = Object.fromEntries(Object.entries(CAT_ICON).map(([cat,nm])=>{
+  const g = ICONS[nm] || ICONS.dot; return [cat, {p:g.p, f:g.f?1:0}];
+}));
 function usMap(points = [], opts = {}){
   const { title='Where your talent is', noun='candidate', emptyMsg='No mapped locations yet.', legend=null, cta='Open', home=null } = opts;
   const id = 'rvmap'+(++_rvMapSeq);
@@ -1612,17 +1623,20 @@ function usMap(points = [], opts = {}){
     </div>`+`<p class="map-hint sm muted">${total.toLocaleString()} ${noun}${total===1?'':'s'} ${T('across')} ${points.length} ${points.length===1?T('metro'):T('metros')}</p>`+`
     <script>(function(){
       if(typeof L==='undefined'){var w=document.getElementById('${id}');if(w)w.innerHTML='<p class="muted sm" style="padding:14px">Map failed to load.</p>';return;}
-      var pts=${JSON.stringify(data)}, cta=${JSON.stringify(esc(cta))}, home=${homeJS}, CAT=${JSON.stringify(CAT_COLOR)};
+      var pts=${JSON.stringify(data)}, cta=${JSON.stringify(esc(cta))}, home=${homeJS}, CAT=${JSON.stringify(CAT_COLOR)}, CATIC=${JSON.stringify(CAT_ICON_DATA)};
       var youTxt=${JSON.stringify(T('You'))}, demandTxt=${JSON.stringify(T('demand'))}, emptyCat=${JSON.stringify(T('No openings in this type here.'))};
       var map=L.map('${id}',{scrollWheelZoom:false});
       L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:18,attribution:'&copy; OpenStreetMap, &copy; CARTO'}).addTo(map);
       var panel=document.getElementById('${id}_panel');
       function nf(n){return n>=10000?Math.round(n/1000)+'k':(n>=1000?(n/1000).toFixed(1).replace(/\\.0$/,'')+'k':String(n));}
       function catCount(d,cat){ if(!cat) return d.n||0; var e=(d.cats||[]).filter(function(c){return c.k===cat;})[0]; return e?e.n:0; }
-      function pinColor(d){ return (d.cats&&d.cats[0]&&CAT[d.cats[0].k])||'#E8923A'; }
-      function makeIcon(d,cnt,col){
+      function pinCat(d){ return (d.cats&&d.cats[0]&&d.cats[0].k)||''; }
+      function pinColor(d){ return CAT[pinCat(d)]||'#E8923A'; }
+      function glyph(cat,col){ var g=CATIC[cat]; if(!g) return ''; return '<g transform="translate(16 16) scale(0.5) translate(-12 -12)" fill="'+(g.f?col:'none')+'" stroke="'+(g.f?'none':col)+'" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">'+g.p+'</g>'; }
+      function makeIcon(d,cnt,col,cat){
         var s=d.near?1.14:1, w=Math.round(32*s), h=Math.round(42*s);
-        var html='<svg width="'+w+'" height="'+h+'" viewBox="0 0 32 42"><path d="M16 0C7.2 0 0 7.2 0 16c0 11 16 26 16 26s16-15 16-26C32 7.2 24.8 0 16 0z" fill="'+col+'" stroke="#fff" stroke-width="2"/><circle cx="16" cy="16" r="10" fill="#fff" fill-opacity="0.95"/><text x="16" y="20" text-anchor="middle" font-size="11" font-weight="800" fill="#3a3a3a">'+nf(cnt)+'</text></svg>';
+        var svg='<svg width="'+w+'" height="'+h+'" viewBox="0 0 32 42"><path d="M16 0C7.2 0 0 7.2 0 16c0 11 16 26 16 26s16-15 16-26C32 7.2 24.8 0 16 0z" fill="'+col+'" stroke="#fff" stroke-width="2"/><circle cx="16" cy="16" r="10" fill="#fff" fill-opacity="0.96"/>'+glyph(cat,col)+'</svg>';
+        var html='<div class="jpin-in">'+svg+(cnt?'<span class="jpin-ct">'+nf(cnt)+'</span>':'')+'</div>';
         return L.divIcon({className:'jobpin'+(d.near?' near':''),html:html,iconSize:[w,h],iconAnchor:[w/2,h]});
       }
       function show(i){var d=pts[i];if(!d||!panel)return;
@@ -1634,18 +1648,29 @@ function usMap(points = [], opts = {}){
         var arr=[];pts.forEach(function(d,i){var c=catCount(d,cat);if(c>0)arr.push({d:d,i:i,c:c});});
         arr.sort(function(a,b){return (b.d.near?1:0)-(a.d.near?1:0) || (a.d.near?(a.d.dist-b.d.dist):(b.c-a.c));});
         ul.innerHTML=arr.slice(0,8).map(function(o){return '<li class="'+(o.d.near?'near':'')+'" onclick="${id}_show('+o.i+')"><span>'+(o.d.near?'<i class="ml-pin"></i>':'')+o.d.c+(o.d.dist!=null?' <em class="mi-tag">'+o.d.dist+' mi</em>':'')+'</span><b>'+o.c.toLocaleString()+'</b></li>';}).join('')||'<li class="muted">'+emptyCat+'</li>';}
+      // cluster overlapping metros on the local (worker) map; national maps stay spread out
+      var cluster = (L.markerClusterGroup && ${hasHome?'true':'false'}) ? L.markerClusterGroup({
+        maxClusterRadius:36, showCoverageOnHover:false, spiderfyOnMaxZoom:true,
+        iconCreateFunction:function(c){ var ms=c.getAllChildMarkers(), sum=0,i; for(i=0;i<ms.length;i++) sum+=(ms[i].__n||0);
+          var z=sum>=10000?48:sum>=1000?42:36; return L.divIcon({className:'jclust',html:'<div class="jc-b" style="width:'+z+'px;height:'+z+'px">'+nf(sum)+'</div>',iconSize:[z,z]}); }
+      }) : null;
+      if(cluster) map.addLayer(cluster);
+      function addM(m){ if(cluster) cluster.addLayer(m); else m.addTo(map); }
+      function clearM(){ if(cluster) cluster.clearLayers(); else markers.forEach(function(o){map.removeLayer(o.m);}); }
       var markers=[], bounds=[], cont=[];
       pts.forEach(function(d,i){ if(d.lat==null)return;
-        var m=L.marker([d.lat,d.lon],{icon:makeIcon(d,d.n||0,pinColor(d))}).addTo(map);
+        var m=L.marker([d.lat,d.lon],{icon:makeIcon(d,d.n||0,pinColor(d),pinCat(d))});
+        m.__n=d.n||0;
         m.bindTooltip(d.c+': '+(d.n||0).toLocaleString()+(d.near?' · near you':''),{direction:'top'});
         m.on('click',function(){show(i);});
-        markers.push({m:m,d:d});
+        addM(m); markers.push({m:m,d:d});
         bounds.push([d.lat,d.lon]);
         if(d.lon>=-125&&d.lon<=-66&&d.lat>=24&&d.lat<=50) cont.push([d.lat,d.lon]); // lower-48 framing
       });
       window['${id}_apply']=function(cat){
-        markers.forEach(function(o){var d=o.d,cnt=catCount(d,cat),vis=!cat||cnt>0,col=cat?(CAT[cat]||'#E8923A'):pinColor(d);
-          if(vis){o.m.setIcon(makeIcon(d,cnt,col));o.m.addTo(map);}else{map.removeLayer(o.m);}});
+        clearM();
+        markers.forEach(function(o){var d=o.d,cnt=catCount(d,cat),vis=!cat||cnt>0,kc=cat||pinCat(d),col=cat?(CAT[cat]||'#E8923A'):pinColor(d);
+          if(vis){o.m.setIcon(makeIcon(d,cnt,col,kc));o.m.__n=cnt;addM(o.m);}});
         rebuildList(cat);
       };
       if(home){
