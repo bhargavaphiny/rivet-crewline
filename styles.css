@@ -491,7 +491,13 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .maplist li{display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
 .maplist li:last-child{border-bottom:none}
 .maplist b{color:var(--brand-d)}
+.maplist li.near{background:rgba(31,169,113,.07);margin:0 -8px;padding-left:8px;padding-right:8px;border-radius:7px}
+.maplist li.near span{font-weight:700;color:var(--steel)}
+.maplist .ml-pin{width:7px;height:7px;border-radius:50%;background:#1FA971;display:inline-block;margin-right:6px;vertical-align:middle}
 @media(max-width:560px){.maplist{width:100%}}
+/* nearby ("reachable") job metros glow green so the worker's eye lands on them first */
+.mdot.near .mdisc{stroke:#1FA971;stroke-width:2.6;filter:drop-shadow(0 0 9px rgba(31,169,113,.95))}
+.mdot.near .mpulse{fill:#1FA971;opacity:.4}
 
 /* ---- map: related-trade dots + legend ---- */
 .maplegend{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;margin-top:12px;font-size:12.5px;color:var(--slate)}
@@ -515,6 +521,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .mapzoom .mz-home{color:#2B6EC9;border-color:rgba(43,110,201,.4)}
 .mapzoom .mz-home:hover{border-color:#2B6EC9}
 .maplegend i.lg-home{background:#2B6EC9;box-shadow:0 0 0 2px #fff,0 0 5px rgba(43,110,201,.6)}
+.maplegend i.lg-near{background:var(--amber);box-shadow:0 0 0 2px #1FA971,0 0 5px rgba(31,169,113,.7)}
 .maplist .mi-tag{font-style:normal;font-size:11px;color:var(--muted);font-weight:600;margin-left:5px}
 .map-near{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin:12px 0 0;padding:9px 13px;border-radius:11px;background:rgba(43,110,201,.07);border:1px solid rgba(43,110,201,.18);font-size:13.5px;color:var(--steel)}
 .map-near b{color:#2156a3;font-size:15px}

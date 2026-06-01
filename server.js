@@ -228,11 +228,14 @@ async function jobGeoForWorker(prof){
   const home = await geocodeZip(prof.zip);
   const commute = (prof.commute_mi>0) ? prof.commute_mi : 0;
   let reachable = 0; // real sample jobs within the worker's commute radius
+  const nearR = commute>0 ? commute : 40; // "near you" band — drives emphasis + reachable count
   const points = Object.values(byZip).map(b=>{
     const dist = (home && b.lat!=null) ? Math.round(haversineMi(home, {lat:b.lat, lon:b.lon})) : null;
-    if(dist!=null && (commute? dist<=commute : dist<=40)) reachable += b.n;
-    return { city:b.city, lat:b.lat, lon:b.lon, n:b.n, kind:b.anyDirect?'direct':'related', dist, items:b.items };
-  }).sort((a,b)=>b.n-a.n);
+    const near = dist!=null && dist<=nearR;
+    if(near) reachable += b.n;
+    return { city:b.city, lat:b.lat, lon:b.lon, n:b.n, kind:b.anyDirect?'direct':'related', dist, near, items:b.items };
+  // nearby work first (closest on top) so the worker's eye lands on jobs they can take, then the rest by volume
+  }).sort((a,b)=> (b.near?1:0)-(a.near?1:0) || (a.near ? a.dist-b.dist : b.n-a.n));
   const homePin = home ? { lat:home.lat, lon:home.lon, zip:prof.zip, city:prof.city||'', commute, reachable } : null;
   return { points, home: homePin };
 }

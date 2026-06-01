@@ -296,7 +296,7 @@ const BUILTIN_ES = {
   'No matches for these filters.':'No hay coincidencias para estos filtros.',
   // map hero
   'across':'en','metro':'metro','metros':'metros','warmer & bigger = more hiring':'más grande = más contratación',
-  'You':'Tú','commute':'traslado','within':'a menos de','mi of you':'mi de ti','Zoom to me':'Acercar a mí',
+  'You':'Tú','commute':'traslado','within':'a menos de','mi of you':'mi de ti','Zoom to me':'Acercar a mí','Within reach':'A tu alcance',
   // X-factors: show-up, pay, crew, renewals
   'Shows up':'Asiste','start':'inicio','starts':'inicios','Confirmed start outcomes — showed up vs no-showed':'Resultados confirmados — se presentó vs. no se presentó',
   'Pays on time':'Paga a tiempo','Worker-confirmed pay outcomes':'Pagos confirmados por trabajadores',
@@ -429,7 +429,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=70">
+  <link rel="stylesheet" href="/styles.css?v=71">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1538,12 +1538,13 @@ function usMap(points = [], opts = {}){
   // the busiest metros gently pulse so the map feels alive (a "real hero").
   const maxN = Math.max(1, ...points.map(g=>g.n||0));
   const dots = points.map((g,i)=>{
-    const r = Math.min(26, 9 + Math.sqrt(g.n||1)*0.24);
+    let r = Math.min(26, 9 + Math.sqrt(g.n||1)*0.24);
+    if(g.near) r = Math.max(r, 13); // size floor so a small nearby metro still catches the eye
     const hot = (g.n||0) >= maxN*0.6;
-    const cls = `mdot${g.kind==='related'?' related':''}${hot?' hot':''}`;
-    const lbl = `${g.city||''}: ${(g.n||0).toLocaleString()} ${noun}${g.n===1?'':'s'} — tap to open`;
+    const cls = `mdot${g.kind==='related'?' related':''}${hot?' hot':''}${g.near?' near':''}`;
+    const lbl = `${g.city||''}: ${(g.n||0).toLocaleString()} ${noun}${g.n===1?'':'s'}${g.dist!=null?` · ${g.dist} mi`:''} — tap to open`;
     return `<g class="${cls}" tabindex="0" role="button" aria-label="${esc(lbl)}" onclick="rvMapShow(${i})" onkeydown="if(event.key==='Enter')rvMapShow(${i})">
-      ${hot?`<circle class="mpulse" cx="${px(g.lon)}" cy="${py(g.lat)}" r="${r.toFixed(1)}"/>`:''}
+      ${(hot||g.near)?`<circle class="mpulse" cx="${px(g.lon)}" cy="${py(g.lat)}" r="${r.toFixed(1)}"/>`:''}
       <circle class="mdisc" cx="${px(g.lon)}" cy="${py(g.lat)}" r="${r.toFixed(1)}"><title>${esc(lbl)}</title></circle>
       <text x="${px(g.lon)}" y="${(+py(g.lat)+3.6).toFixed(1)}" text-anchor="middle">${nfmt(g.n||0)}</text></g>`;
   }).join('');
@@ -1556,7 +1557,7 @@ function usMap(points = [], opts = {}){
       <circle class="mhome-pulse" cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="6"/>
       <circle class="mhome-dot" cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="4.5"><title>${esc(homeLbl)}</title></circle>
     </g>` : '';
-  const top = points.slice(0,7).map((g,i)=>`<li onclick="rvMapShow(${i})"><span>${esc(g.city||'—')}${g.dist!=null?` <em class="mi-tag">${g.dist} mi</em>`:''}</span><b>${(g.n||0).toLocaleString()}</b></li>`).join('');
+  const top = points.slice(0,7).map((g,i)=>`<li class="${g.near?'near':''}" onclick="rvMapShow(${i})"><span>${g.near?'<i class="ml-pin"></i>':''}${esc(g.city||'—')}${g.dist!=null?` <em class="mi-tag">${g.dist} mi</em>`:''}</span><b>${(g.n||0).toLocaleString()}</b></li>`).join('');
   // escaped per-point payload for the click panel (esc() makes it HTML- and </script>-safe)
   const data = points.map(g=>({ c: esc(g.city||''), n:(g.n||0), items: (g.items||[]).slice(0,12).map(it=>({l:esc(it.label||''),s:esc(it.sub||''),h:esc(it.href||'#')})) }));
   return `<div class="card">
@@ -1579,7 +1580,7 @@ function usMap(points = [], opts = {}){
     ${home && home.reachable>0 ? `<p class="map-near"><span class="mn-dot"></span><b>${home.reachable.toLocaleString()}</b> ${noun}${home.reachable===1?'':'s'} ${T('within')} ${home.commute>0?home.commute:40} ${T('mi of you')}${home.city?` · ${esc(home.city)}`:''} <button type="button" class="mn-link" onclick="rvHome()">${T('Zoom to me')} →</button></p>` : ''}
     <div class="maplegend">
       ${legend || `<span class="lg"><i class="lg-dot"></i> ${esc(noun)}s</span>`}
-      ${hx!=null?`<span class="lg"><i class="lg-home"></i> ${T('You')}</span>`:''}
+      ${hx!=null?`<span class="lg"><i class="lg-home"></i> ${T('You')}</span><span class="lg"><i class="lg-near"></i> ${T('Within reach')}</span>`:''}
       <span class="lg lg-scale"><i class="ls ls1"></i><i class="ls ls2"></i><i class="ls ls3"></i> ${T('bigger circle = more')}</span>
       <span class="lg muted">${icon('pin')} ${T('Tap any circle to see them')}</span>
     </div>`+`<p class="map-hint sm muted">${total.toLocaleString()} ${noun}${total===1?'':'s'} ${T('across')} ${points.length} ${points.length===1?T('metro'):T('metros')} · ${T('warmer & bigger = more hiring')}</p>`+`
