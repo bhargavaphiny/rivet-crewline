@@ -296,7 +296,7 @@ const BUILTIN_ES = {
   'No matches for these filters.':'No hay coincidencias para estos filtros.',
   // map hero
   'across':'en','metro':'metro','metros':'metros','warmer & bigger = more hiring':'más grande = más contratación',
-  'You':'Tú','commute':'traslado','within':'a menos de','mi of you':'mi de ti','Zoom to me':'Acercar a mí','Within reach':'A tu alcance',
+  'You':'Tú','commute':'traslado','within':'a menos de','mi of you':'mi de ti','Zoom to me':'Acercar a mí','Within reach':'A tu alcance','View all US':'Ver todo EE. UU.',
   // X-factors: show-up, pay, crew, renewals
   'Shows up':'Asiste','start':'inicio','starts':'inicios','Confirmed start outcomes — showed up vs no-showed':'Resultados confirmados — se presentó vs. no se presentó',
   'Pays on time':'Paga a tiempo','Worker-confirmed pay outcomes':'Pagos confirmados por trabajadores',
@@ -429,7 +429,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=71">
+  <link rel="stylesheet" href="/styles.css?v=72">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1557,6 +1557,13 @@ function usMap(points = [], opts = {}){
       <circle class="mhome-pulse" cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="6"/>
       <circle class="mhome-dot" cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="4.5"><title>${esc(homeLbl)}</title></circle>
     </g>` : '';
+  // default the worker straight into their local market (only when there's nearby work to show);
+  // otherwise keep the full-US view so an empty region never greets them.
+  const localView = (hx!=null && home && home.reachable>0);
+  const LVW=300, LVH=170;
+  const initVB = localView
+    ? `${Math.max(0,Math.min(VW-LVW,hx-LVW/2)).toFixed(1)} ${Math.max(0,Math.min(VH-LVH,hy-LVH/2)).toFixed(1)} ${LVW} ${LVH}`
+    : `0 0 ${VW} ${VH}`;
   const top = points.slice(0,7).map((g,i)=>`<li class="${g.near?'near':''}" onclick="rvMapShow(${i})"><span>${g.near?'<i class="ml-pin"></i>':''}${esc(g.city||'—')}${g.dist!=null?` <em class="mi-tag">${g.dist} mi</em>`:''}</span><b>${(g.n||0).toLocaleString()}</b></li>`).join('');
   // escaped per-point payload for the click panel (esc() makes it HTML- and </script>-safe)
   const data = points.map(g=>({ c: esc(g.city||''), n:(g.n||0), items: (g.items||[]).slice(0,12).map(it=>({l:esc(it.label||''),s:esc(it.sub||''),h:esc(it.href||'#')})) }));
@@ -1564,12 +1571,13 @@ function usMap(points = [], opts = {}){
     <div class="sec-h" style="margin-top:0">${esc(title)} <span class="muted">${total.toLocaleString()} ${noun}${total===1?'':'s'}</span></div>
     ${points.length ? `<div class="mapwrap">
       <div class="mapbox">
-        <svg class="usmap" id="rvsvg" viewBox="0 0 ${VW} ${VH}" role="img" aria-label="US opportunity map">
+        <svg class="usmap" id="rvsvg" viewBox="${initVB}" role="img" aria-label="US opportunity map">
           <g class="us-states">${statePaths}</g>
           <g class="us-geo"><clipPath id="rvclip"><rect x="0" y="0" width="${VW}" height="${VH}"/></clipPath>
             <g clip-path="url(#rvclip)"><g class="geo-rivers">${rivers}</g></g></g>
           <g class="us-cities">${cityLayer}</g>${dots}${homeLayer}
         </svg>
+        ${localView?`<button type="button" class="mz-all" onclick="rvAll()">${T('View all US')}</button>`:''}
         <div class="mapzoom">${hx!=null?`<button type="button" class="mz-home" onclick="rvHome()" aria-label="${esc(T('Zoom to me'))}">${icon('pin')}</button>`:''}<button type="button" onclick="rvZoom(.8)" aria-label="Zoom in">${icon('zoomin')}</button><button type="button" onclick="rvZoom(1.25)" aria-label="Zoom out">${icon('zoomout')}</button></div>
       </div>
       <div class="mapside">
@@ -1594,6 +1602,7 @@ function usMap(points = [], opts = {}){
         p.innerHTML=hdr+d.items.map(function(it){return '<div class="mp-row"><div class="mp-info"><b>'+it.l+'</b><span>'+it.s+'</span></div><a class="mp-cta" href="'+it.h+'">'+window.__RVC+'</a></div>';}).join('')+(d.n>d.items.length?'<p class="muted sm" style="margin-top:8px">+ '+(d.n-d.items.length).toLocaleString()+' more in '+d.c+'</p>':'');};
       window.rvZoom=function(f){var s=document.getElementById('rvsvg');if(!s)return;var vb=(s.getAttribute('viewBox')||'0 0 620 350').split(' ').map(Number);var cx=vb[0]+vb[2]/2,cy=vb[1]+vb[3]/2,nw=Math.max(150,Math.min(620,vb[2]*f)),nh=Math.max(85,Math.min(350,vb[3]*f));s.setAttribute('viewBox',(cx-nw/2).toFixed(1)+' '+(cy-nh/2).toFixed(1)+' '+nw.toFixed(1)+' '+nh.toFixed(1));};
       window.rvHome=function(){var s=document.getElementById('rvsvg');var h=window.__RVHOME;if(!s||!h)return;var nw=260,nh=147;s.setAttribute('viewBox',Math.max(0,Math.min(620-nw,h.x-nw/2)).toFixed(1)+' '+Math.max(0,Math.min(350-nh,h.y-nh/2)).toFixed(1)+' '+nw+' '+nh);};
+      window.rvAll=function(){var s=document.getElementById('rvsvg');if(s)s.setAttribute('viewBox','0 0 620 350');};
     })();</script>`
       : `<p class="muted">${esc(emptyMsg)}</p>`}
   </div>`;
