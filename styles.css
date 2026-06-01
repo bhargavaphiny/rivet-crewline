@@ -475,6 +475,15 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .mapside{flex:none;width:230px;display:flex;flex-direction:column;gap:12px}
 .mappanel{border-top:1px solid var(--line);padding-top:10px;max-height:230px;overflow:auto}
 .mp-h{font-weight:800;font-size:13px;margin-bottom:8px}
+.mp-bal{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:-2px 0 9px}
+/* recruiter market-read card on the job pipeline */
+.mkt-card{border-left:4px solid var(--line)}
+.mkt-card.vtight{border-left-color:#e2453b;background:rgba(226,69,59,.04)}
+.mkt-card.tight{border-left-color:#cc8a33;background:rgba(204,138,51,.05)}
+.mkt-card.bal{border-left-color:#1FA971;background:rgba(31,169,113,.04)}
+.mkt-card.comp{border-left-color:#2B6EC9;background:rgba(43,110,201,.04)}
+.mkt-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mkt-advice{margin:8px 0 0;font-size:13.5px;color:var(--steel)}
 .mp-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
 .mp-row:last-child{border-bottom:none}
 .mp-info{flex:1;min-width:0}

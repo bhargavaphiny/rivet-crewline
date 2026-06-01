@@ -301,7 +301,11 @@ const BUILTIN_ES = {
   'Live openings vs available workers, weighted by national trade shortages.':'Vacantes activas vs trabajadores disponibles, ponderado por la escasez nacional de oficios.',
   'available workers':'trabajadores disponibles','workers':'trabajadores','demand':'demanda',
   'Estimate blends Rivet activity with public labor data.':'La estimación combina la actividad de Rivet con datos públicos de empleo.',
-  'Very short-staffed':'Muy escaso de personal','Short-staffed':'Escaso de personal','Balanced':'Equilibrado','Competitive':'Competitivo',
+  'Very short-staffed':'Muy escaso de personal','Short-staffed':'Escaso de personal','Balanced':'Equilibrado','Competitive':'Competitivo','vs supply':'vs oferta',
+  'This trade is very short-staffed nationwide. Move fast — bump pay or widen your radius to fill it.':'Este oficio tiene mucha escasez de personal a nivel nacional. Actúa rápido — sube el pago o amplía tu radio para cubrirlo.',
+  'Short-staffed trade — hiring is competitive. A pay bump or wider radius will speed up your fill.':'Oficio con escasez — contratar es competitivo. Subir el pago o ampliar el radio acelerará la contratación.',
+  'Balanced market. Standard effort should fill this role at a fair rate.':'Mercado equilibrado. Un esfuerzo normal debería cubrir este puesto a una tarifa justa.',
+  'Lots of available workers for this trade — expect strong applicant flow.':'Muchos trabajadores disponibles para este oficio — espera un buen flujo de solicitantes.',
   // X-factors: show-up, pay, crew, renewals
   'Shows up':'Asiste','start':'inicio','starts':'inicios','Confirmed start outcomes — showed up vs no-showed':'Resultados confirmados — se presentó vs. no se presentó',
   'Pays on time':'Paga a tiempo','Worker-confirmed pay outcomes':'Pagos confirmados por trabajadores',
@@ -436,7 +440,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:image" content="${site}/og.svg">
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=74">
+  <link rel="stylesheet" href="/styles.css?v=76">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1557,6 +1561,7 @@ function usMap(points = [], opts = {}){
   // per-point payload for Leaflet markers + the click panel (esc() keeps it HTML/</script>-safe)
   const data = points.map(g=>({
     c: esc(g.city||''), n:(g.n||0), lat:g.lat, lon:g.lon, near:!!g.near, kind:g.kind||'',
+    bal: g.bal ? {t:esc(g.bal.trade||''), lv:g.bal.level, lb:T(g.bal.label||'Balanced'), r:g.bal.ratio} : null,
     items:(g.items||[]).slice(0,12).map(it=>({l:esc(it.label||''),s:esc(it.sub||''),h:esc(it.href||'#')}))
   }));
   const homeJS = (home && home.lat!=null)
@@ -1591,7 +1596,8 @@ function usMap(points = [], opts = {}){
       var panel=document.getElementById('${id}_panel');
       function show(i){var d=pts[i];if(!d||!panel)return;
         var hdr='<div class="mp-h">'+d.c+(d.n?' <span class="mp-n">'+d.n.toLocaleString()+' open</span>':'')+'</div>';
-        panel.innerHTML=hdr+(d.items.length?d.items.map(function(it){return '<div class="mp-row"><div class="mp-info"><b>'+it.l+'</b><span>'+it.s+'</span></div><a class="mp-cta" href="'+it.h+'">'+cta+'</a></div>';}).join(''):'<p class="muted sm">No sample roles.</p>')+(d.n>d.items.length?'<p class="muted sm" style="margin-top:8px">+ '+(d.n-d.items.length).toLocaleString()+' more in '+d.c+'</p>':'');}
+        var bal=d.bal?'<div class="mp-bal"><span class="bal-chip '+d.bal.lv+'">'+d.bal.lb+'</span> <span class="muted sm">'+d.bal.t+' · '+d.bal.r+'× '+${JSON.stringify(T('demand'))}+'</span></div>':'';
+        panel.innerHTML=hdr+bal+(d.items.length?d.items.map(function(it){return '<div class="mp-row"><div class="mp-info"><b>'+it.l+'</b><span>'+it.s+'</span></div><a class="mp-cta" href="'+it.h+'">'+cta+'</a></div>';}).join(''):'<p class="muted sm">No sample roles.</p>')+(d.n>d.items.length?'<p class="muted sm" style="margin-top:8px">+ '+(d.n-d.items.length).toLocaleString()+' more in '+d.c+'</p>':'');}
       window['${id}_show']=show;
       var bounds=[], cont=[];
       pts.forEach(function(d,i){ if(d.lat==null)return;
@@ -1842,7 +1848,17 @@ function empJobForm(error='', job=null) {
 }
 
 const STAGES = ['Sourced','Screened','Interview','Offer','Hired'];
-function empPipeline({ job, columns, candidates, jobMedia = [], alerted = 0, sourced = 0, quotes = [] }) {
+function empPipeline({ job, columns, candidates, jobMedia = [], alerted = 0, sourced = 0, quotes = [], market = null }) {
+  const mktAdvice = {
+    vtight: T('This trade is very short-staffed nationwide. Move fast — bump pay or widen your radius to fill it.'),
+    tight: T('Short-staffed trade — hiring is competitive. A pay bump or wider radius will speed up your fill.'),
+    bal: T('Balanced market. Standard effort should fill this role at a fair rate.'),
+    comp: T('Lots of available workers for this trade — expect strong applicant flow.'),
+  };
+  const marketCard = market ? `<div class="card mkt-card ${market.level}">
+    <div class="mkt-h"><span class="bal-chip ${market.level}">${T(market.label)}</span> <b>${esc(market.trade)}</b> <span class="muted sm">· ${market.ratio}× ${T('demand')} ${T('vs supply')}</span></div>
+    <p class="mkt-advice">${mktAdvice[market.level]||''}</p>
+  </div>` : '';
   const quotesCard = job.quotes_ok ? `<div class="card">
     <div class="sec-h" style="margin-top:0">${T('Price quotes')} <span class="muted sm">${quotes.length} ${quotes.length===1?T('quote'):T('quotes')}</span></div>
     ${quotes.length ? quotes.map(q=>`<div class="quote-row ${q.status}">
@@ -1871,6 +1887,7 @@ function empPipeline({ job, columns, candidates, jobMedia = [], alerted = 0, sou
       <p class="muted">$${job.pay_min}–${job.pay_max}/hr · ${esc(job.city)}</p>
       <a class="btn-sm ghost right" href="/console/jobs/${job.id}/edit">${T('Edit')}</a>
       <form method="post" action="/console/jobs/${job.id}/${job.status==='closed'?'reopen':'close'}"><button class="btn-sm ${job.status==='closed'?'':'ghost'}">${job.status==='closed'?T('Reopen job'):T('Close job')}</button></form></div>
+    ${marketCard}
     ${job.status==='closed'?`<div class="card warn-card">${T('This job is closed — it’s hidden from worker search and the map. Reopen it to keep matching.')}</div>`:''}
     ${alerted>0?`<div class="ok-card">${icon('bell','xic')} ${alerted} matching worker${alerted===1?'':'s'} with alerts on ${alerted===1?'was':'were'} notified about this job.</div>`:''}
     ${sourced>0?`<div class="ok-card">${icon('spark','xic')} ${T('Sourcing Agent added')} ${sourced} ${sourced===1?T('candidate'):T('candidates')} ${T('to your pipeline.')}</div>`:''}

@@ -216,14 +216,19 @@ async function jobGeoForWorker(prof){
   for(const t of trades) (M.ADJACENT[t]||[]).forEach(a=>{ if(!direct.has(a)) related.add(a); });
   const rows = await db.prepare(`SELECT j.id, j.title, j.trade, j.pay_min, j.pay_max, j.zip, z.lat, z.lon, z.city, u.company
     FROM jobs j JOIN zip_geo z ON z.zip=j.zip JOIN users u ON u.id=j.employer_id WHERE j.status='open'`).all();
+  const primary = trades[0]; // worker's main trade drives the per-metro tightness read
   const byZip = {};
   for(const r of rows){
     const isDirect = direct.has(r.trade), isRelated = related.has(r.trade);
     if(!isDirect && !isRelated) continue;
-    const _k=r.city||r.zip; const b = byZip[_k] || (byZip[_k] = {city:r.city, lat:r.lat, lon:r.lon, n:0, anyDirect:false, items:[]});
+    const _k=r.city||r.zip; const b = byZip[_k] || (byZip[_k] = {city:r.city, lat:r.lat, lon:r.lon, n:0, primJobs:0, anyDirect:false, items:[]});
     b.n++; if(isDirect) b.anyDirect = true;
+    if(r.trade===primary) b.primJobs++;
     b.items.push({ label:`${r.title} · $${r.pay_min}–${r.pay_max}/hr`, sub:`${r.company||''} · ${M.TRADES[r.trade]||r.trade}`, href:`/app/jobs/${r.id}` });
   }
+  // worker-supply in the primary trade per metro → per-metro market tightness for that trade
+  const wkRows = await db.prepare(`SELECT z.city, COUNT(*) n FROM worker_profiles p JOIN zip_geo z ON z.zip=p.zip WHERE p.trade=? GROUP BY z.city`).all(primary);
+  const primWk = Object.fromEntries(wkRows.map(r=>[r.city, r.n]));
   // worker's own location anchors the map — "you are here" + commute ring
   const home = await geocodeZip(prof.zip);
   const commute = (prof.commute_mi>0) ? prof.commute_mi : 0;
@@ -233,7 +238,9 @@ async function jobGeoForWorker(prof){
     const dist = (home && b.lat!=null) ? Math.round(haversineMi(home, {lat:b.lat, lon:b.lon})) : null;
     const near = dist!=null && dist<=nearR;
     if(near) reachable += b.n;
-    return { city:b.city, lat:b.lat, lon:b.lon, n:b.n, kind:b.anyDirect?'direct':'related', dist, near, items:b.items };
+    const mb = M.marketBalance(primary, b.primJobs, primWk[b.city]||0);
+    const bal = { trade: M.TRADES[primary]||primary, level: mb.level, label: M.BALANCE_LABEL[mb.level], ratio: mb.ratio };
+    return { city:b.city, lat:b.lat, lon:b.lon, n:b.n, kind:b.anyDirect?'direct':'related', dist, near, bal, items:b.items };
   // nearby work first (closest on top) so the worker's eye lands on jobs they can take, then the rest by volume
   }).sort((a,b)=> (b.near?1:0)-(a.near?1:0) || (a.near ? a.dist-b.dist : b.n-a.n));
   const homePin = home ? { lat:home.lat, lon:home.lon, zip:prof.zip, city:prof.city||'', commute, reachable } : null;
@@ -1344,7 +1351,12 @@ const server = http.createServer(async (req,res)=>{
         const alerted = Number(url.searchParams.get('alerted'))||0;
         const sourced = Number(url.searchParams.get('sourced'))||0;
         const quotes = job.quotes_ok ? await db.prepare(`SELECT q.*, u.name FROM quotes q JOIN users u ON u.id=q.worker_id WHERE q.job_id=? ORDER BY q.status='accepted' DESC, q.amount ASC`).all(jid) : [];
-        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.empPipeline({job,columns,candidates,jobMedia,alerted,sourced,quotes})}));
+        // market read for this role's trade → staffing-difficulty advice for the recruiter
+        const mJobs = (await db.prepare(`SELECT COUNT(*) n FROM jobs WHERE trade=? AND status='open'`).get(job.trade)).n;
+        const mWk = (await db.prepare(`SELECT COUNT(*) n FROM worker_profiles WHERE trade=?`).get(job.trade)).n;
+        const mb = M.marketBalance(job.trade, mJobs, mWk);
+        const market = { trade: M.TRADES[job.trade]||job.trade, level: mb.level, label: M.BALANCE_LABEL[mb.level], ratio: mb.ratio };
+        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.empPipeline({job,columns,candidates,jobMedia,alerted,sourced,quotes,market})}));
       }
 
       if(p==='/console/search' && method==='GET'){
