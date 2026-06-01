@@ -342,6 +342,7 @@ const BUILTIN_ES = {
   'Pay cadence':'Frecuencia de pago','Daily pay':'Pago diario','Weekly pay':'Pago semanal','Biweekly pay':'Pago quincenal','Monthly pay':'Pago mensual',
   // seasonality
   'In season this':'En temporada este','hiring climbs for these trades now':'la contratación sube para estos oficios ahora','is in season':'está en temporada','Demand is climbing now.':'La demanda está subiendo ahora.',
+  'I take subcontract work':'Acepto trabajo por subcontrato','Subcontract-ready ✓':'Listo para subcontrato ✓','Owner-operator · subcontracts':'Dueño-operador · subcontrata','Open to subcontractors / owner-operators (1099)':'Abierto a subcontratistas / dueños-operadores (1099)','1099 ok':'1099 ok','Subcontractors welcome':'Subcontratistas bienvenidos',
   'AC + heating season':'temporada de aire y calefacción','dry-weather roofing':'techado en clima seco','pour season':'temporada de concreto','growing season':'temporada de jardinería','install season':'temporada de instalación',
   'harvest':'cosecha','harvest packing':'empaque de cosecha','retail peak':'pico minorista','event & holiday season':'temporada de eventos y fiestas','event season':'temporada de eventos',
   'winter building loads':'cargas de invierno en edificios','build season':'temporada de construcción','exterior season':'temporada de exteriores','frozen-pipe season':'temporada de tuberías congeladas','winter demand':'demanda de invierno',
@@ -427,7 +428,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${esc(desc)}">
   <meta name="twitter:image" content="${site}/og.svg">
-  <link rel="stylesheet" href="/styles.css?v=68">
+  <link rel="stylesheet" href="/styles.css?v=69">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -648,6 +649,7 @@ function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 
       ${xToggle('/app/transport', profile.has_transport, 'truck', t('x_transport_on'), t('x_transport_off'), '/app')}
       ${xToggle('/app/bilingual', profile.bilingual, 'globe', t('x_bilingual_on'), t('x_bilingual_off'), '/app')}
       ${xToggle('/app/veteran', profile.veteran, 'shield', T('Veteran ✓'), T('I’m a veteran'), '/app')}
+      ${xToggle('/app/subcontract', profile.self_employed, 'hammer', T('Subcontract-ready ✓'), T('I take subcontract work'), '/app')}
     </div>
     ${welcome}
     ${jobsGeo && jobsGeo.points.length ? usMap(jobsGeo.points, {title:isNew?T('Where the work is'):t('home_top'), noun:T('job'), cta:T('Apply'),
@@ -860,6 +862,7 @@ function jobCard(m, bare = false){
       ${j.fair_chance?`<span class="incl-badge fair">${T('Fair-chance')}</span>`:''}
       ${j.veteran_ok?`<span class="incl-badge vet">${T('Veteran-friendly')}</span>`:''}
       ${j.transport_provided?`<span class="incl-badge transp">${T('Ride provided')}</span>`:''}
+      ${j.subcontract_ok?`<span class="incl-badge sub">${T('1099 ok')}</span>`:''}
       ${bare?'':fit}
     </div>
     ${bare?'':`<div class="matchbar"><i style="width:${m.score}%"></i></div>`}
@@ -947,7 +950,7 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
         <div class="badge big">${tradeEmoji(job.trade)}</div>
         <div class="job-main">
           <h2>${esc(job.title)}</h2>
-          ${job.employment_type?`<span class="jtype">${esc(T(job.employment_type))}</span>`:''}${job.duration?`<span class="jtype dur">${esc(T(job.duration))}</span>`:''}${cadenceBadge(job.pay_cadence)}${job.crew_ok?`<span class="jtype crew">${icon('truck')} ${T('Open to crews')}</span>`:''}${job.quotes_ok?`<span class="jtype quote">${T('Accepting quotes')}</span>`:''}${job.fair_chance?`<span class="jtype fair">${T('Fair-chance')}</span>`:''}${job.veteran_ok?`<span class="jtype vet">${T('Veteran-friendly')}</span>`:''}${job.transport_provided?`<span class="jtype transp">${icon('truck')} ${T('Transport provided')}</span>`:''}
+          ${job.employment_type?`<span class="jtype">${esc(T(job.employment_type))}</span>`:''}${job.duration?`<span class="jtype dur">${esc(T(job.duration))}</span>`:''}${cadenceBadge(job.pay_cadence)}${job.crew_ok?`<span class="jtype crew">${icon('truck')} ${T('Open to crews')}</span>`:''}${job.quotes_ok?`<span class="jtype quote">${T('Accepting quotes')}</span>`:''}${job.fair_chance?`<span class="jtype fair">${T('Fair-chance')}</span>`:''}${job.veteran_ok?`<span class="jtype vet">${T('Veteran-friendly')}</span>`:''}${job.transport_provided?`<span class="jtype transp">${icon('truck')} ${T('Transport provided')}</span>`:''}${job.subcontract_ok?`<span class="jtype sub">${icon('hammer')} ${T('Subcontractors welcome')}</span>`:''}
           <div class="job-c">${job.poster_kind==='individual'?`${icon('pin')} ${T('Posted by a homeowner / small business')} · `:''}${esc(job.company||'')} · ${esc(job.city)} ${esc(job.zip)} · ${esc(T(job.shift))}${distance!=null?` · <b class="dist">${distance} ${T('mi away')}</b>`:''}</div>
           <div class="pay big">${job.quotes_ok&&!job.pay_min?T('Name your price'):`$${job.pay_min}–${job.pay_max}/hr`}</div>
           ${payFitBadge(payFloor, job, 'worker')}
@@ -1793,6 +1796,7 @@ function empJobForm(error='', job=null) {
       <label class="ck"><input type="checkbox" name="fair_chance" value="1" ${editing&&job.fair_chance?'checked':''}> ${T('Fair-chance friendly — we consider applicants with a record')}</label>
       <label class="ck"><input type="checkbox" name="veteran_ok" value="1" ${editing&&job.veteran_ok?'checked':''}> ${T('Veteran-friendly — military experience valued')}</label>
       <label class="ck"><input type="checkbox" name="transport_provided" value="1" ${editing&&job.transport_provided?'checked':''}> ${T('Transport provided — we get workers to the site')}</label>
+      <label class="ck"><input type="checkbox" name="subcontract_ok" value="1" ${editing&&job.subcontract_ok?'checked':''}> ${T('Open to subcontractors / owner-operators (1099)')}</label>
       <label>${T('Required credentials')}</label><div class="ckrow">${cred}</div>
       <label>${T('Description')} <textarea name="descr" rows="3">${v('descr')}</textarea></label>
       <button class="btn full">${editing?T('Save changes'):T('Post & match')}</button>
@@ -1932,7 +1936,7 @@ function empCandidate({ worker, profile, creds, matches, apps, messages, meId, n
       <div class="chips">${tradeChips(profile)}</div>
       <p class="muted">${esc(profile.city)} ${esc(profile.zip||'')} · ${profile.years_exp} yrs experience · seeks $${profile.pay_floor}+/hr</p>
       <div class="rating-row">${ratingHead(rating)} ${showUpBadge(showUp)}</div>
-      ${profile.available?`<div class="avail-badge">${icon('dot','xic')} ${T('Available for work')}</div>`:`<div class="avail-badge off">${T('Not currently available')}</div>`}${profile.work_today?`<div class="avail-badge today">${icon('bolt','xic')} ${T('Can work today')}</div>`:''}${profile.relocate?`<div class="avail-badge relo">${icon('send','xic')} ${T('Open to relocate')}</div>`:''}${profile.veteran?`<div class="avail-badge vet">${icon('shield','xic')} ${T('Veteran')}</div>`:''}
+      ${profile.available?`<div class="avail-badge">${icon('dot','xic')} ${T('Available for work')}</div>`:`<div class="avail-badge off">${T('Not currently available')}</div>`}${profile.work_today?`<div class="avail-badge today">${icon('bolt','xic')} ${T('Can work today')}</div>`:''}${profile.relocate?`<div class="avail-badge relo">${icon('send','xic')} ${T('Open to relocate')}</div>`:''}${profile.veteran?`<div class="avail-badge vet">${icon('shield','xic')} ${T('Veteran')}</div>`:''}${profile.self_employed?`<div class="avail-badge sub">${icon('hammer','xic')} ${T('Owner-operator · subcontracts')}</div>`:''}
       <div class="ministats">
         <div><b>${profile.readiness}</b><span>READINESS</span></div>
         <div><b>${creds.filter(c=>c.verified).length}</b><span>VERIFIED</span></div>

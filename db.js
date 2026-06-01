@@ -1036,6 +1036,8 @@ async function migrate() {
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN commute_mi INTEGER DEFAULT 0'); } catch (e) { /* max miles willing to travel; 0 = no limit */ }
   try { await db.exec('ALTER TABLE reviews ADD COLUMN safety INTEGER'); } catch (e) { /* worker-rated site safety 1-5 */ }
   try { await db.exec('ALTER TABLE jobs ADD COLUMN pay_cadence TEXT'); } catch (e) { /* daily/weekly/biweekly/monthly */ }
+  try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN self_employed INTEGER DEFAULT 0'); } catch (e) { /* owner-operator / open to subcontract */ }
+  try { await db.exec('ALTER TABLE jobs ADD COLUMN subcontract_ok INTEGER DEFAULT 0'); } catch (e) { /* employer open to subcontractors */ }
 }
 
 async function seedZips() {
@@ -1097,6 +1099,14 @@ async function init() {
   try { await seedSafety(); } catch (e) { console.error('[db] safety seed skipped (non-fatal):', e.message); }
   try { await seedXfactors(); } catch (e) { console.error('[db] xfactors seed skipped (non-fatal):', e.message); }
   try { await seedHomeowner(); } catch (e) { console.error('[db] homeowner seed skipped (non-fatal):', e.message); }
+  try {
+    if(!(await metaGet('subcontract_v1'))){
+      // owner-operator / 1099 trades typically run their own small operation
+      await db.exec("UPDATE worker_profiles SET self_employed=1 WHERE trade IN ('handyman','junk_removal','pressure_wash','pool_service','appliance_repair','landscaper','painter')");
+      await db.exec("UPDATE jobs SET subcontract_ok=1 WHERE trade IN ('carpenter','concrete','framer','drywall','painter','roofer','electrician','plumber','landscaper','handyman') AND poster_kind='company'");
+      await metaSet('subcontract_v1','1');
+    }
+  } catch (e) { console.error('[db] subcontract seed skipped (non-fatal):', e.message); }
   try {
     if(!(await metaGet('cadence_v1'))){
       await db.exec("UPDATE jobs SET pay_cadence='weekly' WHERE pay_cadence IS NULL AND trade IN ('electrician','hvac','plumber','welder','pipefitter','carpenter','concrete','warehouse','delivery_driver','landscaper')");

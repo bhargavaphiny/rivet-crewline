@@ -562,6 +562,9 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .incl-badge.transp{background:rgba(43,73,112,.12);color:#2e547e}
 .far-hint{color:#b7322a;font-weight:700;font-size:11px}
 .jtype.cad{background:rgba(31,169,113,.12);color:#157a52}
+.jtype.sub,.incl-badge.sub{background:rgba(154,75,46,.12);color:var(--brand-d,#7a3b22);display:inline-flex;align-items:center;gap:4px}
+.jtype.sub svg{width:12px;height:12px}
+.avail-badge.sub{background:rgba(154,75,46,.1);color:var(--brand-d,#7a3b22)}
 /* seasonality */
 .season-card{background:linear-gradient(180deg,#fbf1e6,var(--card));border:1px solid #e6d3b8}
 .season-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}

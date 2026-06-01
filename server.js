@@ -941,8 +941,8 @@ const server = http.createServer(async (req,res)=>{
         await db.prepare("DELETE FROM media WHERE id=? AND user_id=? AND target='portfolio'").run(Number(pDel[1]), user.id);
         return redirect(res,'/app/profile');
       }
-      if(['/app/available','/app/work-today','/app/alerts','/app/relocate','/app/tools','/app/transport','/app/bilingual','/app/veteran'].includes(p) && method==='POST'){
-        const col = { '/app/available':'available', '/app/work-today':'work_today', '/app/alerts':'alerts', '/app/relocate':'relocate', '/app/tools':'has_tools', '/app/transport':'has_transport', '/app/bilingual':'bilingual', '/app/veteran':'veteran' }[p];
+      if(['/app/available','/app/work-today','/app/alerts','/app/relocate','/app/tools','/app/transport','/app/bilingual','/app/veteran','/app/subcontract'].includes(p) && method==='POST'){
+        const col = { '/app/available':'available', '/app/work-today':'work_today', '/app/alerts':'alerts', '/app/relocate':'relocate', '/app/tools':'has_tools', '/app/transport':'has_transport', '/app/bilingual':'bilingual', '/app/veteran':'veteran', '/app/subcontract':'self_employed' }[p];
         const b = await readBody(req);
         const cur = prof && prof[col] ? 1 : 0;
         await db.prepare(`UPDATE worker_profiles SET ${col}=? WHERE user_id=?`).run(cur?0:1, user.id);
@@ -1168,8 +1168,9 @@ const server = http.createServer(async (req,res)=>{
         const dur = V.DURATIONS.includes(b.duration) ? b.duration : null;
         const fairChance = b.fair_chance ? 1 : 0, vetOk = b.veteran_ok ? 1 : 0, transp = b.transport_provided ? 1 : 0;
         const cad = ['daily','weekly','biweekly','monthly'].includes(b.pay_cadence) ? b.pay_cadence : null;
-        const info = await db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type,sponsorship,crew_ok,poster_kind,quotes_ok,duration,fair_chance,veteran_ok,transport_provided,pay_cadence)
-          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(user.id,b.title,b.trade,Number(b.pay_min)||0,Number(b.pay_max)||0,b.city||'',b.zip||'',b.shift||'Day',reqCreds,b.descr||'',empType,spon,crewOk,posterKind,quotesOk,dur,fairChance,vetOk,transp,cad);
+        const subOk = b.subcontract_ok ? 1 : 0;
+        const info = await db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type,sponsorship,crew_ok,poster_kind,quotes_ok,duration,fair_chance,veteran_ok,transport_provided,pay_cadence,subcontract_ok)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(user.id,b.title,b.trade,Number(b.pay_min)||0,Number(b.pay_max)||0,b.city||'',b.zip||'',b.shift||'Day',reqCreds,b.descr||'',empType,spon,crewOk,posterKind,quotesOk,dur,fairChance,vetOk,transp,cad,subOk);
         const jobId = info.lastInsertRowid;
         try { await geocodeZip(b.zip); } catch(e){} // pin new job on the demand map immediately
         // SMS job alerts to matching, opted-in, available workers who have a phone
@@ -1291,8 +1292,9 @@ const server = http.createServer(async (req,res)=>{
         const dur = V.DURATIONS.includes(b.duration) ? b.duration : null;
         const fairChance = b.fair_chance ? 1 : 0, vetOk = b.veteran_ok ? 1 : 0, transp = b.transport_provided ? 1 : 0;
         const cad = ['daily','weekly','biweekly','monthly'].includes(b.pay_cadence) ? b.pay_cadence : null;
-        await db.prepare(`UPDATE jobs SET title=?,trade=?,pay_min=?,pay_max=?,city=?,zip=?,shift=?,req_creds=?,descr=?,employment_type=?,sponsorship=?,crew_ok=?,poster_kind=?,quotes_ok=?,duration=?,fair_chance=?,veteran_ok=?,transport_provided=?,pay_cadence=? WHERE id=? AND employer_id=?`)
-          .run(String(b.title).slice(0,120), b.trade||job.trade, Number(b.pay_min)||0, Number(b.pay_max)||0, b.city||'', b.zip||'', b.shift||'Day', reqCreds, String(b.descr||'').slice(0,2000), empType, spon, crewOk, posterKind, quotesOk, dur, fairChance, vetOk, transp, cad, jobId, user.id);
+        const subOk = b.subcontract_ok ? 1 : 0;
+        await db.prepare(`UPDATE jobs SET title=?,trade=?,pay_min=?,pay_max=?,city=?,zip=?,shift=?,req_creds=?,descr=?,employment_type=?,sponsorship=?,crew_ok=?,poster_kind=?,quotes_ok=?,duration=?,fair_chance=?,veteran_ok=?,transport_provided=?,pay_cadence=?,subcontract_ok=? WHERE id=? AND employer_id=?`)
+          .run(String(b.title).slice(0,120), b.trade||job.trade, Number(b.pay_min)||0, Number(b.pay_max)||0, b.city||'', b.zip||'', b.shift||'Day', reqCreds, String(b.descr||'').slice(0,2000), empType, spon, crewOk, posterKind, quotesOk, dur, fairChance, vetOk, transp, cad, subOk, jobId, user.id);
         return redirect(res, `/console/jobs/${jobId}`);
       }
 
