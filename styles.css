@@ -474,6 +474,39 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .jpin-ct{position:absolute;top:-4px;right:-7px;background:#2B3338;color:#fff;font-size:9px;font-weight:800;line-height:1;padding:2px 4px;border-radius:8px;border:1.5px solid #fff;min-width:7px;text-align:center;box-shadow:0 1px 2px rgba(0,0,0,.25)}
 .jclust{background:none!important}
 .jc-b{display:grid;place-items:center;border-radius:50%;background:rgba(43,51,56,.92);color:#fff;font-weight:800;font-size:12.5px;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.34)}
+/* ---- GTM sector pages ---- */
+.sector-card{display:block;border-top:4px solid var(--sc,#E8923A);transition:transform .12s,box-shadow .12s;text-decoration:none;color:inherit}
+.sector-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-md,0 8px 24px rgba(0,0,0,.1))}
+.sector-emoji{font-size:30px}
+.sector-nm{font-size:18px;font-weight:800;margin:6px 0 2px}
+.sector-stats{display:flex;flex-wrap:wrap;gap:6px 16px;margin:12px 0 10px;font-size:13px;color:var(--slate)}
+.sector-stats b{color:var(--sc,var(--brand-d))}
+.sector-go{font-weight:800;color:var(--sc,var(--brand-d));font-size:13.5px}
+.sector-hero{border-left:5px solid var(--sc,#E8923A)}
+.sector-hero-emoji{font-size:38px}
+.sector-hero h1{font-size:30px;margin:6px 0 4px;line-height:1.1}
+.sector-tag{font-size:16px;font-weight:700;color:var(--sc,var(--brand-d));margin:0 0 8px}
+.sector-blurb{max-width:680px;color:var(--slate);margin:0 0 16px}
+.sector-kpis{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px}
+.skpi{background:var(--card-2,#f3ece0);border:1px solid var(--line);border-radius:12px;padding:10px 16px;min-width:96px}
+.skpi b{display:block;font-size:20px;color:var(--ink,#222)}
+.skpi span{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.sector-cta{display:flex;gap:10px;flex-wrap:wrap}
+.role-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.role-chip{display:flex;align-items:center;gap:8px;padding:8px 11px;border:1px solid var(--line);border-radius:10px;text-decoration:none;color:inherit;font-size:13px;font-weight:600}
+.role-chip:hover{border-color:var(--brand)}
+.role-chip svg{width:15px;height:15px;color:var(--steel)}
+.role-chip span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.role-chip b{color:var(--brand-d)}
+.whyrivet{background:linear-gradient(180deg,#fbf1e6,var(--card));border:1px solid #e6d3b8}
+.why-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.why-item{display:flex;gap:10px}
+.why-ic{flex:none;width:32px;height:32px;border-radius:9px;background:var(--steel);color:#fff;display:grid;place-items:center}
+.why-ic svg{width:17px;height:17px}
+.cta-band{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;background:var(--steel);color:#fff}
+.cta-band b{font-size:17px}
+.cta-band .muted{color:#c3cfd6!important}
+@media(max-width:560px){.role-grid,.why-grid{grid-template-columns:1fr}}
 .jobpin.near svg{filter:drop-shadow(0 0 4px rgba(31,169,113,.55)) drop-shadow(0 1.5px 2px rgba(0,0,0,.3))}
 .map-tools{display:flex;align-items:center;gap:9px;margin:0 0 12px;flex-wrap:wrap}
 .map-tools .mt-label{font-size:12.5px;font-weight:800;color:var(--steel)}

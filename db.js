@@ -834,6 +834,120 @@ async function seedMoreJobs(){
   console.log(`[db] more-jobs seed — +${made} jobs, +${wmade} workers across ${metros.length} metros`);
 }
 
+// ---- GTM sectors: real employers + roles in Manufacturing / Healthcare / Semiconductor (idempotent) ----
+async function seedSectors(){
+  if (await metaGet('sectors_v1')) return;
+  const pw = hashPassword('demo1234');
+  const { CRED_KINDS } = require('./matching');
+  // real fab / plant / hospital locations
+  const Z = [
+    ['85024',33.68,-112.07,'Phoenix'],['85226',33.30,-111.97,'Chandler'],['43054',40.08,-82.81,'New Albany'],
+    ['83716',43.53,-116.13,'Boise'],['12020',42.97,-73.79,'Malta'],['76574',30.57,-97.41,'Taylor'],
+    ['75090',33.64,-96.61,'Sherman'],['48211',42.39,-83.05,'Detroit'],['48126',42.32,-83.18,'Dearborn'],
+    ['61602',40.69,-89.59,'Peoria'],['50703',42.49,-92.34,'Waterloo'],['29418',32.88,-80.04,'North Charleston'],
+    ['78725',30.22,-97.62,'Austin'],['45215',39.23,-84.46,'Cincinnati'],['37203',36.15,-86.79,'Nashville'],
+    ['94612',37.80,-122.27,'Oakland'],['44195',41.50,-81.62,'Cleveland'],['55905',44.02,-92.47,'Rochester'],
+    ['85006',33.47,-112.06,'Phoenix'],['85013',33.51,-112.08,'Phoenix'],['63141',38.66,-90.44,'St. Louis'],
+  ];
+  for(const [zip,lat,lon,city] of Z){ try { await db.prepare('INSERT OR IGNORE INTO zip_geo(zip,lat,lon,city) VALUES(?,?,?,?)').run(zip,lat,lon,city); } catch(e){} }
+  // employer + its real roles. role = [title, trade, payLo, payHi, reqCred]
+  const EMP = [
+    // ---- Semiconductor ----
+    ['hr@tsmc-az.test','TSMC Arizona','Phoenix','85024','500+','semiconductor','Advanced 4nm/3nm fabs in north Phoenix. Equipment, process and facilities careers with paid training.',
+      [['Equipment Maintenance Technician','equipment_tech',28,42,'osha10'],['Process Technician','process_tech',24,34,''],['Cleanroom Operator','cleanroom_op',21,28,'']]],
+    ['careers@intel-az.test','Intel — Ocotillo','Chandler','85226','500+','semiconductor','Fab 52/62 logic fabs. Manufacturing and equipment technicians, 4-shift rotations, strong benefits.',
+      [['Manufacturing Technician','process_tech',25,35,''],['Equipment Technician','equipment_tech',30,44,'osha10'],['Facilities Technician','facilities',24,34,'']]],
+    ['jobs@intel-oh.test','Intel — Ohio One','New Albany','43054','500+','semiconductor','New $20B campus east of Columbus. Hiring technicians and skilled trades as fabs come online.',
+      [['Equipment Technician','equipment_tech',30,44,'osha10'],['Construction Electrician','electrician',32,46,'osha10'],['Industrial Maintenance Tech','maintenance_tech',26,38,'']]],
+    ['hr@micron-id.test','Micron Technology','Boise','83716','500+','semiconductor','Memory R&D and fab HQ. Fab technicians and equipment maintenance with tuition support.',
+      [['Fab Technician','process_tech',23,33,''],['Equipment Maintenance Tech','equipment_tech',28,40,'osha10'],['Quality Inspector','quality_inspector',22,30,'']]],
+    ['careers@gf-ny.test','GlobalFoundries','Malta','12020','500+','semiconductor','Fab 8, upstate NY. Process and maintenance technicians; on-site training academy.',
+      [['Process Technician','process_tech',24,34,''],['Manufacturing Maintenance Tech','maintenance_tech',27,38,''],['Cleanroom Operator','cleanroom_op',21,28,'']]],
+    ['hr@samsung-tx.test','Samsung Austin Semiconductor','Taylor','76574','500+','semiconductor','New Taylor, TX megafab. Equipment, facilities and process roles with relocation help.',
+      [['Equipment Technician','equipment_tech',29,42,'osha10'],['Facilities Technician','facilities',24,34,''],['Process Technician','process_tech',24,34,'']]],
+    ['jobs@ti-tx.test','Texas Instruments','Sherman','75090','500+','semiconductor','New 300mm analog fabs (SM1/SM2). Manufacturing operators and maintenance technicians.',
+      [['Manufacturing Operator','machine_operator',20,28,''],['Maintenance Technician','maintenance_tech',26,37,''],['Equipment Technician','equipment_tech',28,40,'osha10']]],
+    // ---- Manufacturing ----
+    ['hr@gm-detroit.test','General Motors','Detroit','48211','500+','manufacturing','Factory ZERO EV assembly. Team members and UAW skilled trades; profit sharing.',
+      [['Assembly Team Member','assembler',20,28,''],['Skilled Trades Electrician','electrician',34,47,'osha10'],['Millwright','millwright',33,45,'']]],
+    ['careers@ford-mi.test','Ford Motor Company','Dearborn','48126','500+','manufacturing','Rouge truck plant. Production, tool & die, and maintenance roles.',
+      [['Production Assembler','assembler',20,27,''],['Tool & Die Machinist','machinist',30,44,''],['Maintenance Technician','maintenance_tech',28,40,'osha10']]],
+    ['jobs@cat-il.test','Caterpillar','Peoria','61602','500+','manufacturing','Heavy equipment manufacturing. Welders, machinists and assemblers; OT available.',
+      [['Welder','welder',26,40,'aws_welding'],['CNC Machinist','machinist',26,40,''],['Assembler','assembler',19,27,'']]],
+    ['hr@deere-ia.test','John Deere','Waterloo','50703','500+','manufacturing','Tractor & drivetrain operations. Welders, machine operators, quality.',
+      [['Welder','welder',26,38,'aws_welding'],['Machine Operator','machine_operator',20,29,''],['Quality Inspector','quality_inspector',22,31,'']]],
+    ['careers@boeing-sc.test','Boeing','North Charleston','29418','500+','manufacturing','787 Dreamliner final assembly. Mechanics, inspectors and maintenance.',
+      [['Assembly Mechanic','assembler',24,36,''],['Quality Inspector','quality_inspector',26,38,''],['Maintenance Technician','maintenance_tech',28,40,'osha10']]],
+    ['jobs@tesla-tx.test','Tesla — Gigafactory Texas','Austin','78725','500+','manufacturing','Model Y & Cybertruck production. Associates, maintenance and controls.',
+      [['Production Associate','assembler',22,30,''],['Equipment Maintenance Tech','equipment_tech',28,40,'osha10'],['Controls Technician','controls',30,44,'']]],
+    ['hr@ge-oh.test','GE Aerospace','Cincinnati','45215','500+','manufacturing','Jet engine manufacturing. CNC machinists, assemblers and inspectors.',
+      [['CNC Machinist','machinist',27,41,''],['Assembler','assembler',20,28,''],['Quality Inspector','quality_inspector',24,34,'']]],
+    // ---- Healthcare ----
+    ['careers@hca-tn.test','HCA Healthcare','Nashville','37203','500+','healthcare','TriStar hospital network. CNAs, patient care and sterile processing; CNA→RN ladder.',
+      [['Certified Nursing Assistant','cna',18,24,'cna_cert'],['Patient Care Technician','patient_care_tech',18,24,'bls'],['Sterile Processing Tech','sterile_processing',19,26,'bls']]],
+    ['jobs@kaiser-ca.test','Kaiser Permanente','Oakland','94612','500+','healthcare','Integrated care. Medical assistants, phlebotomy and sterile processing; union benefits.',
+      [['Medical Assistant','medical_assistant',24,32,'bls'],['Phlebotomist','phlebotomist',22,29,'bls'],['Sterile Processing Tech','sterile_processing',24,32,'bls']]],
+    ['hr@ccf-oh.test','Cleveland Clinic','Cleveland','44195','500+','healthcare','Top-ranked academic system. Patient care, surgical and sterile processing techs.',
+      [['Patient Care Technician','patient_care_tech',17,23,'bls'],['Surgical Technologist','surgical_tech',25,35,'bls'],['Sterile Processing Tech','sterile_processing',19,26,'bls']]],
+    ['careers@mayo-mn.test','Mayo Clinic','Rochester','55905','500+','healthcare','Destination medical center. CNAs, surgical techs and patient care; tuition support.',
+      [['Certified Nursing Assistant','cna',19,25,'cna_cert'],['Surgical Technologist','surgical_tech',26,36,'bls'],['Patient Care Technician','patient_care_tech',18,24,'bls']]],
+    ['hr@banner-az.test','Banner Health','Phoenix','85006','500+','healthcare','Largest AZ employer. Medical assistants and nursing assistants; weekly pay.',
+      [['Medical Assistant','medical_assistant',19,26,'bls'],['Certified Nursing Assistant','cna',18,24,'cna_cert'],['Patient Care Technician','patient_care_tech',18,24,'bls']]],
+    ['jobs@commonspirit-az.test','CommonSpirit Health','Phoenix','85013','500+','healthcare','Dignity Health hospitals. CNAs, sterile processing and phlebotomy.',
+      [['Certified Nursing Assistant','cna',18,24,'cna_cert'],['Sterile Processing Tech','sterile_processing',19,25,'bls'],['Phlebotomist','phlebotomist',18,25,'bls']]],
+    ['hr@ascension-mo.test','Ascension','St. Louis','63141','500+','healthcare','National Catholic system. Patient care, medical assisting and surgical techs.',
+      [['Patient Care Technician','patient_care_tech',17,23,'bls'],['Medical Assistant','medical_assistant',19,26,'bls'],['Surgical Technologist','surgical_tech',24,34,'bls']]],
+  ];
+  const startRow = await db.prepare('SELECT COALESCE(MAX(id),0) m FROM jobs').get();
+  const startId = (startRow.m||0) + 1;
+  const insEmp = db.prepare('INSERT INTO users(email,pass,role,name,company,company_city,company_size,company_about) VALUES(?,?,?,?,?,?,?,?)');
+  const insJob = db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type,sector) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`);
+  const zlat = Object.fromEntries(Z.map(z=>[z[0],z]));
+  let made=0, emps=0;
+  for(const row of EMP){
+    const [email,co,city,zip,size,sector,about,roles] = row;
+    let u = await db.prepare('SELECT id FROM users WHERE email=?').get(email);
+    let eid = u ? u.id : null;
+    if(!eid){ try { eid = (await insEmp.run(email,pw,'employer',co+' Talent',co,city,size,about)).lastInsertRowid; emps++; } catch(e){ continue; } }
+    for(const [title,trade,lo,hi,cred] of roles){
+      const descr = `${title} at ${co} — ${city}. Real opening in ${sector}; paid training and benefits.`;
+      try { await insJob.run(eid,title,trade,lo,hi,city,zip,'Day',cred||'',descr,'Full-time',sector); made++; } catch(e){}
+    }
+  }
+  // sector workers so supply / candidate map / supply-vs-demand have depth in these trades
+  const insUser = db.prepare('INSERT INTO users(email,pass,role,name) VALUES(?,?,?,?)');
+  const insProf = db.prepare(`INSERT INTO worker_profiles(user_id,trade,trades,headline,about,years_exp,city,zip,pay_floor,shift,available,work_today,relocate,alerts) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+  const firsts=['Marco','Lena','Devon','Priya','Hassan','Gabriela','Trent','Mei','Cole','Yusuf','Renee','Diego','Kara','Omar','Bianca','Seth','Nadia','Russell','Tara','Felix','Joy','Marcus','Elena','Ray','Nora','Paul','Lila','Drew'];
+  const lasts=['Vance','Okafor','Tran','Sharma','Ali','Reyes','Boyd','Lin','Schmidt','Haddad','Park','Mora','Webb','Nasser','Costa','Berg','Iqbal','Stone','Doyle','Romero','Kane','Bell','Petrov','Cruz','Hale','Nguyen','Frost','Mills'];
+  const WT=[
+    ['equipment_tech',30,'Day',[['osha10','2028-04']]],['process_tech',26,'Day',[]],['cleanroom_op',22,'Day',[]],
+    ['maintenance_tech',28,'Day',[['osha10','2028-02']]],['machine_operator',21,'Day',[]],['assembler',20,'Day',[]],
+    ['quality_inspector',24,'Day',[]],['welder',30,'Day',[['aws_welding','2028-01']]],['machinist',30,'Day',[]],
+    ['cna',20,'Any',[['cna_cert','2027-10']]],['patient_care_tech',20,'Any',[['bls','2027-12']]],['surgical_tech',28,'Day',[['bls','2027-11']]],
+    ['sterile_processing',22,'Day',[['bls','2028-03']]],['medical_assistant',22,'Day',[['bls','2027-09']]],
+  ];
+  const cityZ = Z.map(z=>z);
+  let wmade=0;
+  for(let i=0;i<32;i++){
+    const wt = WT[i % WT.length]; const z = cityZ[(i*3) % cityZ.length];
+    const name = firsts[i%firsts.length]+' '+lasts[(i*5)%lasts.length];
+    const email = name.toLowerCase().replace(/[^a-z]+/g,'.')+'.s'+i+'@rivet.test';
+    let uid; try { uid=(await insUser.run(email,pw,'worker',name)).lastInsertRowid; } catch(e){ continue; }
+    const yrs=2+(i%13), lbl=wt[0].replace(/_/g,' ');
+    try { await insProf.run(uid, wt[0], wt[0], `${lbl} in ${z[3]}`, `${yrs}-year ${lbl}. Reliable, safety-first, ready to start.`, yrs, z[3], z[0], wt[1], wt[2], 1, i%4===0?1:0, i%3===0?1:0, 1); } catch(e){ continue; }
+    for(const [k,exp] of wt[3]){ try { await db.prepare('INSERT INTO credentials(user_id,kind,name,verified,expires) VALUES(?,?,?,?,?)').run(uid,k,CRED_KINDS[k]||k,1,exp); } catch(e){} }
+    try { await recomputeReadiness(uid); } catch(e){}
+    wmade++;
+  }
+  // enrich the new sector jobs in place
+  await db.exec(`UPDATE jobs SET pay_cadence='weekly' WHERE id>=${startId} AND (pay_cadence IS NULL OR pay_cadence='')`);
+  await db.exec(`UPDATE jobs SET duration='Ongoing' WHERE id>=${startId} AND (duration IS NULL OR duration='')`);
+  await db.exec(`UPDATE jobs SET sponsorship='authorized' WHERE id>=${startId} AND (sponsorship IS NULL OR sponsorship='')`);
+  await db.exec(`UPDATE jobs SET veteran_ok=1 WHERE id>=${startId} AND trade IN ('equipment_tech','maintenance_tech','electrician','millwright','welder','machinist','controls','process_tech')`);
+  await metaSet('sectors_v1','1');
+  console.log(`[db] sectors seed — +${emps} employers, +${made} sector jobs, +${wmade} workers (mfg/healthcare/semiconductor)`);
+}
+
 // ---- seed a few community board posts (idempotent) ----
 async function seedPosts(){
   if (await metaGet('posts_v1')) return;
@@ -1165,6 +1279,7 @@ async function migrate() {
   try { await db.exec('ALTER TABLE jobs ADD COLUMN pay_cadence TEXT'); } catch (e) { /* daily/weekly/biweekly/monthly */ }
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN self_employed INTEGER DEFAULT 0'); } catch (e) { /* owner-operator / open to subcontract */ }
   try { await db.exec('ALTER TABLE jobs ADD COLUMN subcontract_ok INTEGER DEFAULT 0'); } catch (e) { /* employer open to subcontractors */ }
+  try { await db.exec('ALTER TABLE jobs ADD COLUMN sector TEXT'); } catch (e) { /* semiconductor|manufacturing|healthcare (GTM verticals) */ }
 }
 
 async function seedZips() {
@@ -1218,6 +1333,7 @@ async function init() {
   try { await seedBig(); } catch (e) { console.error('[db] big seed skipped (non-fatal):', e.message); }
   try { await seedCategories(); } catch (e) { console.error('[db] category seed skipped (non-fatal):', e.message); }
   try { await seedMoreJobs(); } catch (e) { console.error('[db] more-jobs seed skipped (non-fatal):', e.message); }
+  try { await seedSectors(); } catch (e) { console.error('[db] sectors seed skipped (non-fatal):', e.message); }
   try { await seedPosts(); } catch (e) { console.error('[db] posts seed skipped (non-fatal):', e.message); }
   try { await seedLocalGig(); } catch (e) { console.error('[db] localgig seed skipped (non-fatal):', e.message); }
   try { await seedExternal(); } catch (e) { console.error('[db] external seed skipped (non-fatal):', e.message); }

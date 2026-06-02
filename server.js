@@ -199,10 +199,13 @@ async function candidateGeo(){
     return {...b, n, cats};
   }).sort((a,b)=>b.n-a.n);
 }
-// ALL open-job locations (for the Pulse demand heat map)
-async function jobGeoAll(){
-  const rows = await db.prepare(`SELECT j.id, j.title, j.trade, j.pay_min, j.pay_max, j.zip, z.lat, z.lon, z.city, u.company
-    FROM jobs j JOIN zip_geo z ON z.zip=j.zip JOIN users u ON u.id=j.employer_id WHERE j.status='open'`).all();
+// open-job map points, optionally scoped to a GTM sector (semiconductor|manufacturing|healthcare)
+async function jobGeoAll(sector){
+  const rows = sector
+    ? await db.prepare(`SELECT j.id, j.title, j.trade, j.pay_min, j.pay_max, j.zip, z.lat, z.lon, z.city, u.company
+        FROM jobs j JOIN zip_geo z ON z.zip=j.zip JOIN users u ON u.id=j.employer_id WHERE j.status='open' AND j.sector=?`).all(sector)
+    : await db.prepare(`SELECT j.id, j.title, j.trade, j.pay_min, j.pay_max, j.zip, z.lat, z.lon, z.city, u.company
+        FROM jobs j JOIN zip_geo z ON z.zip=j.zip JOIN users u ON u.id=j.employer_id WHERE j.status='open'`).all();
   const byZip = {};
   for(const r of rows){
     const _k=r.city||r.zip; const b = byZip[_k] || (byZip[_k] = {city:r.city, lat:r.lat, lon:r.lon, real:0, catReal:{}, items:[]});
@@ -214,6 +217,26 @@ async function jobGeoAll(){
     const cats = Object.entries(b.catReal).map(([k,rc])=>({k, n:Math.max(1,Math.round(n*rc/b.real))})).sort((a,b)=>b.n-a.n);
     return {...b, n, cats};
   }).sort((a,b)=>b.n-a.n);
+}
+// GTM sector page data: real employers, role types, pay band, metro count + map
+async function sectorStats(sector){
+  const jobs = await db.prepare(`SELECT j.trade, j.pay_min, j.pay_max, j.zip, u.company, u.company_city
+    FROM jobs j JOIN users u ON u.id=j.employer_id WHERE j.status='open' AND j.sector=?`).all(sector);
+  const employers = {}, roles = {}; const metros = new Set(); let lo = Infinity, hi = 0;
+  for(const j of jobs){
+    if(j.company){ (employers[j.company] = employers[j.company] || {company:j.company, city:j.company_city, n:0}).n++; }
+    roles[j.trade] = (roles[j.trade]||0) + 1;
+    if(j.zip) metros.add(j.zip);
+    if(j.pay_min) lo = Math.min(lo, j.pay_min);
+    if(j.pay_max) hi = Math.max(hi, j.pay_max);
+  }
+  return {
+    count: jobs.length, metros: metros.size,
+    payLo: lo===Infinity?0:lo, payHi: hi,
+    employers: Object.values(employers).sort((a,b)=>b.n-a.n),
+    roles: Object.entries(roles).map(([trade,n])=>({trade,n})).sort((a,b)=>b.n-a.n),
+    geo: await jobGeoAll(sector),
+  };
 }
 // open-job locations relevant to a worker: their trades (direct) + adjacent trades (related)
 async function jobGeoForWorker(prof){
@@ -586,6 +609,20 @@ const server = http.createServer(async (req,res)=>{
     // ---- Work-in-the-U.S. resource hub — open to all (public, crawlable) ----
     if(p==='/work-authorization' && method==='GET')
       return send(res, V.layout({title:'Work in the U.S.',user,active:'',body:V.workHub()}));
+
+    // ---- GTM sector hubs (public): Manufacturing / Healthcare / Semiconductor ----
+    if(p==='/sectors' && method==='GET'){
+      const keys = ['semiconductor','manufacturing','healthcare'];
+      const cards = [];
+      for(const k of keys){ const s = await sectorStats(k); cards.push({key:k, count:s.count, employers:s.employers.length, payLo:s.payLo, payHi:s.payHi}); }
+      return send(res, V.layout({title:'Industries we serve',user,active:'sectors',body:V.sectorHub(cards)}));
+    }
+    const secMatch = p.match(/^\/sectors\/(semiconductor|manufacturing|healthcare)$/);
+    if(secMatch && method==='GET'){
+      const key = secMatch[1];
+      const s = await sectorStats(key);
+      return send(res, V.layout({title:V.SECTOR_META[key].label+' jobs',user,active:'sectors',body:V.sectorPage({key, ...s})}));
+    }
 
     // ---- Industry Pulse (trends + community board) — open to all ----
     if(p==='/pulse' && method==='GET'){

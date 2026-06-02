@@ -81,6 +81,18 @@ const TRADES = {
   pool_service:    'Pool Service Tech',
   gig_courier:     'Courier / Gig Delivery',
   event_setup:     'Event Setup Crew',
+  // manufacturing & semiconductor
+  equipment_tech:  'Equipment Maintenance Technician',
+  process_tech:    'Process / Fab Technician',
+  cleanroom_op:    'Cleanroom Operator',
+  machine_operator:'Machine Operator',
+  assembler:       'Assembler / Production',
+  maintenance_tech:'Industrial Maintenance Tech',
+  quality_inspector:'Quality Inspector',
+  // healthcare sub-roles
+  patient_care_tech:'Patient Care Technician',
+  sterile_processing:'Sterile Processing Tech',
+  surgical_tech:   'Surgical Technologist',
 };
 
 // Two-level navigation: category → trade keys (every trade appears once; rest fall to "Other").
@@ -88,7 +100,8 @@ const CATEGORIES = {
   'Construction & trades': ['electrician','hvac','plumber','pipefitter','welder','sheet_metal','carpenter','framer','drywall','painter','roofer','mason','concrete','flooring','tile','glazier','insulation','ironworker','boilermaker','controls','solar','low_voltage','fire_sprinkler','elevator_tech','millwright'],
   'Drivers & logistics': ['cdl_driver','delivery_driver','heavy_equipment','crane_operator','warehouse','mover','gig_courier'],
   'Mechanical & repair': ['diesel_mechanic','automotive_tech','machinist','appliance_repair','locksmith','facilities'],
-  'Healthcare & care': ['cna','caregiver','medical_assistant','phlebotomist','emt'],
+  'Manufacturing & semiconductor': ['equipment_tech','process_tech','cleanroom_op','machine_operator','assembler','maintenance_tech','quality_inspector'],
+  'Healthcare & care': ['cna','caregiver','medical_assistant','phlebotomist','emt','patient_care_tech','sterile_processing','surgical_tech'],
   'Food service': ['cook','prep_cook','server','busser','host','dishwasher','bartender','barback'],
   'Agriculture': ['farmworker','fruit_picker','irrigation_tech','packing_shed','ranch_hand','nursery_worker','landscaper'],
   'Cleaning & facilities': ['janitor','housekeeper','pressure_wash','pool_service'],
@@ -317,6 +330,8 @@ const TRADE_DEMAND = {
   busser:0.95, host:0.95, barback:0.95, warehouse:1.05, delivery_driver:1.1, mover:1.0,
   janitor:1.1, housekeeper:1.05, security_guard:1.1, pressure_wash:1.1, junk_removal:1.0,
   gig_courier:1.0, event_setup:1.05,
+  equipment_tech:2.2, process_tech:2.0, cleanroom_op:1.6, machine_operator:1.3, assembler:1.15,
+  maintenance_tech:1.9, quality_inspector:1.4, patient_care_tech:1.6, sterile_processing:1.6, surgical_tech:1.8,
 };
 // Blend the documented national tightness with our live job/worker mix in a metro/trade,
 // dampening sparse-seed swings with a sqrt. Returns platform-scale demand vs supply + a level.

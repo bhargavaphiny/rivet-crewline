@@ -57,6 +57,8 @@ const TRADE_ICON = {
   irrigation_tech:'droplet',packing_shed:'box',ranch_hand:'leaf',nursery_worker:'leaf',
   prep_cook:'utensils',busser:'utensils',host:'utensils',barback:'utensils',
   handyman:'wrench',junk_removal:'truck',pressure_wash:'spray',pool_service:'droplet',gig_courier:'truck',event_setup:'box',
+  equipment_tech:'wrench',process_tech:'layers',cleanroom_op:'box',machine_operator:'toolbox',assembler:'box',
+  maintenance_tech:'wrench',quality_inspector:'check',patient_care_tech:'heart',sterile_processing:'shield',surgical_tech:'cross',
 };
 
 const esc = s => String(s == null ? '' : s)
@@ -69,7 +71,7 @@ let LANG = 'en';
 function setLang(l){ LANG = (l === 'es') ? 'es' : 'en'; }
 const I18N = {
   en: {
-    nav_login:'Log in', nav_get_started:'Get started', nav_home:'Home', nav_find_work:'Jobs',
+    nav_login:'Log in', nav_get_started:'Get started', nav_home:'Home', nav_find_work:'Jobs', nav_industries:'Industries',
     nav_work_card:'Work Card', nav_applications:'Applications', nav_training:'Learn', nav_pulse:'Pulse', nav_messages:'Messages',
     nav_hiring:'Hiring →', nav_working:'Working →', nav_logout:'Log out', mode_work:'Work', mode_hire:'Hire',
     nav_overview:'Overview', nav_talent:'Talent', nav_jobs:'Jobs', nav_analytics:'Analytics', nav_agents:'Agents',
@@ -116,7 +118,7 @@ const I18N = {
     x_bilingual_on:'Bilingual (EN/ES)', x_bilingual_off:'Tap: Bilingual',
   },
   es: {
-    nav_login:'Entrar', nav_get_started:'Empezar', nav_home:'Inicio', nav_find_work:'Empleos',
+    nav_login:'Entrar', nav_get_started:'Empezar', nav_home:'Inicio', nav_find_work:'Empleos', nav_industries:'Industrias',
     nav_work_card:'Mi perfil', nav_applications:'Solicitudes', nav_training:'Aprender', nav_pulse:'Pulso', nav_messages:'Mensajes',
     nav_hiring:'Contratar →', nav_working:'Trabajar →', nav_logout:'Salir', mode_work:'Trabajo', mode_hire:'Contratar',
     nav_overview:'Resumen', nav_talent:'Talento', nav_jobs:'Empleos', nav_analytics:'Analíticas', nav_agents:'Agentes',
@@ -300,7 +302,7 @@ const BUILTIN_ES = {
   'Filter by type':'Filtrar por tipo','All types':'Todos los tipos','No openings in this type here.':'No hay vacantes de este tipo aquí.',
   'Construction & trades':'Construcción y oficios','Drivers & logistics':'Conductores y logística','Mechanical & repair':'Mecánica y reparación',
   'Healthcare & care':'Salud y cuidado','Food service':'Servicio de comida','Agriculture':'Agricultura',
-  'Cleaning & facilities':'Limpieza e instalaciones','Security':'Seguridad','Freelance & gig':'Independiente y por encargo',
+  'Cleaning & facilities':'Limpieza e instalaciones','Security':'Seguridad','Freelance & gig':'Independiente y por encargo','Manufacturing & semiconductor':'Manufactura y semiconductores',
   'Sourced':'Captado','Screened':'Filtrado','Interview':'Entrevista','Offer':'Oferta','Match':'Coincidencia','Pipeline':'Flujo','All jobs':'Todos los empleos',
   'matching worker with alerts on was notified about this job.':'trabajador compatible con alertas activas fue notificado sobre este empleo.',
   'matching workers with alerts on were notified about this job.':'trabajadores compatibles con alertas activas fueron notificados sobre este empleo.',
@@ -409,7 +411,8 @@ function layout({ title, user, body, active = '', flash = '' }) {
       <a class="seg-opt ${cur==='work'?'on':''}" href="/app">${t('mode_work')}</a><a class="seg-opt ${cur==='hire'?'on':''}" href="/console">${t('mode_hire')}</a></div>`;
   let nav = '';
   if (!user) {
-    nav = `<a class="nav-link" href="/login">${t('nav_login')}</a>
+    nav = `<a class="nav-link ${active==='sectors'?'on':''}" href="/sectors">${t('nav_industries')}</a>
+           <a class="nav-link" href="/login">${t('nav_login')}</a>
            <a class="btn-sm" href="/signup">${t('nav_get_started')}</a>${langTg}`;
   } else if ((user.mode || user.role) === 'worker') {
     const L = (h,l,k)=>`<a class="nav-link ${active===k?'on':''}" href="${h}">${l}</a>`;
@@ -453,7 +456,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=80">
+  <link rel="stylesheet" href="/styles.css?v=81">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1570,12 +1573,12 @@ let _rvMapSeq = 0;
 const CAT_COLOR = {
   'Construction & trades':'#E8923A','Drivers & logistics':'#2B6EC9','Mechanical & repair':'#6D5BD0',
   'Healthcare & care':'#E0556E','Food service':'#0FA9AE','Agriculture':'#7E9B2F',
-  'Cleaning & facilities':'#C77DBB','Security':'#5A6B7B','Freelance & gig':'#D98C2B','Other':'#8A8A8A',
+  'Cleaning & facilities':'#C77DBB','Security':'#5A6B7B','Freelance & gig':'#D98C2B','Manufacturing & semiconductor':'#3F7CAC','Other':'#8A8A8A',
 };
 const CAT_ICON = {
   'Construction & trades':'hammer','Drivers & logistics':'truck','Mechanical & repair':'wrench',
   'Healthcare & care':'heart','Food service':'utensils','Agriculture':'leaf',
-  'Cleaning & facilities':'spray','Security':'shield','Freelance & gig':'toolbox','Other':'dot',
+  'Cleaning & facilities':'spray','Security':'shield','Freelance & gig':'toolbox','Manufacturing & semiconductor':'layers','Other':'dot',
 };
 // SVG path + fill-flag per category, embedded inside each map pin for fast type scanning
 const CAT_ICON_DATA = Object.fromEntries(Object.entries(CAT_ICON).map(([cat,nm])=>{
@@ -2157,5 +2160,85 @@ function ogImage() {
 </svg>`;
 }
 
+// ---------- GTM sector pages (Manufacturing / Healthcare / Semiconductor) ----------
+const SECTOR_META = {
+  semiconductor: { label:'Semiconductor', emoji:'🔬', color:'#3F7CAC',
+    tag:'Build the chips that power America',
+    blurb:'The CHIPS Act is funding the biggest semiconductor build-out in U.S. history. TSMC, Intel, Micron, GlobalFoundries and Samsung are hiring thousands of equipment, process and facilities technicians right now — paid training, no four-year degree required.' },
+  manufacturing: { label:'Manufacturing', emoji:'🏭', color:'#E8923A',
+    tag:'Make the things that move the world',
+    blurb:'From EVs to jet engines, American manufacturers need welders, machinists, assemblers and maintenance techs. Real wages, real benefits, real ladders — at GM, Ford, Boeing, Caterpillar, Tesla and more.' },
+  healthcare: { label:'Healthcare', emoji:'🏥', color:'#E0556E',
+    tag:'Frontline healthcare careers',
+    blurb:'Hospitals and clinics are short-staffed nationwide. Start as a CNA, patient-care, sterile-processing or surgical tech at HCA, Kaiser, Cleveland Clinic, Mayo and more — with a clear path up to nursing.' },
+};
+function sectorHub(cards = []){
+  return `<section class="wrap">
+    <div class="sec-h big">${T('Industries we serve')} <span class="muted">${T('Real openings, verified workers, AI matching')}</span></div>
+    <p class="muted" style="margin:-6px 0 18px;max-width:640px">${T('We package Rivet for the sectors hiring hardest right now — with real employers, sector-specific credentials, and a talent pool built for each industry.')}</p>
+    <div class="grid3">
+      ${cards.map(c=>{const m=SECTOR_META[c.key];return `<a class="card sector-card" href="/sectors/${c.key}" style="--sc:${m.color}">
+        <div class="sector-emoji">${m.emoji}</div>
+        <div class="sector-nm">${T(m.label)}</div>
+        <p class="muted sm">${T(m.tag)}</p>
+        <div class="sector-stats"><span><b>${c.count?(c.count*180).toLocaleString():'—'}</b> ${T('openings')}</span><span><b>${c.employers}</b> ${T('top employers')}</span>${c.payHi?`<span><b>$${c.payLo}–${c.payHi}</b>/hr</span>`:''}</div>
+        <span class="sector-go">${T('Explore')} ${m.label} →</span>
+      </a>`;}).join('')}
+    </div>
+    ${whyRivetBlock()}
+  </section>`;
+}
+function sectorPage({ key, count, metros, payLo, payHi, employers = [], roles = [], geo = [] }){
+  const m = SECTOR_META[key];
+  const scaled = (count*180).toLocaleString(); // platform-scale estimate, consistent with the demand map
+  return `<section class="wrap">
+    <a class="back" href="/sectors">← ${T('All industries')}</a>
+    <div class="card sector-hero" style="--sc:${m.color}">
+      <div class="sector-hero-emoji">${m.emoji}</div>
+      <h1>${T(m.label)} ${T('jobs on Rivet')}</h1>
+      <p class="sector-tag">${T(m.tag)}</p>
+      <p class="sector-blurb">${T(m.blurb)}</p>
+      <div class="sector-kpis">
+        <div class="skpi"><b>${scaled}</b><span>${T('open roles (U.S.)')}</span></div>
+        <div class="skpi"><b>${employers.length}</b><span>${T('hiring employers')}</span></div>
+        <div class="skpi"><b>${metros}</b><span>${T('metros')}</span></div>
+        ${payHi?`<div class="skpi"><b>$${payLo}–${payHi}</b><span>${T('typical pay/hr')}</span></div>`:''}
+      </div>
+      <div class="sector-cta"><a class="btn" href="/signup?role=worker">${T('Find these jobs')}</a><a class="btn ghost" href="/signup?role=employer">${T('Hire for this sector')}</a></div>
+    </div>
+    ${geo.length ? usMap(geo, {title:`${T('Where')} ${T(m.label)} ${T('is hiring')}`, noun:T('job'), cta:T('View')}) : ''}
+    <div class="grid2">
+      <div class="card">
+        <div class="sec-h" style="margin-top:0">${T('Top employers hiring now')}</div>
+        ${employers.length ? employers.slice(0,10).map((e,i)=>`<div class="trend-row">
+          <span class="trend-rank">${i+1}</span>
+          <span class="trend-ic">${icon('building','tic')}</span>
+          <div class="trend-main"><div class="trend-nm">${esc(e.company)}</div><div class="muted sm">${esc(e.city||'')}</div></div>
+          <b class="trend-n">${e.n}</b></div>`).join('') : `<p class="muted">${T('No employers yet.')}</p>`}
+      </div>
+      <div class="card">
+        <div class="sec-h" style="margin-top:0">${T('Roles in demand')}</div>
+        <div class="role-grid">${roles.slice(0,12).map(r=>`<a class="role-chip" href="/jobs?trade=${r.trade}">${tradeEmoji(r.trade)} <span>${esc(TRADES[r.trade]||r.trade)}</span><b>${r.n}</b></a>`).join('') || `<p class="muted">${T('No roles yet.')}</p>`}</div>
+        <p class="muted sm" style="margin-top:10px">${T('Credentials we verify for this sector help you stand out — add them to your Work Card.')}</p>
+      </div>
+    </div>
+    ${whyRivetBlock()}
+    <div class="card cta-band"><div><b>${T('Ready to get hired in')} ${T(m.label)}?</b><p class="muted sm" style="margin:4px 0 0">${T('Build a verified Work Card in minutes — it’s free for workers, always.')}</p></div>
+      <a class="btn" href="/signup?role=worker">${T('Get started')}</a></div>
+  </section>`;
+}
+function whyRivetBlock(){
+  const rows = [
+    ['shield', T('Verified Work Card'), T('Credentials checked — OSHA, CDL, EPA, licenses. Not an anonymous listing.')],
+    ['spark', T('AI matching, not searching'), T('We score fit on trade, pay, location and credentials and surface the best — you don’t dig through spam.')],
+    ['check', T('Trust both ways'), T('Show-Up Score, Paid-Like-Promised, and two-sided ratings keep everyone honest.')],
+    ['pin', T('Built for the trades'), T('Bilingual, mobile-first, and free for workers — unlike generic job boards.')],
+  ];
+  return `<div class="card whyrivet">
+    <div class="sec-h" style="margin-top:0">${T('Why Rivet, not Craigslist or Indeed')}</div>
+    <div class="why-grid">${rows.map(([ic,h,b])=>`<div class="why-item"><span class="why-ic">${icon(ic)}</span><div><b>${h}</b><p class="muted sm">${b}</p></div></div>`).join('')}</div>
+  </div>`;
+}
+
 module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP };
+  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage };
