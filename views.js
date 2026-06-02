@@ -71,7 +71,7 @@ let LANG = 'en';
 function setLang(l){ LANG = (l === 'es') ? 'es' : 'en'; }
 const I18N = {
   en: {
-    nav_login:'Log in', nav_get_started:'Get started', nav_home:'Home', nav_find_work:'Jobs', nav_industries:'Industries', nav_careers:'Careers',
+    nav_login:'Log in', nav_get_started:'Get started', nav_home:'Home', nav_find_work:'Jobs', nav_industries:'Industries', nav_careers:'Careers', nav_shifts:'Shifts',
     nav_work_card:'Work Card', nav_applications:'Applications', nav_training:'Learn', nav_pulse:'Pulse', nav_messages:'Messages',
     nav_hiring:'Hiring →', nav_working:'Working →', nav_logout:'Log out', mode_work:'Work', mode_hire:'Hire',
     nav_overview:'Overview', nav_talent:'Talent', nav_jobs:'Jobs', nav_analytics:'Analytics', nav_agents:'Agents',
@@ -118,7 +118,7 @@ const I18N = {
     x_bilingual_on:'Bilingual (EN/ES)', x_bilingual_off:'Tap: Bilingual',
   },
   es: {
-    nav_login:'Entrar', nav_get_started:'Empezar', nav_home:'Inicio', nav_find_work:'Empleos', nav_industries:'Industrias', nav_careers:'Carreras',
+    nav_login:'Entrar', nav_get_started:'Empezar', nav_home:'Inicio', nav_find_work:'Empleos', nav_industries:'Industrias', nav_careers:'Carreras', nav_shifts:'Turnos',
     nav_work_card:'Mi perfil', nav_applications:'Solicitudes', nav_training:'Aprender', nav_pulse:'Pulso', nav_messages:'Mensajes',
     nav_hiring:'Contratar →', nav_working:'Trabajar →', nav_logout:'Salir', mode_work:'Trabajo', mode_hire:'Contratar',
     nav_overview:'Resumen', nav_talent:'Talento', nav_jobs:'Empleos', nav_analytics:'Analíticas', nav_agents:'Agentes',
@@ -419,7 +419,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   } else if ((user.mode || user.role) === 'worker') {
     const L = (h,l,k)=>`<a class="nav-link ${active===k?'on':''}" href="${h}">${l}</a>`;
     const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/app/messages">${t('nav_messages')}${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
-    nav = `${L('/app',t('nav_home'),'home')}${L('/app/jobs',t('nav_find_work'),'jobs')}${L('/app/agents',t('nav_agents'),'agents')}${L('/app/profile',t('nav_work_card'),'profile')}${L('/app/applications',t('nav_applications'),'apps')}${L('/app/training',t('nav_training'),'training')}${L('/pulse',t('nav_pulse'),'pulse')}${msg}
+    nav = `${L('/app',t('nav_home'),'home')}${L('/app/jobs',t('nav_find_work'),'jobs')}${L('/app/shifts',t('nav_shifts'),'shifts')}${L('/app/agents',t('nav_agents'),'agents')}${L('/app/profile',t('nav_work_card'),'profile')}${L('/app/applications',t('nav_applications'),'apps')}${L('/app/training',t('nav_training'),'training')}${L('/pulse',t('nav_pulse'),'pulse')}${msg}
            ${modeTg('work')}
            <span class="who">${initials(user.name)}</span>
            <a class="nav-link" href="/logout">${t('nav_logout')}</a>${langTg}`;
@@ -458,7 +458,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=87">
+  <link rel="stylesheet" href="/styles.css?v=88">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1512,6 +1512,34 @@ function landJob({ job, company = '', score = 0, breakdown = {}, missing = [], r
   </section>`;
 }
 
+// ---------- Verified shift & contract marketplace (the money engine) ----------
+function fmtShiftDate(d){ try { return new Date(d+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}); } catch(e){ return d; } }
+function t12(hm){ const [h,m] = String(hm).split(':').map(Number); const ap = h>=12?'p':'a'; const hh = ((h+11)%12)+1; return hh + (m?(':'+String(m).padStart(2,'0')):'') + ap; }
+function shiftHours(s){ const [a,b]=String(s.start_time).split(':').map(Number); const [c,d]=String(s.end_time).split(':').map(Number); let h=(c+d/60)-(a+b/60); if(h<=0)h+=24; return Math.round(h*10)/10; }
+function shiftCard(s){
+  const hrs = shiftHours(s), earn = Math.round((s.pay_rate||0)*hrs);
+  const kl = {'per-diem':T('Per-diem'),'contract':T('Contract'),'travel':T('Travel')}[s.kind] || s.kind;
+  return `<div class="card shift-card ${s.kind}">
+    <div class="shift-top"><span class="shift-kind ${s.kind}">${kl}</span>${s.urgent?`<span class="shift-urgent">${icon('flame')} ${T('Fills fast')}</span>`:''}${s.mine?`<span class="shift-fit">${T('Your trade')}</span>`:''}</div>
+    <div class="shift-title">${tradeEmoji(s.trade)} ${esc(s.title)}</div>
+    <div class="muted sm">${esc(s.company||'')} · ${esc(s.city||'')}${s.distance!=null?` · ${s.distance} mi`:''}</div>
+    <div class="shift-when">${icon('bell')} ${fmtShiftDate(s.date)} · ${t12(s.start_time)}–${t12(s.end_time)} <span class="muted">(${hrs} ${T('hrs')})</span></div>
+    <div class="shift-pay"><b>$${s.pay_rate}/hr</b> <span class="muted sm">· ~$${earn.toLocaleString()} ${T('this shift')} · ${T('paid next day')}</span></div>
+    <div class="shift-foot">
+      ${s.claimed?`<span class="v ok">${T('Claimed ✓')}</span>`:s.status==='filled'?`<span class="muted sm">${T('Just filled')}</span>`:`<form method="post" action="/app/shifts/${s.id}/claim"><button class="btn-sm">${T('Claim shift')} →</button></form>`}
+      <span class="shift-noagency">${icon('check')} ${T('No agency cut')}</span>
+    </div>
+  </div>`;
+}
+function shiftsBoard({ shifts = [], showUp = null }){
+  return `<section class="wrap">
+    <div class="sec-h big">${icon('bolt','xic')} ${T('Open shifts & contracts')} <span class="muted">${T('Get paid this week — no agency, no résumé')}</span></div>
+    <div class="card shift-banner"><div class="sb-txt">${T('Verified workers claim open shifts straight from the employer — per-diem, contract and travel. You keep your full rate; we cut out the staffing agency.')}</div>
+      ${showUp!=null?`<span class="shift-su">${icon('check')} ${T('Your Show-Up Score')}: <b>${showUp}%</b></span>`:`<span class="shift-su muted sm">${T('Verify your Work Card to claim faster')}</span>`}</div>
+    ${shifts.length?`<div class="grid3 shift-grid">${shifts.map(shiftCard).join('')}</div>`:`<p class="muted">${T('No open shifts right now — check back soon.')}</p>`}
+  </section>`;
+}
+
 // ---------- Career guides: everything about each role (real BLS data + Rivet hiring) ----------
 function careerGuide({ trade, employers = [], metros = [], openCount = 0 }){
   const r = ROLE_BLS[trade], lt = LEARN_TRACKS[trade];
@@ -2518,4 +2546,4 @@ function whyRivetBlock(){
 }
 
 module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard };
+  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard, shiftsBoard };

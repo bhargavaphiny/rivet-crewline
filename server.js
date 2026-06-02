@@ -1219,6 +1219,27 @@ const server = http.createServer(async (req,res)=>{
           job, company:job.company||'', score:match.score, breakdown:match.breakdown, missing:match.missing,
           readiness:prof.readiness||0, haveCreds:creds.filter(c=>c.verified).map(c=>c.kind), distance, applied, external, trust })}));
       }
+      if(p==='/app/shifts' && method==='GET'){
+        const today = new Date().toISOString().slice(0,10);
+        const rows = await db.prepare(`SELECT s.*, u.company, z.lat, z.lon FROM shifts s JOIN users u ON u.id=s.employer_id LEFT JOIN zip_geo z ON z.zip=s.zip WHERE (s.status='open' OR s.id IN (SELECT shift_id FROM shift_claims WHERE worker_id=?)) AND s.date>=? ORDER BY s.date ASC LIMIT 60`).all(user.id, today);
+        const claimed = new Set((await db.prepare('SELECT shift_id FROM shift_claims WHERE worker_id=?').all(user.id)).map(r=>r.shift_id));
+        const trades = new Set(profTrades(prof));
+        const home = await geocodeZip(prof.zip);
+        const shifts = rows.map(s=>{ const dist = (home && s.lat!=null) ? Math.round(haversineMi(home,{lat:s.lat,lon:s.lon})) : null; return {...s, claimed:claimed.has(s.id), distance:dist, mine:trades.has(s.trade)}; })
+          .sort((a,b)=> (b.mine?1:0)-(a.mine?1:0) || ((a.distance==null?1e9:a.distance)-(b.distance==null?1e9:b.distance)) || (a.date<b.date?-1:1));
+        const su = await showUp(user.id);
+        return send(res, V.layout({title:'Open shifts',user,active:'shifts',body:V.shiftsBoard({shifts, showUp:su.pct})}));
+      }
+      if(jid && p===`/app/shifts/${jid}/claim` && method==='POST'){
+        const s = await db.prepare("SELECT * FROM shifts WHERE id=? AND status='open'").get(jid);
+        if(s){
+          try { await db.prepare('INSERT INTO shift_claims(shift_id,worker_id) VALUES(?,?)').run(jid, user.id); } catch(e){}
+          const n = (await db.prepare('SELECT COUNT(*) c FROM shift_claims WHERE shift_id=?').get(jid)).c;
+          if(n >= (s.slots||1)) await db.prepare("UPDATE shifts SET status='filled' WHERE id=?").run(jid);
+          if(s.employer_id){ try { await sendMessage(user.id, s.employer_id, `I claimed your "${s.title}" shift on ${s.date}. Verified Work Card attached — ready to go.`); } catch(e){} }
+        }
+        return redirect(res, '/app/shifts');
+      }
       if(jid && p===`/app/jobs/${jid}/apply` && method==='POST'){
         const job = await db.prepare('SELECT * FROM jobs WHERE id=?').get(jid);
         if(job){ const m=bestMatch(prof,await getCreds(user.id),job);

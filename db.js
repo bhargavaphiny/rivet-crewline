@@ -232,6 +232,27 @@ async function createSchema() {
       created_at TEXT DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_crew_worker ON crew_members(worker_id);
+    CREATE TABLE IF NOT EXISTS shifts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      employer_id INTEGER REFERENCES users(id),
+      title TEXT, trade TEXT, sector TEXT,
+      city TEXT, zip TEXT,
+      date TEXT, start_time TEXT, end_time TEXT,
+      pay_rate REAL, kind TEXT DEFAULT 'per-diem',
+      slots INTEGER DEFAULT 1, urgent INTEGER DEFAULT 0,
+      descr TEXT DEFAULT '', status TEXT DEFAULT 'open', seeded INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS shift_claims (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      shift_id INTEGER REFERENCES shifts(id),
+      worker_id INTEGER REFERENCES users(id),
+      status TEXT DEFAULT 'claimed',
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(shift_id, worker_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_shifts_status ON shifts(status);
+    CREATE INDEX IF NOT EXISTS idx_shift_claims_worker ON shift_claims(worker_id);
     CREATE INDEX IF NOT EXISTS idx_interviews_worker ON interviews(worker_id, status);
     CREATE INDEX IF NOT EXISTS idx_interviews_job ON interviews(job_id);
     CREATE INDEX IF NOT EXISTS idx_messages_to ON messages(to_id, read_at);
@@ -948,6 +969,44 @@ async function seedSectors(){
   console.log(`[db] sectors seed — +${emps} employers, +${made} sector jobs, +${wmade} workers (mfg/healthcare/semiconductor)`);
 }
 
+// ---- Verified shift & contract marketplace: rolling open shifts for the money roles ----
+// Self-refreshing: drops past shifts, tops up to a live set of upcoming per-diem/contract gigs.
+async function seedShifts(){
+  const { TRADES } = require('./matching');
+  const today = new Date().toISOString().slice(0,10);
+  try { await db.exec(`DELETE FROM shift_claims WHERE shift_id IN (SELECT id FROM shifts WHERE seeded=1 AND date < '${today}')`); } catch(e){}
+  try { await db.exec(`DELETE FROM shifts WHERE seeded=1 AND date < '${today}'`); } catch(e){}
+  const cnt = (await db.prepare("SELECT COUNT(*) c FROM shifts WHERE seeded=1 AND status='open' AND date >= ?").get(today)).c;
+  if(cnt >= 16) return;
+  const T = [
+    ['Per-Diem CNA','cna','healthcare','per-diem',22,'07:00','19:00'],
+    ['Patient Care Tech — Nights','patient_care_tech','healthcare','per-diem',24,'19:00','07:00'],
+    ['Sterile Processing Tech — Contract','sterile_processing','healthcare','contract',30,'06:00','14:30'],
+    ['Surgical Tech — Per-Diem','surgical_tech','healthcare','per-diem',34,'07:00','15:30'],
+    ['Equipment Maintenance Tech — Contract','equipment_tech','semiconductor','contract',42,'06:00','18:00'],
+    ['Process Technician — Weekend','process_tech','semiconductor','per-diem',28,'06:00','18:00'],
+    ['Industrial Maintenance Tech — Contract','maintenance_tech','manufacturing','contract',38,'06:00','18:00'],
+    ['Shutdown Welder — Travel','welder','manufacturing','travel',40,'06:00','18:00'],
+    ['Warehouse Associate — Same-Day','warehouse','manufacturing','per-diem',20,'08:00','16:30'],
+    ['CNC Machinist — Contract','machinist','manufacturing','contract',34,'06:00','16:30'],
+  ];
+  const ins = db.prepare(`INSERT INTO shifts(employer_id,title,trade,sector,city,zip,date,start_time,end_time,pay_rate,kind,slots,urgent,descr,status,seeded) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'open',1)`);
+  let made=0, di=1;
+  for(let i=0;i<T.length;i++){
+    const [title,trade,sector,kind,pay,st,en] = T[i];
+    let pool = await db.prepare(`SELECT j.employer_id eid,u.company,j.city,j.zip FROM jobs j JOIN users u ON u.id=j.employer_id WHERE j.trade=? AND j.zip IS NOT NULL GROUP BY j.employer_id LIMIT 2`).all(trade);
+    if(!pool.length) pool = await db.prepare(`SELECT j.employer_id eid,u.company,j.city,j.zip FROM jobs j JOIN users u ON u.id=j.employer_id WHERE j.sector=? AND j.zip IS NOT NULL GROUP BY j.employer_id LIMIT 2`).all(sector);
+    for(const e of pool){
+      const d = new Date(); d.setDate(d.getDate()+di); di = (di % 9) + 1;
+      const date = d.toISOString().slice(0,10);
+      const urgent = (made % 4 === 0) ? 1 : 0;
+      const descr = `${kind==='contract'?'Contract':kind==='travel'?'Travel':'Per-diem'} ${TRADES[trade]||trade} at ${e.company} — verified workers only, paid fast, no agency cut.`;
+      try { await ins.run(e.eid, title, trade, sector, e.city, e.zip, date, st, en, pay, kind, 1, urgent, descr); made++; } catch(ex){}
+    }
+  }
+  console.log(`[db] shifts seed — +${made} open shifts (per-diem + contract money roles)`);
+}
+
 // ---- seed a few community board posts (idempotent) ----
 async function seedPosts(){
   if (await metaGet('posts_v1')) return;
@@ -1334,6 +1393,7 @@ async function init() {
   try { await seedCategories(); } catch (e) { console.error('[db] category seed skipped (non-fatal):', e.message); }
   try { await seedMoreJobs(); } catch (e) { console.error('[db] more-jobs seed skipped (non-fatal):', e.message); }
   try { await seedSectors(); } catch (e) { console.error('[db] sectors seed skipped (non-fatal):', e.message); }
+  try { await seedShifts(); } catch (e) { console.error('[db] shifts seed skipped (non-fatal):', e.message); }
   try { await seedPosts(); } catch (e) { console.error('[db] posts seed skipped (non-fatal):', e.message); }
   try { await seedLocalGig(); } catch (e) { console.error('[db] localgig seed skipped (non-fatal):', e.message); }
   try { await seedExternal(); } catch (e) { console.error('[db] external seed skipped (non-fatal):', e.message); }

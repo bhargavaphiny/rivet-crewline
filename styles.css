@@ -609,6 +609,28 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .trust-list li:last-child{border-bottom:0}
 .trust-list svg{width:15px;height:15px;flex:none;margin-top:2px}
 .trust-list .tr-ok svg{color:#157a52}.trust-list .tr-warn svg{color:#b7322a}.trust-list .tr-info svg{color:var(--muted)}
+/* Shift & contract marketplace */
+.shift-banner{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;background:linear-gradient(180deg,#fbf1e6,var(--card));border:1px solid #e6d3b8}
+.shift-banner .sb-txt{flex:1;min-width:240px;font-size:14px;color:var(--steel)}
+.shift-su{font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:6px;color:#157a52}
+.shift-su svg{width:14px;height:14px}
+.shift-grid{margin-top:14px}
+.shift-card{display:flex;flex-direction:column;gap:6px;border-top:4px solid var(--line)}
+.shift-card.contract{border-top-color:#6D5BD0}.shift-card.travel{border-top-color:#0FA9AE}.shift-card.per-diem{border-top-color:#E8923A}
+.shift-top{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.shift-kind{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:3px 9px;border-radius:11px;background:rgba(232,146,58,.16);color:#9a6a1f}
+.shift-kind.contract{background:rgba(109,91,208,.16);color:#5a48b0}.shift-kind.travel{background:rgba(15,169,174,.16);color:#0a7d81}
+.shift-urgent{font-size:10px;font-weight:800;color:#b7322a;display:inline-flex;align-items:center;gap:3px}
+.shift-urgent svg{width:12px;height:12px}
+.shift-fit{font-size:10px;font-weight:800;color:#157a52;background:rgba(31,169,113,.14);padding:3px 8px;border-radius:10px}
+.shift-title{font-size:15px;font-weight:800;display:flex;align-items:center;gap:6px}
+.shift-title svg{width:15px;height:15px;color:var(--steel)}
+.shift-when{font-size:13px;display:flex;align-items:center;gap:6px;color:var(--steel)}
+.shift-when svg{width:14px;height:14px;color:var(--muted)}
+.shift-pay b{font-size:17px;color:var(--brand-d)}
+.shift-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px;border-top:1px solid var(--line);padding-top:8px}
+.shift-noagency{font-size:11px;color:#157a52;font-weight:700;display:inline-flex;align-items:center;gap:4px}
+.shift-noagency svg{width:12px;height:12px}
 .jobpin.near svg{filter:drop-shadow(0 0 4px rgba(31,169,113,.55)) drop-shadow(0 1.5px 2px rgba(0,0,0,.3))}
 .map-tools{display:flex;align-items:center;gap:9px;margin:0 0 12px;flex-wrap:wrap}
 .map-tools .mt-label{font-size:12.5px;font-weight:800;color:var(--steel)}
