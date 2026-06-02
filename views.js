@@ -458,7 +458,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=86">
+  <link rel="stylesheet" href="/styles.css?v=87">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -970,7 +970,41 @@ function workerJobs({ matches, filters = {}, jobsGeo = null, needZip = false }) 
 }
 
 // ---------- worker: job detail ----------
+// "Is this job worth it?" — the worker-protection trust verdict. Composes real signals so a
+// vulnerable worker never wastes effort on a ghost listing, an agency, or an underpaying job.
+function trustVerdict(job, sig = {}){
+  const { rating = {avg:0,count:0}, pay = {}, rehire = 0, safety = {avg:0,n:0}, payFloor = 0, marketHr = 0 } = sig;
+  const reasons = [];
+  const company = String(job.company||'');
+  const external = !!(job.apply_url && /^https?:\/\//i.test(job.apply_url));
+  const agency = /staffing|staff |agency|temp\b|temps\b|labor ready|labour|recruit/i.test(company);
+  if(agency) reasons.push(['warn', T('Staffing agency — confirm who you’d actually work for and the real pay.')]);
+  else if(external) reasons.push(['ok', `${T('Listed directly on')} ${esc(company)}${T('’s official careers site')}`]);
+  else if(job.company_about) reasons.push(['ok', T('Verified employer with a real company profile')]);
+  else if(job.poster_kind==='individual') reasons.push(['info', T('Individual/homeowner posting — agree on scope and pay up front.')]);
+  else reasons.push(['info', T('Newer employer — limited history yet.')]);
+  if(pay && pay.n>0) reasons.push([pay.pct>=90?'ok':'warn', `${T('Pays on time')} — ${pay.pct}% (${pay.n})`]);
+  if(safety && safety.n>0) reasons.push([safety.avg>=4?'ok':'warn', `${T('Site safety')} ${safety.avg.toFixed(1)}/5 (${safety.n})`]);
+  if(rehire>0) reasons.push(['ok', `${rehire} ${rehire===1?T('worker came back for more'):T('workers came back for more')}`]);
+  if(rating && rating.count>0) reasons.push([rating.avg>=4?'ok':'info', `${rating.avg.toFixed(1)}/5 ${T('from')} ${rating.count} ${T('workers')}`]);
+  if(marketHr && job.pay_max) reasons.push([job.pay_max>=marketHr?'ok':'warn', job.pay_max>=marketHr ? `${T('Pay is at/above the national median')} (~$${marketHr}/hr)` : `${T('Below the typical')} ~$${marketHr}/hr — ${T('worth negotiating')}`]);
+  if(payFloor && job.pay_max && job.pay_max>=payFloor) reasons.push(['ok', T('Meets your pay floor')]);
+  const warns = reasons.filter(r=>r[0]==='warn').length, oks = reasons.filter(r=>r[0]==='ok').length;
+  const level = warns>=2 ? 'caution' : (oks>=2 && warns===0) ? 'trusted' : 'solid';
+  const label = level==='trusted' ? T('Looks trustworthy') : level==='caution' ? T('Proceed carefully — check these') : T('Reasonable — a few unknowns');
+  return { level, label, reasons };
+}
+function trustCard(v){
+  if(!v || !v.reasons.length) return '';
+  const ic = {ok:'check',warn:'warn',info:'dot'};
+  return `<div class="card trust-card ${v.level}">
+    <div class="trust-h"><span class="trust-badge ${v.level}">${v.level==='trusted'?icon('shield'):v.level==='caution'?icon('warn'):icon('dot')} ${esc(v.label)}</span>
+      <span class="muted sm">${T('Is this job worth it?')}</span></div>
+    <ul class="trust-list">${v.reasons.map(([k,t])=>`<li class="tr-${k}">${icon(ic[k]||'dot')} <span>${t}</span></li>`).join('')}</ul>
+  </div>`;
+}
 function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance = null, rules = null, empRating = {avg:0,count:0}, workAuth = '', empPay = {}, myQuote = null, payFloor = 0, empRehire = 0, empSafety = {} }) {
+  const _trust = trustCard(trustVerdict(job, { rating:empRating, pay:empPay, rehire:empRehire, safety:empSafety, payFloor, marketHr: ROLE_BLS[job.trade]?Math.round(ROLE_BLS[job.trade].med/2080):0 }));
   const belowMin = rules && job.pay_min && job.pay_min < rules.minWage;
   const spon = (job.sponsorship)||'authorized';
   const sponMatch = (spon==='h2a'&&workAuth==='need_h2a')||(spon==='h2b'&&workAuth==='need_h2b');
@@ -1014,6 +1048,7 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
         ${bd(T('Credentials'),match.breakdown.cred,15)}
       </div>
       ${match.missing.length?`<div class="warn-card">${T('Missing')}: ${match.missing.map(k=>CRED_KINDS[k]||k).join(', ')} — <a href="/app/training" style="font-weight:700;color:inherit;text-decoration:underline">${T('see how to earn it')}</a> ${T('to boost this match.')}</div>`:''}
+      ${_trust}
       <a class="btn full gameplan-cta" href="/app/land/${job.id}">${icon('spark')} ${T('Get your game plan to land this job')}</a>
       ${isExternal(job)
         ? `<a class="btn full" href="${esc(job.apply_url)}" target="_blank" rel="noopener noreferrer">${T('Apply on')} ${esc(job.source)} ↗</a>
@@ -1440,7 +1475,7 @@ function workerTraining({ have = [], hiring = [] }) {
 }
 
 // ---------- "Land This Job": the worker co-pilot — qualify → plan → practice → apply ----------
-function landJob({ job, company = '', score = 0, breakdown = {}, missing = [], readiness = 0, haveCreds = [], distance = null, applied = false, external = false }){
+function landJob({ job, company = '', score = 0, breakdown = {}, missing = [], readiness = 0, haveCreds = [], distance = null, applied = false, external = false, trust = '' }){
   const trade = job.trade, role = TRADES[trade] || trade;
   const qualifies = score >= 70 && missing.length === 0;
   const ring = score>=80 ? 'rate-strong' : score>=60 ? 'rate-solid' : 'rate-weak';
@@ -1461,6 +1496,7 @@ function landJob({ job, company = '', score = 0, breakdown = {}, missing = [], r
       <div class="verdict-body"><div class="verdict-h">${qualifies?T('You qualify — go for it.'):T('You’re close. Here’s how to lock it in.')}</div>
         <p class="muted sm">$${job.pay_min}–${job.pay_max}/hr · ${esc(job.city)}${distance!=null?` · ${distance} mi`:''}</p></div>
     </div>
+    ${trust}
     <div class="grid2">
       <div class="card"><div class="sec-h" style="margin-top:0">${icon('check','xic')} ${T('What you’ve got')}</div>
         <ul class="land-list">${have.map(h=>`<li>${h}</li>`).join('')}</ul></div>
@@ -2482,4 +2518,4 @@ function whyRivetBlock(){
 }
 
 module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob };
+  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard };

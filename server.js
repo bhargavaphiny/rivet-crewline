@@ -1212,9 +1212,12 @@ const server = http.createServer(async (req,res)=>{
         const distance = await workerDistance(prof, job.zip);
         const applied = !!(await db.prepare('SELECT 1 FROM applications WHERE job_id=? AND worker_id=?').get(jid,user.id));
         const external = !!(job.apply_url && /^https?:\/\//i.test(job.apply_url));
+        const jobFull = await db.prepare('SELECT company_about FROM users WHERE id=?').get(job.employer_id);
+        if(jobFull) job.company_about = jobFull.company_about;
+        const trust = V.trustCard(V.trustVerdict(job, { rating:await ratingFor(job.employer_id,'employer'), pay:await payRep(job.employer_id), rehire:await rehireStat(job.employer_id), safety:await safetyStat(job.employer_id), payFloor:prof.pay_floor||0, marketHr: V.ROLE_BLS[job.trade]?Math.round(V.ROLE_BLS[job.trade].med/2080):0 }));
         return send(res, V.layout({title:'Your game plan',user,active:'jobs',body:V.landJob({
           job, company:job.company||'', score:match.score, breakdown:match.breakdown, missing:match.missing,
-          readiness:prof.readiness||0, haveCreds:creds.filter(c=>c.verified).map(c=>c.kind), distance, applied, external })}));
+          readiness:prof.readiness||0, haveCreds:creds.filter(c=>c.verified).map(c=>c.kind), distance, applied, external, trust })}));
       }
       if(jid && p===`/app/jobs/${jid}/apply` && method==='POST'){
         const job = await db.prepare('SELECT * FROM jobs WHERE id=?').get(jid);

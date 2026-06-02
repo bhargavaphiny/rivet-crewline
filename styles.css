@@ -593,6 +593,22 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .reality-txt{color:var(--slate);font-size:14px;margin:0 0 10px;line-height:1.5}
 .reality-thrive{font-size:13.5px;display:flex;align-items:flex-start;gap:7px;background:var(--card-2,#f3ece0);padding:9px 12px;border-radius:10px;margin:0}
 .reality-thrive svg{width:15px;height:15px;color:#cc8a33;flex:none;margin-top:2px}
+/* "Is this job worth it?" trust verdict */
+.trust-card{margin-top:6px;border-left:4px solid var(--line)}
+.trust-card.trusted{border-left-color:#1FA971;background:rgba(31,169,113,.04)}
+.trust-card.caution{border-left-color:#cc8a33;background:rgba(204,138,51,.05)}
+.trust-card.solid{border-left-color:#2B6EC9;background:rgba(43,110,201,.04)}
+.trust-h{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.trust-badge{display:inline-flex;align-items:center;gap:6px;font-weight:800;font-size:13px;padding:4px 11px;border-radius:12px}
+.trust-badge svg{width:14px;height:14px}
+.trust-badge.trusted{background:rgba(31,169,113,.16);color:#157a52}
+.trust-badge.caution{background:rgba(204,138,51,.18);color:#9a6a1f}
+.trust-badge.solid{background:rgba(43,110,201,.14);color:#2156a3}
+.trust-list{list-style:none;margin:0;padding:0}
+.trust-list li{display:flex;align-items:flex-start;gap:8px;padding:6px 0;font-size:13.5px;border-bottom:1px solid var(--line)}
+.trust-list li:last-child{border-bottom:0}
+.trust-list svg{width:15px;height:15px;flex:none;margin-top:2px}
+.trust-list .tr-ok svg{color:#157a52}.trust-list .tr-warn svg{color:#b7322a}.trust-list .tr-info svg{color:var(--muted)}
 .jobpin.near svg{filter:drop-shadow(0 0 4px rgba(31,169,113,.55)) drop-shadow(0 1.5px 2px rgba(0,0,0,.3))}
 .map-tools{display:flex;align-items:center;gap:9px;margin:0 0 12px;flex-wrap:wrap}
 .map-tools .mt-label{font-size:12.5px;font-weight:800;color:var(--steel)}
