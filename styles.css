@@ -588,6 +588,11 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .emp-chip{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:6px 11px;border:1px solid var(--line);border-radius:20px;color:var(--steel)}
 .emp-chip svg{width:13px;height:13px;color:var(--muted)}
 .emp-chip b{color:var(--brand-d)}
+.reality-card{border-left:4px solid #cc8a33}
+.onramp-card{border-left:4px solid #1FA971}
+.reality-txt{color:var(--slate);font-size:14px;margin:0 0 10px;line-height:1.5}
+.reality-thrive{font-size:13.5px;display:flex;align-items:flex-start;gap:7px;background:var(--card-2,#f3ece0);padding:9px 12px;border-radius:10px;margin:0}
+.reality-thrive svg{width:15px;height:15px;color:#cc8a33;flex:none;margin-top:2px}
 .jobpin.near svg{filter:drop-shadow(0 0 4px rgba(31,169,113,.55)) drop-shadow(0 1.5px 2px rgba(0,0,0,.3))}
 .map-tools{display:flex;align-items:center;gap:9px;margin:0 0 12px;flex-wrap:wrap}
 .map-tools .mt-label{font-size:12.5px;font-weight:800;color:var(--steel)}
