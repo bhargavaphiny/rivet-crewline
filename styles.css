@@ -527,6 +527,18 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .iv-form{display:flex;gap:8px}
 .iv-form input[name=answer]{flex:1}
 @media(max-width:560px){.track-grid{grid-template-columns:1fr}}
+/* ---- career guides ---- */
+.guide-hero{border-left:5px solid var(--sc,#E8923A)}
+.guide-top{display:flex;align-items:center;gap:12px}
+.guide-top h1{font-size:26px;margin:0;line-height:1.1}
+.guide-sector{font-size:13px;font-weight:700;color:var(--sc,var(--brand-d));text-decoration:none}
+.guide-what{color:var(--slate);margin:12px 0 14px;max-width:680px}
+.guide-kpis{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+.g-row{margin:0 0 8px;font-size:14px}
+.emp-chips{display:flex;flex-wrap:wrap;gap:8px}
+.emp-chip{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:6px 11px;border:1px solid var(--line);border-radius:20px;color:var(--steel)}
+.emp-chip svg{width:13px;height:13px;color:var(--muted)}
+.emp-chip b{color:var(--brand-d)}
 .jobpin.near svg{filter:drop-shadow(0 0 4px rgba(31,169,113,.55)) drop-shadow(0 1.5px 2px rgba(0,0,0,.3))}
 .map-tools{display:flex;align-items:center;gap:9px;margin:0 0 12px;flex-wrap:wrap}
 .map-tools .mt-label{font-size:12.5px;font-weight:800;color:var(--steel)}

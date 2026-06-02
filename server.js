@@ -624,6 +624,23 @@ const server = http.createServer(async (req,res)=>{
       return send(res, V.layout({title:V.SECTOR_META[key].label+' jobs',user,active:'sectors',body:V.sectorPage({key, ...s})}));
     }
 
+    // ---- Career guides (public): real BLS data + who's hiring, per role ----
+    if(p==='/careers' && method==='GET'){
+      const trades = Object.keys(V.ROLE_BLS);
+      const counts = await db.prepare("SELECT trade, COUNT(*) c FROM jobs WHERE status='open' GROUP BY trade").all();
+      const cMap = Object.fromEntries(counts.map(r=>[r.trade, r.c]));
+      const items = trades.map(t=>({trade:t, openCount:cMap[t]||0}));
+      return send(res, V.layout({title:'Career guides',user,active:'careers',body:V.careerHub(items)}));
+    }
+    const carMatch = p.match(/^\/careers\/([a-z_]+)$/);
+    if(carMatch && method==='GET' && V.ROLE_BLS[carMatch[1]]){
+      const trade = carMatch[1];
+      const employers = await db.prepare("SELECT u.company, COUNT(*) n FROM jobs j JOIN users u ON u.id=j.employer_id WHERE j.trade=? AND j.status='open' AND u.company IS NOT NULL AND u.company<>'' GROUP BY u.company ORDER BY n DESC LIMIT 12").all(trade);
+      const metros = await db.prepare("SELECT z.city, COUNT(*) n FROM jobs j JOIN zip_geo z ON z.zip=j.zip WHERE j.trade=? AND j.status='open' GROUP BY z.city ORDER BY n DESC LIMIT 14").all(trade);
+      const openCount = (await db.prepare("SELECT COUNT(*) c FROM jobs WHERE trade=? AND status='open'").get(trade)).c;
+      return send(res, V.layout({title:(M.TRADES[trade]||trade)+' — career guide',user,active:'careers',body:V.careerGuide({trade, employers, metros, openCount})}));
+    }
+
     // ---- Industry Pulse (trends + community board) — open to all ----
     if(p==='/pulse' && method==='GET'){
       const trending = await db.prepare(`SELECT trade, COUNT(*) n FROM jobs WHERE status='open' GROUP BY trade ORDER BY n DESC LIMIT 8`).all();

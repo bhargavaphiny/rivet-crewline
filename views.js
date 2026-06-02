@@ -71,7 +71,7 @@ let LANG = 'en';
 function setLang(l){ LANG = (l === 'es') ? 'es' : 'en'; }
 const I18N = {
   en: {
-    nav_login:'Log in', nav_get_started:'Get started', nav_home:'Home', nav_find_work:'Jobs', nav_industries:'Industries',
+    nav_login:'Log in', nav_get_started:'Get started', nav_home:'Home', nav_find_work:'Jobs', nav_industries:'Industries', nav_careers:'Careers',
     nav_work_card:'Work Card', nav_applications:'Applications', nav_training:'Learn', nav_pulse:'Pulse', nav_messages:'Messages',
     nav_hiring:'Hiring →', nav_working:'Working →', nav_logout:'Log out', mode_work:'Work', mode_hire:'Hire',
     nav_overview:'Overview', nav_talent:'Talent', nav_jobs:'Jobs', nav_analytics:'Analytics', nav_agents:'Agents',
@@ -118,7 +118,7 @@ const I18N = {
     x_bilingual_on:'Bilingual (EN/ES)', x_bilingual_off:'Tap: Bilingual',
   },
   es: {
-    nav_login:'Entrar', nav_get_started:'Empezar', nav_home:'Inicio', nav_find_work:'Empleos', nav_industries:'Industrias',
+    nav_login:'Entrar', nav_get_started:'Empezar', nav_home:'Inicio', nav_find_work:'Empleos', nav_industries:'Industrias', nav_careers:'Carreras',
     nav_work_card:'Mi perfil', nav_applications:'Solicitudes', nav_training:'Aprender', nav_pulse:'Pulso', nav_messages:'Mensajes',
     nav_hiring:'Contratar →', nav_working:'Trabajar →', nav_logout:'Salir', mode_work:'Trabajo', mode_hire:'Contratar',
     nav_overview:'Resumen', nav_talent:'Talento', nav_jobs:'Empleos', nav_analytics:'Analíticas', nav_agents:'Agentes',
@@ -412,6 +412,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   let nav = '';
   if (!user) {
     nav = `<a class="nav-link ${active==='sectors'?'on':''}" href="/sectors">${t('nav_industries')}</a>
+           <a class="nav-link ${active==='careers'?'on':''}" href="/careers">${t('nav_careers')}</a>
            <a class="nav-link" href="/login">${t('nav_login')}</a>
            <a class="btn-sm" href="/signup">${t('nav_get_started')}</a>${langTg}`;
   } else if ((user.mode || user.role) === 'worker') {
@@ -456,7 +457,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=82">
+  <link rel="stylesheet" href="/styles.css?v=83">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1293,11 +1294,33 @@ const LEARN_TRACKS = {
   cna: { why:'CNAs are the fastest path into healthcare — huge, steady demand.', pay:'$18–25/hr', cert:['State CNA certification','https://www.redcross.org/take-a-class/nurse-assistant-training'], vid:'CNA day in the life certified nursing assistant', qs:['Are you certified in your state — and is it current?','How do you help with ADLs while protecting dignity?','How do you handle a combative or confused patient?','Tell me about teamwork on a busy floor.'] },
   sterile_processing: { why:'Sterile processing techs keep ORs running — strong hospital demand.', pay:'$19–27/hr', cert:['CRCST (HSPA)','https://myhspa.org'], vid:'sterile processing technician day in the life', qs:['Do you hold CRCST or are you working toward it?','Walk me through decontamination → assembly → sterilization.','How do you track instrument trays and counts?','How do you handle a recall or failed biological indicator?'] },
 };
+// Real labor-market data per role — U.S. Bureau of Labor Statistics, Occupational Outlook Handbook (May 2024).
+// med=median annual wage, low/high=10th–90th pctile, growth=2024–34 projection, openings=avg/yr.
+const ROLE_BLS = {
+  equipment_tech:   {sector:'manufacturing',med:63510,low:44430,high:91620,growth:'+13%',gl:'much faster than average',openings:'54,200',edu:'High-school diploma + on-the-job training',what:'Install, maintain and repair the factory machinery and automated systems that keep production lines running.',advance:'Lead tech → maintenance supervisor → reliability / controls engineer.',url:'https://www.bls.gov/ooh/installation-maintenance-and-repair/industrial-machinery-mechanics-and-maintenance-workers-and-millwrights.htm'},
+  maintenance_tech: {sector:'manufacturing',med:63510,low:44430,high:91620,growth:'+13%',gl:'much faster than average',openings:'54,200',edu:'High-school diploma + on-the-job training',what:'Keep plant equipment, conveyors and utilities running with preventive maintenance and fast repairs.',advance:'Maintenance tech → lead → facilities / reliability engineer.',url:'https://www.bls.gov/ooh/installation-maintenance-and-repair/industrial-machinery-mechanics-and-maintenance-workers-and-millwrights.htm'},
+  machinist:        {sector:'manufacturing',med:56150,low:38100,high:78760,growth:'steady',gl:'~34,200 openings/yr as machinists retire',openings:'34,200',edu:'High-school diploma + apprenticeship or vocational program',what:'Set up and run lathes, mills and CNC machines to make precision metal parts to blueprint tolerances.',advance:'Machinist → CNC programmer → tool & die maker ($63k+) → shop lead.',url:'https://www.bls.gov/ooh/production/machinists-and-tool-and-die-makers.htm'},
+  welder:           {sector:'manufacturing',med:51000,low:38130,high:75850,growth:'+2%',gl:'steady — ~45,600 openings/yr',openings:'45,600',edu:'High-school diploma + welding program / certification',what:'Join metal with MIG, TIG, stick or flux-core for structures, pipe, ships, rockets and more.',advance:'Certified / 6G welder → welding inspector (CWI) → welding supervisor.',url:'https://www.bls.gov/ooh/production/welders-cutters-solderers-and-brazers.htm'},
+  electrician:      {sector:'manufacturing',med:62350,low:0,high:0,growth:'+9%',gl:'much faster than average',openings:'81,000',edu:'High-school diploma + paid apprenticeship',what:'Install and maintain electrical systems in plants, data centers, job sites and homes.',advance:'Apprentice → journeyman → master electrician → contractor.',url:'https://www.bls.gov/ooh/construction-and-extraction/electricians.htm'},
+  machine_operator: {sector:'manufacturing',med:43570,low:32270,high:63490,growth:'entry-level',gl:'one of the highest-volume roles — ~198,800 openings/yr',openings:'198,800',edu:'High-school diploma; trained on the job',what:'Run the production machines and lines that build vehicles, batteries, electronics and goods.',advance:'Operator → line lead → maintenance or quality technician.',url:'https://www.bls.gov/ooh/production/assemblers-and-fabricators.htm'},
+  assembler:        {sector:'manufacturing',med:43570,low:32270,high:63490,growth:'high-volume',gl:'~198,800 openings/yr',openings:'198,800',edu:'High-school diploma; trained on the job',what:'Build finished products and sub-assemblies — EVs, rockets, robots, electronics — by hand and with tools.',advance:'Assembler → lead → quality inspector or technician.',url:'https://www.bls.gov/ooh/production/assemblers-and-fabricators.htm'},
+  quality_inspector:{sector:'manufacturing',med:47460,low:34590,high:75510,growth:'steady',gl:'~69,900 openings/yr',openings:'69,900',edu:'High-school diploma + on-the-job training',what:'Measure and test parts with gauges, calipers and GD&T so only in-spec product ships.',advance:'Inspector → QA technician → quality engineer.',url:'https://www.bls.gov/ooh/production/quality-control-inspectors.htm'},
+  automotive_tech:  {sector:'manufacturing',med:49670,low:0,high:0,growth:'+4%',gl:'about as fast as average — ~70,000 openings/yr',openings:'70,000',edu:'Postsecondary award or on-the-job training',what:'Diagnose, repair and maintain cars, fleets and increasingly EVs and robotaxis.',advance:'Tech → ASE Master → shop foreman → service manager.',url:'https://www.bls.gov/ooh/installation-maintenance-and-repair/automotive-service-technicians-and-mechanics.htm'},
+  hvac:             {sector:'manufacturing',med:59810,low:39130,high:91020,growth:'+9%',gl:'faster than average',openings:'~40,000',edu:'Postsecondary program + EPA 608',what:'Install and service heating, cooling and refrigeration — surging with data centers and housing.',advance:'Installer → service tech → lead → contractor.',url:'https://www.bls.gov/ooh/installation-maintenance-and-repair/heating-air-conditioning-and-refrigeration-mechanics-and-installers.htm'},
+  process_tech:     {sector:'semiconductor',med:51180,low:35980,high:87190,growth:'+11%',gl:'much faster than average — CHIPS Act buildout',openings:'3,900',edu:'Certificate or associate degree; some on-the-job',what:'Operate and monitor the tools that fabricate semiconductor wafers in a cleanroom.',advance:'Process tech → equipment tech → process engineer.',url:'https://www.bls.gov/ooh/production/semiconductor-processing-technicians.htm'},
+  cleanroom_op:     {sector:'semiconductor',med:51180,low:35980,high:87190,growth:'+11%',gl:'much faster than average — CHIPS Act buildout',openings:'3,900',edu:'High-school diploma + cleanroom training',what:'Run wafer-processing steps in a cleanroom, following exact recipes and logging results.',advance:'Operator → process tech → equipment tech.',url:'https://www.bls.gov/ooh/production/semiconductor-processing-technicians.htm'},
+  cna:              {sector:'healthcare',med:37700,low:0,high:0,growth:'+2%',gl:'one of the largest healthcare roles — ~211,800 openings/yr',openings:'211,800',edu:'State-approved CNA program (weeks) + competency exam',what:'Provide hands-on daily care — mobility, bathing, vitals — in hospitals and long-term care.',advance:'CNA → patient-care tech → LPN → RN.',url:'https://www.bls.gov/ooh/healthcare/nursing-assistants.htm'},
+  patient_care_tech:{sector:'healthcare',med:37700,low:0,high:0,growth:'+2%',gl:'huge, steady demand — ~211,800 openings/yr',openings:'211,800',edu:'CNA certification + employer training',what:'Support nurses with patient care, vitals, EKGs and phlebotomy on hospital floors.',advance:'PCT → LPN → RN.',url:'https://www.bls.gov/ooh/healthcare/nursing-assistants.htm'},
+  surgical_tech:    {sector:'healthcare',med:62830,low:43290,high:90700,growth:'+5%',gl:'faster than average',openings:'8,700',edu:'Postsecondary certificate/associate + certification',what:'Prep the OR, instruments and patients and assist the surgical team during operations.',advance:'Surgical tech → first assistant → OR coordinator.',url:'https://www.bls.gov/ooh/healthcare/surgical-technologists.htm'},
+  medical_assistant:{sector:'healthcare',med:44200,low:0,high:0,growth:'+12%',gl:'much faster than average',openings:'112,300',edu:'Postsecondary certificate (~1 year)',what:'Handle clinical and admin tasks in clinics — vitals, EHR, prep, injections.',advance:'MA → lead MA → LPN/RN or office manager.',url:'https://www.bls.gov/ooh/healthcare/medical-assistants.htm'},
+  phlebotomist:     {sector:'healthcare',med:43660,low:34860,high:57750,growth:'+6%',gl:'faster than average',openings:'18,400',edu:'Postsecondary certificate (months)',what:'Draw blood for tests, donations and research and manage the samples.',advance:'Phlebotomist → lab assistant → medical lab technician.',url:'https://www.bls.gov/ooh/healthcare/phlebotomists.htm'},
+  sterile_processing:{sector:'healthcare',med:47000,low:0,high:0,growth:'steady',gl:'steady hospital demand',openings:'—',edu:'Certificate + CRCST certification',what:'Decontaminate, assemble and sterilize surgical instruments so every OR tray is safe.',advance:'Tech → lead → sterile-processing supervisor.',url:'https://www.bls.gov/ooh/healthcare/'},
+};
 function ytSearch(q){ return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q); }
 function learnTrackCard(key){
   const t = LEARN_TRACKS[key]; if(!t) return '';
   return `<div class="card track-card">
-    <div class="track-h"><span class="trend-ic">${tradeEmoji(key)}</span><div><b>${esc(TRADES[key]||key)}</b><div class="muted sm">${t.pay} · ${T('hiring now')}</div></div></div>
+    <div class="track-h"><span class="trend-ic">${tradeEmoji(key)}</span><div><b>${ROLE_BLS[key]?`<a class="cand-link" href="/careers/${key}">${esc(TRADES[key]||key)}</a>`:esc(TRADES[key]||key)}</b><div class="muted sm">${t.pay} · ${T('hiring now')}</div></div></div>
     <p class="track-why">${T(t.why)}</p>
     <div class="track-links">
       <a class="track-link vid" href="${ytSearch(t.vid)}" target="_blank" rel="noopener noreferrer">${icon('star')} ${T('Watch: day in the life')}</a>
@@ -1356,6 +1379,60 @@ function workerTraining({ have = [], hiring = [] }) {
       </div>
       <a class="btn-sm" href="/work-authorization" style="margin-top:12px">${icon('globe')} ${T('Work in the U.S. — full guide')}</a>
     </div>
+  </section>`;
+}
+
+// ---------- Career guides: everything about each role (real BLS data + Rivet hiring) ----------
+function careerGuide({ trade, employers = [], metros = [], openCount = 0 }){
+  const r = ROLE_BLS[trade], lt = LEARN_TRACKS[trade];
+  const label = TRADES[trade] || trade;
+  const sm = r ? SECTOR_META[r.sector] : null;
+  const hr = r ? Math.round(r.med/2080) : 0;
+  return `<section class="wrap">
+    <a class="back" href="/careers">← ${T('All career guides')}</a>
+    <div class="card guide-hero" style="--sc:${sm?sm.color:'#E8923A'}">
+      <div class="guide-top"><span class="trend-ic">${tradeEmoji(trade)}</span>
+        <div><h1>${esc(label)}</h1>${sm?`<a class="guide-sector" href="/sectors/${r.sector}">${sm.emoji} ${T(sm.label)}</a>`:''}</div></div>
+      ${r?`<p class="guide-what">${T(r.what)}</p>
+      <div class="guide-kpis">
+        <div class="skpi"><b>$${r.med.toLocaleString()}</b><span>${T('median/yr')} · ~$${hr}/hr</span></div>
+        <div class="skpi"><b>${esc(r.growth)}</b><span>${T('jobs by 2034')}</span></div>
+        <div class="skpi"><b>${esc(r.openings)}</b><span>${T('U.S. openings/yr')}</span></div>
+        ${openCount?`<div class="skpi"><b>${openCount}</b><span>${T('open now on Rivet')}</span></div>`:''}
+      </div>
+      <p class="muted sm">${T(r.gl)}.${r.low?` ${T('Range')} $${r.low.toLocaleString()}–$${r.high.toLocaleString()}.`:''} <a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${T('Source: U.S. BLS')} ↗</a></p>`:''}
+      <div class="sector-cta"><a class="btn" href="/signup?role=worker">${T('Get matched to')} ${esc(label)} ${T('jobs')}</a><a class="btn ghost" href="/app/learn/interview?trade=${trade}">${T('Practice the interview')}</a></div>
+    </div>
+    <div class="grid2">
+      <div class="card"><div class="sec-h" style="margin-top:0">${T('How to start')}</div>
+        ${r?`<p class="g-row"><b>${T('Typical entry')}:</b> ${T(r.edu)}</p>`:''}
+        ${lt?`<p class="g-row"><b>${T('Credential that pays off')}:</b> <a href="${esc(lt.cert[1])}" target="_blank" rel="noopener noreferrer">${esc(lt.cert[0])} ↗</a></p>`:''}
+        ${r?`<p class="g-row"><b>${T('Path up')}:</b> ${T(r.advance)}</p>`:''}
+        <a class="btn-sm" href="/app/training" style="margin-top:10px">${T('Get certified on Rivet →')}</a>
+      </div>
+      <div class="card"><div class="sec-h" style="margin-top:0">${T('Learn the role')}</div>
+        ${lt?`<a class="track-link vid" href="${ytSearch(lt.vid)}" target="_blank" rel="noopener noreferrer">${icon('star')} ${T('Watch: day in the life')}</a>`:''}
+        <a class="track-link prep" href="/app/learn/interview?trade=${trade}" style="margin-top:8px">${icon('spark')} ${T('AI mock interview')}</a>
+        ${lt?`<div style="margin-top:12px"><b class="sm">${T('You may be asked:')}</b><ul class="iv-qs">${lt.qs.slice(0,3).map(q=>`<li>${T(q)}</li>`).join('')}</ul></div>`:''}
+      </div>
+    </div>
+    ${employers.length?`<div class="card"><div class="sec-h" style="margin-top:0">${T('Who’s hiring')} — ${esc(label)}</div>
+      <div class="emp-chips">${employers.slice(0,12).map(e=>`<span class="emp-chip">${icon('building')} ${esc(e.company)} <b>${e.n}</b></span>`).join('')}</div></div>`:''}
+    ${metros.length?`<div class="card"><div class="sec-h" style="margin-top:0">${T('Where the jobs are')}</div>
+      <div class="emp-chips">${metros.slice(0,14).map(m=>`<span class="emp-chip">${icon('pin')} ${esc(m.city)} <b>${m.n}</b></span>`).join('')}</div></div>`:''}
+    <p class="muted sm" style="margin-top:6px">${T('Pay & outlook: U.S. Bureau of Labor Statistics, Occupational Outlook Handbook (May 2024). Hiring data: live openings on Rivet.')}</p>
+  </section>`;
+}
+function careerHub(items = []){
+  const bySec = {semiconductor:[],manufacturing:[],healthcare:[]};
+  items.forEach(it=>{ const r=ROLE_BLS[it.trade]; if(r&&bySec[r.sector]) bySec[r.sector].push(it); });
+  return `<section class="wrap">
+    <div class="sec-h big">${T('Career guides')} <span class="muted">${T('Everything about the jobs we place')}</span></div>
+    <p class="muted" style="margin:-6px 0 16px;max-width:640px">${T('Real U.S. Bureau of Labor Statistics pay & outlook, the credentials that matter, who’s hiring, where, and a mock interview — for every role on Rivet.')}</p>
+    ${Object.entries(bySec).map(([sec,list])=>{ if(!list.length) return ''; const sm=SECTOR_META[sec]; return `<div class="sec-h">${sm.emoji} ${T(sm.label)}</div>
+      <div class="track-grid">${list.map(it=>{ const r=ROLE_BLS[it.trade]; return `<a class="card track-card" href="/careers/${it.trade}">
+        <div class="track-h"><span class="trend-ic">${tradeEmoji(it.trade)}</span><div><b>${esc(TRADES[it.trade]||it.trade)}</b><div class="muted sm">$${r.med.toLocaleString()}/yr · ${esc(r.growth)}${it.openCount?` · ${it.openCount} ${T('open')}`:''}</div></div></div>
+        <p class="track-why">${T(r.what)}</p><span class="sector-go">${T('Full guide')} →</span></a>`; }).join('')}</div>`; }).join('')}
   </section>`;
 }
 
@@ -2277,7 +2354,7 @@ function sectorPage({ key, count, metros, payLo, payHi, employers = [], roles = 
       </div>
       <div class="card">
         <div class="sec-h" style="margin-top:0">${T('Roles in demand')}</div>
-        <div class="role-grid">${roles.slice(0,12).map(r=>`<a class="role-chip" href="/jobs?trade=${r.trade}">${tradeEmoji(r.trade)} <span>${esc(TRADES[r.trade]||r.trade)}</span><b>${r.n}</b></a>`).join('') || `<p class="muted">${T('No roles yet.')}</p>`}</div>
+        <div class="role-grid">${roles.slice(0,12).map(r=>`<a class="role-chip" href="${ROLE_BLS[r.trade]?`/careers/${r.trade}`:`/sectors/${key}`}">${tradeEmoji(r.trade)} <span>${esc(TRADES[r.trade]||r.trade)}</span><b>${r.n}</b></a>`).join('') || `<p class="muted">${T('No roles yet.')}</p>`}</div>
         <p class="muted sm" style="margin-top:10px">${T('Credentials we verify for this sector help you stand out — add them to your Work Card.')}</p>
       </div>
     </div>
@@ -2300,4 +2377,4 @@ function whyRivetBlock(){
 }
 
 module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS };
+  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide };
