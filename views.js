@@ -35,6 +35,7 @@ const ICONS = {
   toolbox: { f:0, p:'<path d="M3 9h18v11H3z"/><path d="M8 9V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v3"/><path d="M3 13h18"/>' },
   building:{ f:0, p:'<path d="M4 21V4a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v17"/><path d="M15 9h4a1 1 0 0 1 1 1v11"/><path d="M8 7h3M8 11h3M8 15h3"/>' },
   globe:   { f:0, p:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>' },
+  mic:     { f:0, p:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/>' },
 };
 function icon(name, cls=''){
   const ic = ICONS[name] || ICONS.wrench;
@@ -426,7 +427,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   } else {
     const L = (h,l,k)=>`<a class="nav-link ${active===k?'on':''}" href="${h}">${l}</a>`;
     const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/console/messages">${t('nav_messages')}${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
-    nav = `${L('/console',t('nav_overview'),'ov')}${L('/console/search',t('nav_talent'),'search')}${L('/console/jobs',t('nav_jobs'),'jobs')}${L('/console/agents',t('nav_agents'),'agents')}${L('/console/analytics',t('nav_analytics'),'analytics')}${L('/pulse',t('nav_pulse'),'pulse')}${msg}
+    nav = `${L('/console',t('nav_overview'),'ov')}${L('/console/search',t('nav_talent'),'search')}${L('/console/jobs',t('nav_jobs'),'jobs')}${L('/console/shifts',t('nav_shifts'),'shifts')}${L('/console/agents',t('nav_agents'),'agents')}${L('/console/analytics',t('nav_analytics'),'analytics')}${L('/pulse',t('nav_pulse'),'pulse')}${msg}
            ${modeTg('hire')}
            <a class="who" href="/console/company" title="Company profile">${initials(user.company||user.name)}</a>
            <a class="nav-link" href="/logout">${t('nav_logout')}</a>${langTg}`;
@@ -458,12 +459,13 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=89">
+  <link rel="stylesheet" href="/styles.css?v=90">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
   ${flash?`<div class="flash wrap">${esc(flash)}</div>`:''}
   <main id="main">${body}</main>
+  ${user ? voiceAgent(user.mode || user.role) : ''}
   ${user ? `<footer class="site-foot">Rivet × Crewline — blue-collar hiring platform</footer>`
     : `<footer class="site-foot rich">
     <div class="wrap foot-grid">
@@ -820,7 +822,7 @@ function agentsHub({ mode }){
     { title:T('Onboarding Agent'), desc:T('Builds your Work Card by chat — just answer in your own words, English or Spanish.'), action:`<a class="btn-sm" href="/app/onboard/chat">${T('Start chat')}</a>` },
   ];
   const recruiter = [
-    { title:T('Sourcing Agent'), desc:T('Scans every verified worker and auto-adds the strongest matches to a job’s pipeline.'), action:`<a class="btn-sm" href="/console/jobs">${T('Pick a job →')}</a>` },
+    { title:T('Sourcing Agent'), desc:T('Ranks verified workers for your hardest-to-fill roles and verifies every credential against its official public registry.'), action:`<a class="btn-sm" href="/console/source">${T('Open Sourcing →')}</a>` },
     { title:T('Screening Agent'), desc:T('Generates tailored pre-qualifying questions and a fit summary for any candidate.'), action:`<a class="btn-sm" href="/console/search">${T('Open a candidate →')}</a>` },
     { title:T('Scheduling Agent'), desc:T('Proposes interview times to a shortlisted candidate in one click.'), action:`<a class="btn-sm" href="/console/search">${T('Open a candidate →')}</a>` },
   ];
@@ -1554,6 +1556,207 @@ function shiftsBoard({ shifts = [], showUp = null, claims = [], conflict = false
     ${weekPanel}
     ${shifts.length?`<div class="grid3 shift-grid">${shifts.map(shiftCard).join('')}</div>`:`<p class="muted">${T('No open shifts right now — check back soon.')}</p>`}
   </section>`;
+}
+
+// ---------- Public-registry Sourcing Agent (recruiter) ----------
+// Maps a credential to its OFFICIAL public verification source. We never scrape — we point
+// the recruiter to the authoritative registry/board so they can verify a claim themselves.
+const REGISTRY = {
+  cna_cert:   { src:'State Nurse Aide Registry', url:'https://www.careeronestop.org/Toolkit/Training/find-certifications.aspx', state:true },
+  hha:        { src:'State Home Health Aide Registry', url:'https://www.careeronestop.org/Toolkit/Training/find-certifications.aspx', state:true },
+  bls:        { src:'AHA CPR/BLS eCard', url:'https://www.heart.org/en/cpr/course-formats/ecards', state:false },
+  cpr:        { src:'AHA CPR eCard', url:'https://www.heart.org/en/cpr/course-formats/ecards', state:false },
+  license:    { src:'State licensing board', url:'https://www.careeronestop.org/Toolkit/Training/find-licenses.aspx', state:true },
+  aws_welding:{ src:'AWS Certified Welder', url:'https://www.aws.org/certification', state:false },
+  nate:       { src:'NATE technician registry', url:'https://natex.org', state:false },
+  ase:        { src:'ASE certification', url:'https://www.ase.com', state:false },
+  nccer:      { src:'NCCER registry', url:'https://www.nccer.org', state:false },
+  nccco_crane:{ src:'NCCCO crane operator', url:'https://www.nccco.org', state:false },
+  osha10:     { src:'OSHA Outreach card', url:'https://www.osha.gov/training/outreach', state:false },
+  osha30:     { src:'OSHA Outreach card', url:'https://www.osha.gov/training/outreach', state:false },
+  epa608:     { src:'EPA Section 608', url:'https://www.epa.gov/section608', state:false },
+  cdl:        { src:'State DMV / FMCSA', url:'https://www.fmcsa.dot.gov', state:true },
+  twic:       { src:'TSA TWIC', url:'https://www.tsa.gov/for-industry/twic', state:false },
+  guard_card: { src:'State security guard registry', url:'https://www.careeronestop.org/Toolkit/Training/find-licenses.aspx', state:true },
+};
+function regFor(kind){
+  return REGISTRY[kind] || { src:(CRED_KINDS[kind]||kind), url:(TRAINING[kind]&&TRAINING[kind].url)||'https://www.careeronestop.org/Toolkit/Training/find-certifications.aspx', state:false };
+}
+function registryChips(creds = []){
+  if(!creds.length) return `<span class="muted sm">${T('No verified credentials on file yet.')}</span>`;
+  return creds.map(c=>{ const r=regFor(c.kind); return `<a class="reg-chip ${c.verified?'v':''}" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer" title="${T('Verify on the official public registry')}">${c.verified?icon('check'):icon('shield')} ${esc(CRED_KINDS[c.kind]||c.kind)} <span class="reg-src">${T('verify')} · ${esc(r.src)}${r.state?` (${T('state')})`:''} ↗</span></a>`; }).join('');
+}
+// roles: [{trade,label,demand:{ratio,level},open}]  leads: [{id,name,city,trade,readiness,vcount,creds,score,available}]
+function sourcingAgent({ roles = [], picked = '', pickedLabel = '', leads = [], market = null, sourcedCount = 0, jobsForRole = [] }){
+  const lvlLabel = { vtight:T('Very short-staffed'), tight:T('Short-staffed'), bal:T('Balanced'), comp:T('Competitive') };
+  const roleRows = roles.map(r=>`<a class="src-role ${r.trade===picked?'on':''} ${r.demand.level}" href="/console/source?trade=${r.trade}">
+      <span class="trend-ic">${tradeEmoji(r.trade)}</span>
+      <span class="src-role-main"><b>${esc(r.label)}</b><span class="bal-chip ${r.demand.level}">${lvlLabel[r.demand.level]}</span></span>
+      <span class="src-role-num">${r.demand.ratio}× <small>${T('demand')}</small>${r.open?` · ${r.open} ${T('avail.')}`:''}</span>
+    </a>`).join('');
+  const leadCards = leads.map(w=>`<div class="card src-lead">
+      <div class="src-lead-h">
+        <a class="cand-link" href="/console/candidates/${w.id}"><span class="av-t">${initials(w.name)}</span><b>${esc(w.name)}</b></a>
+        <span class="score-tag ${scoreClass(w.score)}">${w.score}</span>
+      </div>
+      <div class="muted sm">${tradeEmoji(w.trade)} ${esc(TRADES[w.trade]||w.trade)} · ${esc(w.city||'—')} · ${T('readiness')} ${w.readiness||0}${w.available?` · <span class="v ok">${T('available')}</span>`:''}</div>
+      <div class="reg-row">${registryChips(w.creds)}</div>
+      <div class="src-lead-ft">
+        <a class="btn-xs" href="/console/candidates/${w.id}">${T('View Work Card')} →</a>
+        <form method="post" action="/console/candidates/${w.id}/save"><input type="hidden" name="from" value="source"><input type="hidden" name="trade" value="${picked}"><button class="btn-xs ghost">★ ${T('Shortlist')}</button></form>
+      </div>
+    </div>`).join('');
+  return `<section class="wrap">
+    <div class="page-h"><h2>${icon('spark','xic')} ${T('Sourcing Agent')}</h2>
+      <p class="muted">${T('Find verified talent for the roles where hiring is hardest — and verify every credential against its official public registry.')}</p></div>
+    ${sourcedCount?`<div class="ok-card">${T('Added')} ${sourcedCount} ${T('candidate(s) to your pipeline.')}</div>`:''}
+    <div class="src-grid">
+      <div class="card src-roles">
+        <div class="sec-h" style="margin-top:0">${icon('bolt','xic')} ${T('Where you can win')}</div>
+        <p class="muted sm" style="margin-top:-4px">${T('Ranked by how short-staffed the role is nationally — the tighter the market, the more your filled seat is worth.')}</p>
+        ${roleRows || `<p class="muted sm">${T('Post a job to see demand for your roles.')}</p>`}
+      </div>
+      <div class="src-main">
+        ${picked ? `
+          ${market?`<div class="card mkt-card ${market.level}"><div class="mkt-h"><span class="bal-chip ${market.level}">${lvlLabel[market.level]}</span> <b>${esc(pickedLabel)}</b> <span class="muted sm">· ${market.ratio}× ${T('demand vs supply')}</span></div>
+            <p class="mkt-advice">${T('Verified, registry-checked candidates ranked by fit. Move on the top few fast — this role is hard to fill.')}</p></div>`:''}
+          ${jobsForRole.length?`<form method="post" action="/console/source/auto" class="src-auto"><input type="hidden" name="trade" value="${picked}">
+            <label class="sm">${T('One-click: add the top matches to')} <select name="job_id">${jobsForRole.map(j=>`<option value="${j.id}">${esc(T(j.title))}</option>`).join('')}</select></label>
+            <button class="btn-sm">${T('Source top 5 →')}</button></form>`:''}
+          <div class="sec-h">${leads.length} ${T('verified candidates')} — ${esc(pickedLabel)}</div>
+          ${leadCards || `<div class="card muted">${T('No verified candidates for this role yet. Try a nearby trade, or post the role to attract applicants.')}</div>`}
+        ` : `<div class="card src-empty"><div class="agent-h">${icon('spark','xic')} ${T('Pick a role to source')}</div>
+          <p class="muted">${T('Choose a high-demand role on the left. The agent ranks every verified worker by fit, shows their credentials, and links each one to its official public registry so you can verify before you reach out.')}</p>
+          <p class="muted sm">${T('Sources: state Nurse Aide registries, state licensing boards, AWS / NATE / ASE / NCCER / NCCCO / OSHA registries, AHA eCards. We link to official sources only — no scraping.')}</p></div>`}
+      </div>
+    </div>
+  </section>`;
+}
+
+// ---------- Employer: post a shift + claims dashboard ----------
+const SHIFT_KINDS = { 'per-diem':'Per-diem (single shift)', 'contract':'Contract (multi-day)', 'travel':'Travel assignment' };
+function empShiftForm(error='', v={}){
+  const opts = tradeOptionsGrouped(v.trade||'');
+  const val = (k,d='') => v[k]!=null && v[k]!=='' ? esc(v[k]) : d;
+  return `<section class="wrap narrow"><div class="card">
+    <a class="back" href="/console/shifts">← ${T('My shifts')}</a>
+    <h2>${T('Post a shift')}</h2><p class="muted">${T('Open shifts go straight to verified, ready-to-work crews — they keep their full rate, you skip the staffing agency.')}</p>
+    ${error?`<div class="err">${esc(error)}</div>`:''}
+    <form method="post" action="/console/shifts/new">
+      <label>${T('Title')} <input name="title" required placeholder="${T('e.g. CNA — NOC shift')}" value="${val('title')}"></label>
+      <label>${T('Role / trade')} <select name="trade">${opts}</select></label>
+      <div class="row2"><label>${T('Type')} <select name="kind">${Object.entries(SHIFT_KINDS).map(([k,l])=>`<option value="${k}" ${v.kind===k?'selected':''}>${T(l)}</option>`).join('')}</select></label>
+        <label>${T('Pay ($/hr)')} <input type="number" step="0.5" name="pay_rate" required value="${val('pay_rate','24')}"></label></div>
+      <div class="row2"><label>${T('City')} <input name="city" value="${val('city','Phoenix')}"></label>
+        <label>${T('ZIP')} <input name="zip" value="${val('zip','85004')}"></label></div>
+      <div class="row2"><label>${T('Date')} <input type="date" name="date" required value="${val('date')}"></label>
+        <label>${T('Openings')} <input type="number" name="slots" min="1" value="${val('slots','1')}"></label></div>
+      <div class="row2"><label>${T('Start')} <input type="time" name="start_time" required value="${val('start_time','07:00')}"></label>
+        <label>${T('End')} <input type="time" name="end_time" required value="${val('end_time','15:00')}"></label></div>
+      <label class="ck"><input type="checkbox" name="urgent" value="1" ${v.urgent?'checked':''}> ${T('Mark urgent — needs to fill fast')}</label>
+      <label>${T('Notes')} <textarea name="descr" rows="2" placeholder="${T('Unit, parking, what to bring…')}">${val('descr')}</textarea></label>
+      <button class="btn full">${T('Post shift')}</button>
+    </form>
+  </div></section>`;
+}
+function empShifts({ shifts = [] }){
+  const open = shifts.filter(s=>s.status==='open').length;
+  const totalClaims = shifts.reduce((a,s)=>a+(s.claimants?s.claimants.length:0),0);
+  const card = s => {
+    const hrs = shiftHours(s), filled = s.claimants?s.claimants.length:0, slots = s.slots||1;
+    const kl = SHIFT_KINDS[s.kind] ? T(SHIFT_KINDS[s.kind]) : s.kind;
+    return `<div class="card emp-shift ${s.status}">
+      <div class="shift-top"><span class="shift-kind ${s.kind}">${esc(String(kl).split(' (')[0])}</span>${s.urgent?`<span class="shift-urgent">${icon('flame')} ${T('Urgent')}</span>`:''}${s.status!=='open'?`<span class="closed-tag">${s.status==='filled'?T('Filled'):T('Closed')}</span>`:''}</div>
+      <div class="shift-title">${tradeEmoji(s.trade)} ${esc(s.title)}</div>
+      <div class="muted sm">${fmtShiftDate(s.date)} · ${t12(s.start_time)}–${t12(s.end_time)} (${hrs} ${T('hrs')}) · $${s.pay_rate}/hr · ${esc(s.city||'')}</div>
+      <div class="emp-shift-fill"><b>${filled}/${slots}</b> ${T('claimed')} <div class="fillbar"><span style="width:${Math.min(100,Math.round(filled/slots*100))}%"></span></div></div>
+      ${filled?`<div class="claimant-row">${s.claimants.map(c=>`<a class="cand-link sm" href="/console/candidates/${c.worker_id}"><span class="av-t">${initials(c.name)}</span>${esc(c.name)}${c.show_up!=null?` · ${c.show_up}%`:''}</a>`).join('')}</div>`:`<p class="muted sm">${T('No claims yet — verified workers see this on their Shifts board.')}</p>`}
+      <div class="emp-shift-ft">${s.status==='open'?`<form method="post" action="/console/shifts/${s.id}/close"><button class="btn-xs ghost">${T('Close')}</button></form>`:''}</div>
+    </div>`;
+  };
+  return `<section class="wrap">
+    <div class="page-h"><h2>${icon('bolt','xic')} ${T('Shifts & contracts')}</h2><p class="muted">${open} ${T('open')} · ${totalClaims} ${T('claimed')}</p>
+      <a class="btn-sm right" href="/console/shifts/new">${T('+ Post a shift')}</a></div>
+    <div class="card shift-banner"><div class="sb-txt">${T('Post per-diem, contract or travel shifts to verified, job-ready workers. They claim in one tap with a verified Work Card — no agency markup, you pay them direct.')}</div></div>
+    ${shifts.length?`<div class="grid3 shift-grid">${shifts.map(card).join('')}</div>`:`<div class="card src-empty"><div class="agent-h">${icon('bolt','xic')} ${T('No shifts posted yet')}</div><p class="muted">${T('Post your first open shift — it goes straight to verified crews who can start now.')}</p><a class="btn-sm" href="/console/shifts/new">${T('+ Post a shift')}</a></div>`}
+  </section>`;
+}
+
+// ---------- Voice-guided 0-click agent (client-side intent → action) ----------
+function voiceAgent(mode){
+  const isEmp = mode==='employer';
+  // intent table the browser uses to map a spoken phrase → an action with no clicks
+  const intents = isEmp ? [
+    {re:'post (a )?(job|position|role)', url:'/console/jobs/new', say:'Opening Post a job'},
+    {re:'post (a )?shift|new shift|add (a )?shift', url:'/console/shifts/new', say:'Opening Post a shift'},
+    {re:'shift|per ?diem|contract|claim', url:'/console/shifts', say:'Opening your shifts'},
+    {re:'sourc|find (me )?(candidates|talent|workers)|who can i hire', url:'/console/source', say:'Opening the Sourcing Agent'},
+    {re:'talent|candidate|search|pool', url:'/console/search', say:'Opening Talent Search'},
+    {re:'job|posting|listing', url:'/console/jobs', say:'Opening your jobs'},
+    {re:'analytic|report|funnel|metric', url:'/console/analytics', say:'Opening analytics'},
+    {re:'message|inbox|chat', url:'/console/messages', say:'Opening messages'},
+    {re:'agent', url:'/console/agents', say:'Opening agents'},
+    {re:'home|overview|dashboard', url:'/console', say:'Going to your overview'},
+  ] : [
+    {re:'shift|gig|per ?diem|extra work|this weekend|tonight', url:'/app/shifts', say:'Opening open shifts near you'},
+    {re:'job|work near|find work|hiring', url:'/app/jobs', say:'Opening jobs near you'},
+    {re:'apply for me|auto.?apply|apply me', url:'/app/agents', say:'Opening your agents'},
+    {re:'coach|what should i learn|which (cert|credential)|earn more', url:'/app/coach', say:'Opening your Career Coach'},
+    {re:'interview|practice|mock', url:'/app/learn/interview', say:'Opening the mock interview'},
+    {re:'train|certif|class|course', url:'/app/training', say:'Opening training'},
+    {re:'work card|profile|my card|resume', url:'/app/profile', say:'Opening your Work Card'},
+    {re:'applicat|status|where am i', url:'/app/applications', say:'Opening your applications'},
+    {re:'message|inbox|chat', url:'/app/messages', say:'Opening messages'},
+    {re:'home|main', url:'/app', say:'Going home'},
+  ];
+  // role keyword search (worker only): "find welder jobs", "cna shifts"
+  const roleHints = Object.entries(TRADES).map(([k,v])=>[k, v.toLowerCase()]);
+  return `
+  <button id="va-fab" class="va-fab" aria-label="${T('Voice assistant')}" title="${T('Talk to Rivet')}">${icon('mic')}</button>
+  <div id="va-panel" class="va-panel" hidden>
+    <div class="va-h">${icon('mic','xic')} <b>${T('Voice assistant')}</b><button id="va-x" class="va-x" aria-label="${T('Close')}">×</button></div>
+    <div id="va-status" class="va-status muted sm">${T('Tap the mic and say what you want — “open shifts”, “find welder jobs”, “practice interview”.')}</div>
+    <div id="va-heard" class="va-heard" hidden></div>
+    <div class="va-row">
+      <button id="va-mic" class="va-mic">${icon('mic')} <span>${T('Hold to talk')}</span></button>
+    </div>
+    <form id="va-form" class="va-typed"><input id="va-text" placeholder="${T('…or type a command')}" autocomplete="off"><button class="btn-xs">${T('Go')}</button></form>
+    <div class="va-tips muted sm">${(isEmp?['post a shift','source CNAs','talent search','analytics']:['open shifts','find electrician jobs','practice interview','career coach']).map(x=>`<button class="va-chip" data-cmd="${esc(x)}">${esc(x)}</button>`).join('')}</div>
+  </div>
+  <script>(function(){
+    var INTENTS=${JSON.stringify(intents)}, ROLES=${JSON.stringify(roleHints)}, WORKER=${isEmp?'false':'true'};
+    var fab=document.getElementById('va-fab'), panel=document.getElementById('va-panel'),
+        statusEl=document.getElementById('va-status'), heard=document.getElementById('va-heard'),
+        micBtn=document.getElementById('va-mic'), form=document.getElementById('va-form'), text=document.getElementById('va-text');
+    function open(){ panel.hidden=false; fab.classList.add('on'); } function close(){ panel.hidden=true; fab.classList.remove('on'); }
+    fab.onclick=function(){ panel.hidden?open():close(); };
+    document.getElementById('va-x').onclick=close;
+    function speak(t){ try{ if(window.speechSynthesis){ var u=new SpeechSynthesisUtterance(t); u.rate=1.05; speechSynthesis.cancel(); speechSynthesis.speak(u);} }catch(e){} }
+    function go(url,say){ statusEl.textContent=say+'…'; speak(say); setTimeout(function(){ location.href=url; }, 650); }
+    function route(raw){
+      var q=(raw||'').toLowerCase().trim(); if(!q) return;
+      heard.hidden=false; heard.textContent='"'+raw+'"';
+      // role-specific search wins if a trade is named alongside job/shift
+      var role=null; for(var i=0;i<ROLES.length;i++){ if(q.indexOf(ROLES[i][1])>=0){ role=ROLES[i]; break; } }
+      if(WORKER && role && /shift|gig|per ?diem/.test(q)) return go('/app/shifts','Finding '+role[1]+' shifts');
+      if(WORKER && role) return go('/app/jobs?q='+encodeURIComponent(role[0]),'Finding '+role[1]+' jobs');
+      for(var j=0;j<INTENTS.length;j++){ if(new RegExp(INTENTS[j].re).test(q)) return go(INTENTS[j].url, INTENTS[j].say); }
+      statusEl.textContent='Hmm, try “'+(WORKER?'open shifts':'post a shift')+'” or “'+(WORKER?'find welder jobs':'source CNAs')+'”.';
+      speak('Sorry, I did not catch that. Try again.');
+    }
+    form.onsubmit=function(e){ e.preventDefault(); route(text.value); };
+    Array.prototype.forEach.call(document.querySelectorAll('.va-chip'), function(c){ c.onclick=function(){ route(c.getAttribute('data-cmd')); }; });
+    var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SR){ micBtn.disabled=true; micBtn.querySelector('span').textContent='${T('Type a command (mic not supported)')}'; return; }
+    var rec=new SR(); rec.lang='${LANG==='es'?'es-ES':'en-US'}'; rec.interimResults=true; rec.maxAlternatives=1; var finalT='';
+    function start(){ try{ finalT=''; rec.start(); micBtn.classList.add('live'); statusEl.textContent='Listening…'; }catch(e){} }
+    function stop(){ try{ rec.stop(); }catch(e){} micBtn.classList.remove('live'); }
+    rec.onresult=function(ev){ var s=''; for(var i=ev.resultIndex;i<ev.results.length;i++){ s+=ev.results[i][0].transcript; if(ev.results[i].isFinal) finalT+=ev.results[i][0].transcript; } heard.hidden=false; heard.textContent='"'+(finalT||s)+'"'; };
+    rec.onend=function(){ micBtn.classList.remove('live'); if(finalT.trim()) route(finalT); };
+    micBtn.onmousedown=start; micBtn.onmouseup=stop; micBtn.onmouseleave=function(){ if(micBtn.classList.contains('live')) stop(); };
+    micBtn.ontouchstart=function(e){ e.preventDefault(); start(); }; micBtn.ontouchend=function(e){ e.preventDefault(); stop(); };
+    micBtn.onclick=function(){ if(!micBtn.classList.contains('live')) start(); };
+  })();</script>`;
 }
 
 // ---------- Career guides: everything about each role (real BLS data + Rivet hiring) ----------
@@ -2562,4 +2765,4 @@ function whyRivetBlock(){
 }
 
 module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard, shiftsBoard };
+  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard, shiftsBoard, sourcingAgent, empShifts, empShiftForm, voiceAgent, SHIFT_KINDS, REGISTRY };

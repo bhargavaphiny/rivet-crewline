@@ -1569,10 +1569,11 @@ const server = http.createServer(async (req,res)=>{
       }
       const cSave = p.match(/^\/console\/candidates\/(\d+)\/save$/);
       if(cSave && method==='POST'){
-        const wid = Number(cSave[1]);
+        const wid = Number(cSave[1]); const b = await readBody(req);
         const exists = await db.prepare('SELECT 1 FROM saved_candidates WHERE employer_id=? AND worker_id=?').get(user.id, wid);
         if(exists) await db.prepare('DELETE FROM saved_candidates WHERE employer_id=? AND worker_id=?').run(user.id, wid);
         else await db.prepare('INSERT INTO saved_candidates(employer_id,worker_id) VALUES(?,?)').run(user.id, wid);
+        if(b.from==='source') return redirect(res, `/console/source?trade=${encodeURIComponent(b.trade||'')}`);
         return redirect(res, `/console/candidates/${wid}`);
       }
       // employer rates a worker they hired
@@ -1611,6 +1612,86 @@ const server = http.createServer(async (req,res)=>{
           JOIN users u ON u.id=s.worker_id JOIN worker_profiles p ON p.user_id=s.worker_id
           WHERE s.employer_id=? ORDER BY s.created_at DESC`).all(user.id);
         return send(res, V.layout({title:'Shortlist',user,active:'search',body:V.empShortlist({rows})}));
+      }
+
+      // ---- Employer: shifts & contracts (real, employer-posted supply) ----
+      if(p==='/console/shifts' && method==='GET'){
+        const rows = await db.prepare('SELECT * FROM shifts WHERE employer_id=? ORDER BY date ASC, id DESC').all(user.id);
+        const ids = rows.map(s=>s.id);
+        const claimsByShift = {};
+        if(ids.length){
+          const ph = ids.map(()=>'?').join(',');
+          const cl = await db.prepare(`SELECT c.shift_id, c.worker_id, u.name FROM shift_claims c JOIN users u ON u.id=c.worker_id WHERE c.shift_id IN (${ph}) ORDER BY c.id`).all(...ids);
+          for(const c of cl){ (claimsByShift[c.shift_id]=claimsByShift[c.shift_id]||[]).push(c); }
+        }
+        const shifts = rows.map(s=>({...s, claimants: claimsByShift[s.id]||[]}));
+        return send(res, V.layout({title:'Shifts',user,active:'shifts',body:V.empShifts({shifts})}));
+      }
+      if(p==='/console/shifts/new' && method==='GET')
+        return send(res, V.layout({title:'Post a shift',user,active:'shifts',body:V.empShiftForm()}));
+      if(p==='/console/shifts/new' && method==='POST'){
+        const b = await readBody(req);
+        const v = { title:b.title, trade:b.trade, kind:b.kind, pay_rate:b.pay_rate, city:b.city, zip:b.zip, date:b.date, slots:b.slots, start_time:b.start_time, end_time:b.end_time, urgent:b.urgent, descr:b.descr };
+        const today = new Date().toISOString().slice(0,10);
+        if(!b.title || !b.date || !b.start_time || !b.end_time) return send(res, V.layout({title:'Post a shift',user,active:'shifts',body:V.empShiftForm('Title, date and times are required.', v)}));
+        if(b.date < today) return send(res, V.layout({title:'Post a shift',user,active:'shifts',body:V.empShiftForm('Pick a date today or later.', v)}));
+        const kind = ['per-diem','contract','travel'].includes(b.kind) ? b.kind : 'per-diem';
+        const trade = b.trade || 'cna';
+        const sector = (V.ROLE_BLS[trade] && V.ROLE_BLS[trade].sector) || '';
+        await db.prepare(`INSERT INTO shifts(employer_id,title,trade,sector,city,zip,date,start_time,end_time,pay_rate,kind,slots,urgent,descr,status,seeded)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'open', 0)`).run(user.id, String(b.title).slice(0,120), trade, sector, b.city||'', b.zip||'', b.date, b.start_time, b.end_time, Number(b.pay_rate)||0, kind, Math.max(1,Number(b.slots)||1), b.urgent?1:0, String(b.descr||'').slice(0,400));
+        try { await geocodeZip(b.zip); } catch(e){}
+        return redirect(res, '/console/shifts');
+      }
+      const shClose = p.match(/^\/console\/shifts\/(\d+)\/close$/);
+      if(shClose && method==='POST'){
+        await db.prepare("UPDATE shifts SET status='closed' WHERE id=? AND employer_id=?").run(Number(shClose[1]), user.id);
+        return redirect(res, '/console/shifts');
+      }
+
+      // ---- Public-registry Sourcing Agent: demand-ranked roles + verified, registry-checked candidates ----
+      if(p==='/console/source' && method==='GET'){
+        const picked = String(url.searchParams.get('trade')||'').trim();
+        const sourcedCount = Number(url.searchParams.get('sourced')||0) || 0;
+        const cbu = await allCredsByUser();
+        const workers = await db.prepare(`SELECT u.id user_id, u.name, p.* FROM users u JOIN worker_profiles p ON p.user_id=u.id`).all();
+        const byTrade = {};
+        for(const w of workers){ for(const tr of profTrades(w)) (byTrade[tr]=byTrade[tr]||[]).push(w); }
+        const myTrades = (await db.prepare(`SELECT DISTINCT trade FROM jobs WHERE employer_id=? AND status='open'`).all(user.id)).map(r=>r.trade);
+        const curated = ['cna','patient_care_tech','sterile_processing','surgical_tech','medical_assistant','equipment_tech','process_tech','maintenance_tech','quality_inspector','welder','machinist','electrician','hvac','millwright','cdl_driver'];
+        const roleSet = Array.from(new Set([...myTrades, ...curated].filter(t=>t && M.TRADES[t])));
+        const roles = roleSet.map(tr=>{ const pool=(byTrade[tr]||[]); const bal=M.marketBalance(tr, 0, pool.length);
+          return { trade:tr, label:M.TRADES[tr]||tr, demand:bal, open:pool.length }; })
+          .sort((a,b)=>b.demand.ratio-a.demand.ratio).slice(0,12);
+        let leads=[], market=null, pickedLabel='', jobsForRole=[];
+        if(picked && M.TRADES[picked]){
+          pickedLabel = M.TRADES[picked];
+          market = M.marketBalance(picked, 0, (byTrade[picked]||[]).length);
+          leads = (byTrade[picked]||[]).map(w=>{ const creds=cbu[w.user_id]||[]; const vcount=creds.filter(c=>c.verified).length;
+            const score = M.clamp(Math.round((w.readiness||0)*0.7 + vcount*10 + (w.available?8:0) + (w.open_to_extra?4:0)));
+            return { id:w.user_id, name:w.name, city:w.city, trade:picked, readiness:w.readiness, available:!!w.available, creds, score }; })
+            .sort((a,b)=>b.score-a.score).slice(0,12);
+          jobsForRole = await db.prepare(`SELECT id,title FROM jobs WHERE employer_id=? AND trade=? AND status='open'`).all(user.id, picked);
+        }
+        return send(res, V.layout({title:'Sourcing Agent',user,active:'agents',body:V.sourcingAgent({roles, picked, pickedLabel, leads, market, sourcedCount, jobsForRole})}));
+      }
+      if(p==='/console/source/auto' && method==='POST'){
+        const b = await readBody(req);
+        const jobId = Number(b.job_id)||0; const trade = String(b.trade||'').trim();
+        const job = jobId && await db.prepare('SELECT * FROM jobs WHERE id=? AND employer_id=?').get(jobId, user.id);
+        let sourced = 0;
+        if(job){
+          const inPipe = new Set((await db.prepare('SELECT worker_id FROM applications WHERE job_id=?').all(jobId)).map(r=>r.worker_id));
+          const ranked = (await rankWorkersForJob(job)).filter(w=>!inPipe.has(w.user_id) && w.score>=70).slice(0,5);
+          for(const w of ranked){
+            try {
+              await db.prepare('INSERT INTO applications(job_id,worker_id,stage,score) VALUES(?,?,?,?)').run(jobId, w.user_id, 'Sourced', w.score);
+              await db.prepare('INSERT INTO notes(author_id,worker_id,body) VALUES(?,?,?)').run(user.id, w.user_id, `🤖 Sourcing Agent: ${M.TRADES[w.trade]||w.trade} fit ${w.score}/100${w.available?' · available now':''}.`);
+              sourced++;
+            } catch(e){}
+          }
+        }
+        return redirect(res, `/console/source?trade=${encodeURIComponent(trade)}&sourced=${sourced}`);
       }
 
       // Sourcing agent: auto-add top matches for a job to the pipeline (with AI rationale note)
