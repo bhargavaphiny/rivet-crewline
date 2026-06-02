@@ -1204,6 +1204,18 @@ const server = http.createServer(async (req,res)=>{
         }
         return redirect(res, `/app/jobs/${jid}`);
       }
+      if(jid && p===`/app/land/${jid}` && method==='GET'){
+        const job = await db.prepare(`SELECT j.*,u.company FROM jobs j JOIN users u ON u.id=j.employer_id WHERE j.id=?`).get(jid);
+        if(!job) return redirect(res, '/app/jobs');
+        const creds = await getCreds(user.id);
+        const match = bestMatch(prof, creds, job);
+        const distance = await workerDistance(prof, job.zip);
+        const applied = !!(await db.prepare('SELECT 1 FROM applications WHERE job_id=? AND worker_id=?').get(jid,user.id));
+        const external = !!(job.apply_url && /^https?:\/\//i.test(job.apply_url));
+        return send(res, V.layout({title:'Your game plan',user,active:'jobs',body:V.landJob({
+          job, company:job.company||'', score:match.score, breakdown:match.breakdown, missing:match.missing,
+          readiness:prof.readiness||0, haveCreds:creds.filter(c=>c.verified).map(c=>c.kind), distance, applied, external })}));
+      }
       if(jid && p===`/app/jobs/${jid}/apply` && method==='POST'){
         const job = await db.prepare('SELECT * FROM jobs WHERE id=?').get(jid);
         if(job){ const m=bestMatch(prof,await getCreds(user.id),job);

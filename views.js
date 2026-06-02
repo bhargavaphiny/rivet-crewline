@@ -458,7 +458,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=84">
+  <link rel="stylesheet" href="/styles.css?v=85">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1014,6 +1014,7 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
         ${bd(T('Credentials'),match.breakdown.cred,15)}
       </div>
       ${match.missing.length?`<div class="warn-card">${T('Missing')}: ${match.missing.map(k=>CRED_KINDS[k]||k).join(', ')} — <a href="/app/training" style="font-weight:700;color:inherit;text-decoration:underline">${T('see how to earn it')}</a> ${T('to boost this match.')}</div>`:''}
+      <a class="btn full gameplan-cta" href="/app/land/${job.id}">${icon('spark')} ${T('Get your game plan to land this job')}</a>
       ${isExternal(job)
         ? `<a class="btn full" href="${esc(job.apply_url)}" target="_blank" rel="noopener noreferrer">${T('Apply on')} ${esc(job.source)} ↗</a>
            <p class="muted sm" style="text-align:center;margin-top:8px">${T('This opening is listed on')} ${esc(job.source)}. ${T('You’ll finish applying on their site.')}</p>`
@@ -1412,6 +1413,43 @@ function workerTraining({ have = [], hiring = [] }) {
       </div>
       <a class="btn-sm" href="/work-authorization" style="margin-top:12px">${icon('globe')} ${T('Work in the U.S. — full guide')}</a>
     </div>
+  </section>`;
+}
+
+// ---------- "Land This Job": the worker co-pilot — qualify → plan → practice → apply ----------
+function landJob({ job, company = '', score = 0, breakdown = {}, missing = [], readiness = 0, haveCreds = [], distance = null, applied = false, external = false }){
+  const trade = job.trade, role = TRADES[trade] || trade;
+  const qualifies = score >= 70 && missing.length === 0;
+  const ring = score>=80 ? 'rate-strong' : score>=60 ? 'rate-solid' : 'rate-weak';
+  const have = [];
+  if((breakdown.trade||0) >= 30) have.push(T('Your trade matches this role'));
+  if(distance!=null && distance<=60) have.push(`${T('Within range')} — ${distance} mi`);
+  haveCreds.slice(0,4).forEach(c=>have.push(`${esc(CRED_KINDS[c]||c)} ✓`));
+  if(readiness) have.push(`${T('Readiness')} ${readiness}/100`);
+  if(!have.length) have.push(T('You’ve started your Work Card'));
+  const planCards = missing.map(k=>{ const tr = TRAINING[k]; return `<div class="plan-step"><span class="plan-n">${icon('shield')}</span>
+      <div class="plan-b"><b>${esc(CRED_KINDS[k]||k)}</b><p class="muted sm">${tr?esc(tr.how):T('Add this credential to qualify.')}</p>
+      ${tr&&tr.url?`<a class="btn-xs" href="${esc(tr.url)}" target="_blank" rel="noopener noreferrer">${T('How to earn it ↗')}</a>`:''}</div></div>`; }).join('');
+  return `<section class="wrap narrow">
+    <a class="back" href="/app/jobs/${job.id}">← ${T('Back to the job')}</a>
+    <div class="sec-h big">${T('Your game plan')} <span class="muted">${esc(role)}${company?` · ${esc(company)}`:''}</span></div>
+    <div class="card verdict-card land-hero">
+      <div class="verdict-ring ${ring}"><b>${score}</b><span>${T('match')}</span></div>
+      <div class="verdict-body"><div class="verdict-h">${qualifies?T('You qualify — go for it.'):T('You’re close. Here’s how to lock it in.')}</div>
+        <p class="muted sm">$${job.pay_min}–${job.pay_max}/hr · ${esc(job.city)}${distance!=null?` · ${distance} mi`:''}</p></div>
+    </div>
+    <div class="grid2">
+      <div class="card"><div class="sec-h" style="margin-top:0">${icon('check','xic')} ${T('What you’ve got')}</div>
+        <ul class="land-list">${have.map(h=>`<li>${h}</li>`).join('')}</ul></div>
+      <div class="card"><div class="sec-h" style="margin-top:0">${icon('spark','xic')} ${T('Close the gap')}</div>
+        ${missing.length?`<div class="plan-steps">${planCards}</div><a class="btn-sm" href="/app/training" style="margin-top:10px">${T('See all training →')}</a>`:`<p class="muted">${T('You meet the credential requirements. Nice.')}</p>`}</div>
+    </div>
+    <div class="card agent-card row"><div><div class="agent-h">${icon('spark','xic')} ${T('Practice the interview')}</div>
+      <p class="agent-line">${T('A scored mock interview for this exact role and employer — your readiness verdict in 5 minutes.')}</p></div>
+      <a class="btn-sm" href="/app/learn/interview?job=${job.id}">${T('Start mock interview →')}</a></div>
+    <div class="card agent-card row"><div><div class="agent-h">${icon('check','xic')} ${applied?T('Applied ✓'):T('Apply with your verified Work Card')}</div>
+      <p class="agent-line">${T('The employer sees your checked credentials and Show-Up Score.')}</p></div>
+      ${applied?`<span class="v ok">${T('Applied')}</span>`:external?`<a class="btn-sm" href="${esc(job.apply_url)}" target="_blank" rel="noopener noreferrer">${T('Apply on')} ${esc(job.source)} ↗</a>`:`<form method="post" action="/app/jobs/${job.id}/apply"><button class="btn-sm">${T('Apply now')}</button></form>`}</div>
   </section>`;
 }
 
@@ -2410,4 +2448,4 @@ function whyRivetBlock(){
 }
 
 module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide };
+  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob };
