@@ -1339,6 +1339,7 @@ async function migrate() {
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN self_employed INTEGER DEFAULT 0'); } catch (e) { /* owner-operator / open to subcontract */ }
   try { await db.exec('ALTER TABLE jobs ADD COLUMN subcontract_ok INTEGER DEFAULT 0'); } catch (e) { /* employer open to subcontractors */ }
   try { await db.exec('ALTER TABLE jobs ADD COLUMN sector TEXT'); } catch (e) { /* semiconductor|manufacturing|healthcare (GTM verticals) */ }
+  try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN open_to_extra INTEGER DEFAULT 0'); } catch (e) { /* wants to stack multiple jobs/shifts */ }
 }
 
 async function seedZips() {

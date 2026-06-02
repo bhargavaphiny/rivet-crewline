@@ -458,7 +458,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=88">
+  <link rel="stylesheet" href="/styles.css?v=89">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -680,6 +680,7 @@ function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 
       ${xToggle('/app/bilingual', profile.bilingual, 'globe', t('x_bilingual_on'), t('x_bilingual_off'), '/app')}
       ${xToggle('/app/veteran', profile.veteran, 'shield', T('Veteran ✓'), T('I’m a veteran'), '/app')}
       ${xToggle('/app/subcontract', profile.self_employed, 'hammer', T('Subcontract-ready ✓'), T('I take subcontract work'), '/app')}
+      ${xToggle('/app/extra', profile.open_to_extra, 'bolt', T('Open to extra work ✓'), T('I want extra / multiple jobs'), '/app')}
     </div>
     ${welcome}
     ${jobsGeo && jobsGeo.points.length ? usMap(jobsGeo.points, {title:isNew?T('Where the work is'):t('home_top'), noun:T('job'), cta:T('Apply'), home:jobsGeo.home,
@@ -1531,11 +1532,26 @@ function shiftCard(s){
     </div>
   </div>`;
 }
-function shiftsBoard({ shifts = [], showUp = null }){
+function shiftsBoard({ shifts = [], showUp = null, claims = [], conflict = false, openToExtra = false }){
+  let weekPanel = '';
+  if(claims.length){
+    const byDate = {}; let total=0, hoursTotal=0;
+    claims.forEach(c=>{ const h=shiftHours(c); const earn=Math.round((c.pay_rate||0)*h); total+=earn; hoursTotal+=h; (byDate[c.date]=byDate[c.date]||[]).push({...c,earn}); });
+    const days = Object.keys(byDate).sort();
+    weekPanel = `<div class="card week-card">
+      <div class="week-h"><div><div class="agent-h">${icon('check','xic')} ${T('My week')}</div>
+        <p class="muted sm" style="margin:2px 0 0">${claims.length} ${claims.length===1?T('gig'):T('gigs')} · ${hoursTotal} ${T('hrs')} · ${days.length} ${days.length===1?T('employer'):T('employers')}</p></div>
+        <div class="week-earn"><b>~$${total.toLocaleString()}</b><span>${T('projected')}</span></div></div>
+      ${days.map(d=>`<div class="week-day"><span class="week-date">${fmtShiftDate(d)}</span><div class="week-gigs">${byDate[d].map(g=>`<span class="week-gig">${tradeEmoji(g.trade)} ${esc(g.company)} · ${t12(g.start_time)}–${t12(g.end_time)} · <b>$${g.earn}</b></span>`).join('')}</div></div>`).join('')}
+      <p class="muted sm" style="margin-top:8px">${T('Stack as many as you can work — Rivet keeps your schedule clear of double-bookings.')}</p>
+    </div>`;
+  }
   return `<section class="wrap">
     <div class="sec-h big">${icon('bolt','xic')} ${T('Open shifts & contracts')} <span class="muted">${T('Get paid this week — no agency, no résumé')}</span></div>
-    <div class="card shift-banner"><div class="sb-txt">${T('Verified workers claim open shifts straight from the employer — per-diem, contract and travel. You keep your full rate; we cut out the staffing agency.')}</div>
+    ${conflict?`<div class="warn-card">${T('That shift overlaps one you already claimed — pick a different time so you’re not double-booked.')}</div>`:''}
+    <div class="card shift-banner"><div class="sb-txt">${T('Verified workers claim open shifts straight from the employer — per-diem, contract and travel. Stack multiple jobs, keep your full rate; we cut out the staffing agency.')}</div>
       ${showUp!=null?`<span class="shift-su">${icon('check')} ${T('Your Show-Up Score')}: <b>${showUp}%</b></span>`:`<span class="shift-su muted sm">${T('Verify your Work Card to claim faster')}</span>`}</div>
+    ${weekPanel}
     ${shifts.length?`<div class="grid3 shift-grid">${shifts.map(shiftCard).join('')}</div>`:`<p class="muted">${T('No open shifts right now — check back soon.')}</p>`}
   </section>`;
 }

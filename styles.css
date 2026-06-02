@@ -631,6 +631,17 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .shift-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px;border-top:1px solid var(--line);padding-top:8px}
 .shift-noagency{font-size:11px;color:#157a52;font-weight:700;display:inline-flex;align-items:center;gap:4px}
 .shift-noagency svg{width:12px;height:12px}
+/* My Week — multi-job income stack */
+.week-card{border-left:4px solid #1FA971}
+.week-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.week-earn{text-align:right}
+.week-earn b{display:block;font-size:22px;color:#157a52}
+.week-earn span{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+.week-day{display:flex;gap:12px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}
+.week-date{flex:none;width:84px;font-weight:800;font-size:12.5px;color:var(--steel)}
+.week-gigs{display:flex;flex-direction:column;gap:4px}
+.week-gig{font-size:13px;color:var(--slate)}
+.week-gig b{color:var(--brand-d)}
 .jobpin.near svg{filter:drop-shadow(0 0 4px rgba(31,169,113,.55)) drop-shadow(0 1.5px 2px rgba(0,0,0,.3))}
 .map-tools{display:flex;align-items:center;gap:9px;margin:0 0 12px;flex-wrap:wrap}
 .map-tools .mt-label{font-size:12.5px;font-weight:800;color:var(--steel)}

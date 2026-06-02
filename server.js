@@ -1077,8 +1077,8 @@ const server = http.createServer(async (req,res)=>{
         await db.prepare("DELETE FROM media WHERE id=? AND user_id=? AND target='portfolio'").run(Number(pDel[1]), user.id);
         return redirect(res,'/app/profile');
       }
-      if(['/app/available','/app/work-today','/app/alerts','/app/relocate','/app/tools','/app/transport','/app/bilingual','/app/veteran','/app/subcontract'].includes(p) && method==='POST'){
-        const col = { '/app/available':'available', '/app/work-today':'work_today', '/app/alerts':'alerts', '/app/relocate':'relocate', '/app/tools':'has_tools', '/app/transport':'has_transport', '/app/bilingual':'bilingual', '/app/veteran':'veteran', '/app/subcontract':'self_employed' }[p];
+      if(['/app/available','/app/work-today','/app/alerts','/app/relocate','/app/tools','/app/transport','/app/bilingual','/app/veteran','/app/subcontract','/app/extra'].includes(p) && method==='POST'){
+        const col = { '/app/available':'available', '/app/work-today':'work_today', '/app/alerts':'alerts', '/app/relocate':'relocate', '/app/tools':'has_tools', '/app/transport':'has_transport', '/app/bilingual':'bilingual', '/app/veteran':'veteran', '/app/subcontract':'self_employed', '/app/extra':'open_to_extra' }[p];
         const b = await readBody(req);
         const cur = prof && prof[col] ? 1 : 0;
         await db.prepare(`UPDATE worker_profiles SET ${col}=? WHERE user_id=?`).run(cur?0:1, user.id);
@@ -1228,11 +1228,18 @@ const server = http.createServer(async (req,res)=>{
         const shifts = rows.map(s=>{ const dist = (home && s.lat!=null) ? Math.round(haversineMi(home,{lat:s.lat,lon:s.lon})) : null; return {...s, claimed:claimed.has(s.id), distance:dist, mine:trades.has(s.trade)}; })
           .sort((a,b)=> (b.mine?1:0)-(a.mine?1:0) || ((a.distance==null?1e9:a.distance)-(b.distance==null?1e9:b.distance)) || (a.date<b.date?-1:1));
         const su = await showUp(user.id);
-        return send(res, V.layout({title:'Open shifts',user,active:'shifts',body:V.shiftsBoard({shifts, showUp:su.pct})}));
+        const claims = await db.prepare(`SELECT sh.title, sh.trade, sh.date, sh.start_time, sh.end_time, sh.pay_rate, u.company FROM shift_claims c JOIN shifts sh ON sh.id=c.shift_id JOIN users u ON u.id=sh.employer_id WHERE c.worker_id=? AND sh.date>=? ORDER BY sh.date ASC`).all(user.id, today);
+        return send(res, V.layout({title:'Open shifts',user,active:'shifts',body:V.shiftsBoard({shifts, showUp:su.pct, claims, conflict:!!url.searchParams.get('conflict'), openToExtra:!!(prof&&prof.open_to_extra)})}));
       }
       if(jid && p===`/app/shifts/${jid}/claim` && method==='POST'){
         const s = await db.prepare("SELECT * FROM shifts WHERE id=? AND status='open'").get(jid);
         if(s){
+          // conflict guard: don't let a multi-job worker double-book an overlapping time the same day
+          const toMin = t => { const [h,m]=String(t).split(':').map(Number); return h*60+(m||0); };
+          let aS=toMin(s.start_time), aE=toMin(s.end_time); if(aE<=aS) aE+=1440;
+          const sameDay = await db.prepare('SELECT sh.start_time, sh.end_time FROM shift_claims c JOIN shifts sh ON sh.id=c.shift_id WHERE c.worker_id=? AND sh.date=?').all(user.id, s.date);
+          let conflict=false; for(const x of sameDay){ let bS=toMin(x.start_time), bE=toMin(x.end_time); if(bE<=bS)bE+=1440; if(aS<bE && bS<aE){ conflict=true; break; } }
+          if(conflict) return redirect(res, '/app/shifts?conflict=1');
           try { await db.prepare('INSERT INTO shift_claims(shift_id,worker_id) VALUES(?,?)').run(jid, user.id); } catch(e){}
           const n = (await db.prepare('SELECT COUNT(*) c FROM shift_claims WHERE shift_id=?').get(jid)).c;
           if(n >= (s.slots||1)) await db.prepare("UPDATE shifts SET status='filled' WHERE id=?").run(jid);
