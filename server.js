@@ -543,6 +543,38 @@ async function fillTranslations(){
   } catch(e){ /* non-fatal */ } finally { trBusy = false; }
 }
 
+// ---------- AI mock interview engine ----------
+function buildInterviewQuestions(trade, job){
+  const role = M.TRADES[trade] || 'this role';
+  const lt = V.LEARN_TRACKS[trade];
+  const qs = [`Tell me about your experience and why you'd be a great ${role}.`];
+  if(lt && lt.qs) qs.push(...lt.qs);
+  qs.push(job && job.company ? `Why do you want to work at ${job.company}?` : `Why do you want this ${role} job?`);
+  return qs.slice(0,6);
+}
+async function rateAnswer(answer, role, question){
+  const t = (answer||'').trim();
+  if(LLM.enabled && t.length>1){
+    const prompt = `You are an encouraging blue-collar hiring coach. Role: ${role}. Interview question: "${question}". Candidate's answer: "${t}". Reply ONLY with compact JSON and nothing else: {"rating":"strong|solid|weak","tip":"one short, specific, encouraging coaching sentence in plain language"}.`;
+    try { const r = await LLM.chat(prompt, 130, 7000); const m = r && r.match(/\{[\s\S]*\}/); if(m){ const o = JSON.parse(m[0]); if(o && /^(strong|solid|weak)$/.test(o.rating) && o.tip) return { rating:o.rating, tip:String(o.tip).slice(0,200) }; } } catch(e){}
+  }
+  const lc = t.toLowerCase();
+  const specific = /\d/.test(t) || /(osha|safety|ppe|lockout|tig|mig|weld|cleanroom|forklift|patient|sterile|torque|calibrat|blueprint|recipe|cnc|ase|epa|cdl|shift)/.test(lc);
+  const rating = t.length < 60 ? 'weak' : (t.length > 160 || specific) ? 'strong' : 'solid';
+  const tips = { weak:'Give a real example — the situation, what you did, and how it turned out.', solid:'Good — add one concrete detail or number to make it land.', strong:'Strong, specific answer. Keep that structure.' };
+  return { rating, tip: tips[rating] };
+}
+function interviewVerdict(history){
+  const map = { strong:100, solid:75, weak:45 };
+  const score = history.length ? Math.round(history.reduce((a,h)=>a+(map[h.rating]||60),0)/history.length) : 0;
+  const anyStrong = history.some(h=>h.rating==='strong'), anyWeak = history.some(h=>h.rating==='weak');
+  const cls = score>=85 ? 'rate-strong' : score>=65 ? 'rate-solid' : 'rate-weak';
+  const headline = score>=85 ? 'You’re interview-ready. Go get it.' : score>=65 ? 'Solid — a little polish and you’re there.' : 'Good start — a few reps will get you ready.';
+  const good = anyStrong ? 'specific, detailed answers with real examples' : 'showing up and answering every question';
+  const fix = anyWeak ? 'adding concrete examples and numbers to your shorter answers' : 'tightening each answer into a clean STAR story';
+  return { score, cls, headline, good, fix };
+}
+
 // ---------- router ----------
 const server = http.createServer(async (req,res)=>{
   const url = new URL(req.url, `http://${req.headers.host}`);
@@ -1067,27 +1099,27 @@ const server = http.createServer(async (req,res)=>{
         const hiring = hot.map(r=>r.trade).filter(t=>V.LEARN_TRACKS[t]);
         return send(res, V.layout({title:'Learn & get hired',user,active:'training',body:V.workerTraining({have, hiring})}));
       }
-      if(p==='/app/learn/interview' && method==='GET'){
-        const trade = (url.searchParams.get('trade')||'').trim();
-        return send(res, V.layout({title:'Mock interview',user,active:'training',body:V.mockInterview({trade, history:[], aiOn:LLM.enabled})}));
-      }
-      if(p==='/app/learn/interview' && method==='POST'){
-        const b = await readBody(req);
-        const trade = String(b.trade||'').trim();
-        const answer = String(b.answer||'').slice(0,600);
-        const label = (M.TRADES[trade]||trade);
-        const qbank = (V.LEARN_TRACKS[trade]||{}).qs || [];
-        let history = [];
-        try { history = JSON.parse(b.history||'[]'); } catch(e){}
-        history.push({role:'you', text:answer});
-        let reply = '';
-        if(LLM.enabled){
-          const prompt = `You are a friendly hiring coach running a mock interview for a ${label} role. The candidate just answered: "${answer}". In 2-3 short sentences: give one specific, encouraging piece of feedback on that answer, then ask ONE new relevant interview question for a ${label}. Plain language, no markdown.`;
-          try { reply = await LLM.chat(prompt, 160, 8000); } catch(e){}
+      if(p==='/app/learn/interview' && (method==='GET'||method==='POST')){
+        const b = method==='POST' ? await readBody(req) : {};
+        const jobId = String((method==='POST'? b.job : url.searchParams.get('job'))||'').trim();
+        let trade = String((method==='POST'? b.trade : url.searchParams.get('trade'))||'').trim();
+        let job = null;
+        if(jobId){
+          job = await db.prepare('SELECT id,title,trade FROM jobs WHERE id=?').get(jobId);
+          if(job){ trade = job.trade; const emp = await db.prepare('SELECT u.company FROM users u JOIN jobs j ON j.employer_id=u.id WHERE j.id=?').get(jobId); job.company = emp ? emp.company : ''; }
         }
-        if(!reply){ const next = qbank[(history.filter(m=>m.role==='them').length)%(qbank.length||1)] || 'Tell me more about your hands-on experience.'; reply = `Good — be specific with a real example next time. ${next}`; }
-        history.push({role:'them', text:reply});
-        return send(res, V.layout({title:'Mock interview',user,active:'training',body:V.mockInterview({trade, history, aiOn:LLM.enabled})}));
+        const questions = buildInterviewQuestions(trade, job);
+        const base = { trade, jobId: job?String(job.id):jobId, company: job?(job.company||''):'', questions, aiOn: LLM.enabled };
+        if(method==='GET'){
+          return send(res, V.layout({title:'AI mock interview',user,active:'training',body:V.mockInterview({...base, history:[], qi:0, done:false})}));
+        }
+        let history = []; try { history = JSON.parse(b.history||'[]'); } catch(e){}
+        let qi = Math.max(0, Math.min(questions.length-1, Number(b.qi)||0));
+        const rated = await rateAnswer(String(b.answer||'').slice(0,900), M.TRADES[trade]||trade, questions[qi]||'');
+        history.push({ q: questions[qi]||'', a: String(b.answer||'').slice(0,900), rating: rated.rating, tip: rated.tip });
+        qi++;
+        const done = qi >= questions.length;
+        return send(res, V.layout({title:'AI mock interview',user,active:'training',body:V.mockInterview({...base, history, qi, done, verdict: done?interviewVerdict(history):null})}));
       }
       if(p==='/app/applications' && method==='GET'){
         const apps = await db.prepare(`SELECT a.*, j.title,j.trade,j.pay_min,j.pay_max,j.city,j.zip,u.company,u.id employer_id

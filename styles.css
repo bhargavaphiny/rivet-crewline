@@ -526,6 +526,41 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .iv-msg.me{background:var(--brand);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
 .iv-form{display:flex;gap:8px}
 .iv-form input[name=answer]{flex:1}
+/* scored AI interview */
+.iv-progress{display:flex;align-items:center;gap:10px;margin:0 0 14px}
+.iv-bar{flex:1;height:7px;border-radius:6px;background:#EAE0CD;overflow:hidden}
+.iv-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--amber),var(--amber-d));border-radius:6px;transition:width .3s}
+.iv-turn{margin-bottom:12px}
+.iv-q{font-weight:700;font-size:14px;display:flex;align-items:flex-start;gap:7px}
+.iv-q svg{width:15px;height:15px;color:var(--brand-d);flex:none;margin-top:2px}
+.iv-q.big{font-size:17px;line-height:1.35;margin-bottom:12px}
+.iv-a{background:var(--brand);color:#fff;padding:9px 12px;border-radius:13px 13px 4px 13px;margin:7px 0;font-size:14px;max-width:88%;margin-left:auto}
+.iv-fb{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--slate);background:var(--card-2,#f3ece0);padding:9px 12px;border-radius:11px}
+.rate-chip{flex:none;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:3px 8px;border-radius:10px}
+.rate-strong{background:rgba(31,169,113,.16);color:#157a52}
+.rate-solid{background:rgba(204,138,51,.18);color:#9a6a1f}
+.rate-weak{background:rgba(226,69,59,.13);color:#b7322a}
+.iv-current textarea{width:100%;border:1px solid var(--line);border-radius:11px;padding:11px;font:inherit;resize:vertical}
+.iv-actions{display:flex;gap:8px;align-items:center;margin-top:10px}
+.mic-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 13px;font-weight:700;font-size:13px;color:var(--steel);cursor:pointer}
+.mic-btn svg{width:15px;height:15px}
+.mic-btn.rec{background:rgba(226,69,59,.12);border-color:#e2453b;color:#b7322a;animation:micpulse 1.3s ease-in-out infinite}
+@keyframes micpulse{0%,100%{opacity:1}50%{opacity:.55}}
+.verdict-card{display:flex;gap:18px;align-items:center;flex-wrap:wrap;border-left:5px solid var(--brand)}
+.verdict-ring{flex:none;width:96px;height:96px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--amber) 0,var(--amber) var(--p,70%),#EAE0CD 0);position:relative}
+.verdict-ring::after{content:'';position:absolute;inset:8px;border-radius:50%;background:var(--card)}
+.verdict-ring b,.verdict-ring span{position:relative;z-index:1;text-align:center;line-height:1}
+.verdict-ring b{font-size:26px}
+.verdict-ring span{font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:.04em}
+.verdict-ring.rate-strong{background:conic-gradient(#1FA971 0,#1FA971 100%,#EAE0CD 0)}
+.verdict-ring.rate-solid{background:conic-gradient(#cc8a33 0,#cc8a33 75%,#EAE0CD 0)}
+.verdict-ring.rate-weak{background:conic-gradient(#e2453b 0,#e2453b 50%,#EAE0CD 0)}
+.verdict-body{flex:1;min-width:240px}
+.verdict-h{font-size:18px;font-weight:800;margin-bottom:6px}
+.verdict-good,.verdict-fix{display:flex;align-items:flex-start;gap:7px;font-size:13.5px;margin:4px 0}
+.verdict-good svg,.verdict-fix svg{width:15px;height:15px;flex:none;margin-top:2px}
+.verdict-good svg{color:#157a52}.verdict-fix svg{color:var(--brand-d)}
+.verdict-cta{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
 @media(max-width:560px){.track-grid{grid-template-columns:1fr}}
 /* ---- career guides ---- */
 .guide-hero{border-left:5px solid var(--sc,#E8923A)}

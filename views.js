@@ -300,6 +300,7 @@ const BUILTIN_ES = {
   'across':'en','metro':'metro','metros':'metros','warmer & bigger = more hiring':'más grande = más contratación',
   'You':'Tú','commute':'traslado','within':'a menos de','mi of you':'mi de ti','Zoom to me':'Acercar a mí','Within reach':'A tu alcance','View all US':'Ver todo EE. UU.','Near me':'Cerca de mí','Opportunity map':'Mapa de oportunidades','Tap a pin to see openings there':'Toca un pin para ver las vacantes ahí','Tap any pin to see them':'Toca cualquier pin para verlos','Number on a pin = openings · tap to see them':'El número en el pin = vacantes · toca para verlas',
   'Filter by type':'Filtrar por tipo','All types':'Todos los tipos','No openings in this type here.':'No hay vacantes de este tipo aquí.',
+  'AI mock interview':'Entrevista simulada con IA','Practice the interview for this job':'Practica la entrevista para este empleo','Question':'Pregunta','of':'de','Complete':'Completo','ready':'listo','Strongest':'Lo más fuerte','Work on':'Mejora','Practice again':'Practicar de nuevo','Apply to this job →':'Postúlate a este empleo →','See matching jobs →':'Ver empleos compatibles →','Answer':'Responder','Speak':'Hablar','Type or tap the mic and speak your answer…':'Escribe o toca el micrófono y di tu respuesta…','Back to the job':'Volver al empleo','Needs work':'A mejorar','Solid':'Sólido','Strong':'Fuerte','You’re interview-ready. Go get it.':'Estás listo para la entrevista. ¡A por ello!','Solid — a little polish and you’re there.':'Bien — un poco de pulido y lo tienes.','Good start — a few reps will get you ready.':'Buen comienzo — con algo de práctica estarás listo.',
   'Construction & trades':'Construcción y oficios','Drivers & logistics':'Conductores y logística','Mechanical & repair':'Mecánica y reparación',
   'Healthcare & care':'Salud y cuidado','Food service':'Servicio de comida','Agriculture':'Agricultura',
   'Cleaning & facilities':'Limpieza e instalaciones','Security':'Seguridad','Freelance & gig':'Independiente y por encargo','Manufacturing & semiconductor':'Manufactura y semiconductores',
@@ -457,7 +458,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=83">
+  <link rel="stylesheet" href="/styles.css?v=84">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1028,6 +1029,7 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
             ? `<div class="ok-card">${T('✓ Applied — the employer can see your verified Work Card.')}</div>`
             : `<form method="post" action="/app/jobs/${job.id}/apply"><button class="btn full">${T('Apply with verified Work Card')}</button></form>`))}
       <form method="post" action="/app/jobs/${job.id}/save"><button class="btn full ghost">${saved?T('★ Saved — remove'):T('☆ Save this job')}</button></form>
+      <a class="btn full ghost iv-cta" href="/app/learn/interview?job=${job.id}">${icon('spark')} ${T('Practice the interview for this job')}</a>
     </div>
     ${(job.company_about||job.company_website||job.company_size||empRating.count||empRehire||(empSafety&&empSafety.n))?`<div class="card">
       <div class="sec-h" style="margin-top:0">${T('About the employer')}</div>
@@ -1329,30 +1331,61 @@ function learnTrackCard(key){
     </div>
   </div>`;
 }
-function mockInterview({ trade, history = [], aiOn = false }){
-  const t = LEARN_TRACKS[trade];
+// Kickass AI interview: job/role-aware, scores every answer, ends with a readiness verdict.
+// state = { trade, jobId, company, questions:[...], history:[{q,a,rating,tip}], qi, done, verdict }
+const RATE_META = { strong:['Strong','rate-strong'], solid:['Solid','rate-solid'], weak:['Needs work','rate-weak'] };
+function mockInterview(st){
+  const { trade, jobId='', company='', questions=[], history=[], qi=0, done=false, verdict=null, aiOn=false } = st;
   const label = TRADES[trade] || trade;
-  const qs = t ? t.qs : ['Tell me about your experience.','Why do you want this role?','Describe a hard problem you solved.','Why should we hire you?'];
+  const total = questions.length || (history.length + 1);
+  const curQ = done ? null : questions[qi];
+  const ctx = company ? `${esc(label)} · ${esc(company)}` : esc(label);
+  const turn = (h)=>`<div class="iv-turn">
+      <div class="iv-q">${icon('spark')} ${esc(h.q)}</div>
+      <div class="iv-a">${esc(h.a)}</div>
+      <div class="iv-fb"><span class="rate-chip ${RATE_META[h.rating]?RATE_META[h.rating][1]:'rate-solid'}">${T((RATE_META[h.rating]||RATE_META.solid)[0])}</span> <span>${esc(h.tip)}</span></div>
+    </div>`;
   return `<section class="wrap narrow">
-    <a class="back" href="/app/training">← ${T('Back to Learn')}</a>
-    <div class="sec-h big">${T('Mock interview')} <span class="muted">${esc(label)}</span></div>
-    <div class="card">
-      <div class="sec-h" style="margin-top:0">${T('Common questions for this role')}</div>
-      <ol class="iv-qs">${qs.map(q=>`<li>${T(q)}</li>`).join('')}</ol>
-      <p class="muted sm">${T('Tip: answer out loud using STAR — Situation, Task, Action, Result. Keep it to 60–90 seconds.')}</p>
-    </div>
-    <div class="card">
-      <div class="sec-h" style="margin-top:0">${icon('spark','xic')} ${T('Practice with the AI coach')}</div>
-      ${aiOn ? `<div class="iv-chat" id="ivchat">${history.map(m=>`<div class="iv-msg ${m.role==='you'?'me':'them'}">${esc(m.text)}</div>`).join('') || `<div class="iv-msg them">${T('Ready when you are. Tell me about your experience as a')} ${esc(label)}.</div>`}</div>
-      <form method="post" action="/app/learn/interview" class="iv-form">
-        <input type="hidden" name="trade" value="${esc(trade)}">
-        <input type="hidden" name="history" value="${esc(JSON.stringify(history))}">
-        <input name="answer" placeholder="${T('Type your answer…')}" autocomplete="off" required maxlength="600" autofocus>
-        <button class="btn-sm">${T('Send')}</button>
-      </form>
-      <p class="muted sm">${T('The coach asks role-specific questions and gives quick feedback. Practice as many times as you like.')}</p>`
-      : `<p class="muted">${T('AI practice is warming up. For now, rehearse the questions above out loud — record yourself on your phone and watch it back.')}</p>`}
-    </div>
+    <a class="back" href="${jobId?`/app/jobs/${jobId}`:'/app/training'}">← ${jobId?T('Back to the job'):T('Back to Learn')}</a>
+    <div class="sec-h big">${icon('spark','xic')} ${T('AI mock interview')} <span class="muted">${ctx}</span></div>
+    <div class="iv-progress"><div class="iv-bar"><i style="width:${Math.round((history.length/Math.max(total,1))*100)}%"></i></div>
+      <span class="muted sm">${done?T('Complete'):`${T('Question')} ${history.length+1} ${T('of')} ${total}`}</span></div>
+    ${history.map(turn).join('')}
+    ${done ? `<div class="card verdict-card">
+        <div class="verdict-ring ${verdict.cls}"><b>${verdict.score}</b><span>${T('ready')}</span></div>
+        <div class="verdict-body">
+          <div class="verdict-h">${T(verdict.headline)}</div>
+          <p class="verdict-good">${icon('check')} ${T('Strongest')}: ${esc(verdict.good)}</p>
+          <p class="verdict-fix">${icon('spark')} ${T('Work on')}: ${esc(verdict.fix)}</p>
+          <div class="verdict-cta">
+            <a class="btn-sm ghost" href="/app/learn/interview?trade=${esc(trade)}${jobId?`&job=${esc(jobId)}`:''}">${T('Practice again')}</a>
+            ${jobId?`<a class="btn-sm" href="/app/jobs/${jobId}">${T('Apply to this job →')}</a>`:`<a class="btn-sm" href="/app/jobs">${T('See matching jobs →')}</a>`}
+          </div>
+        </div>
+      </div>`
+    : `<div class="card iv-current">
+        <div class="iv-q big">${icon('spark')} ${esc(curQ||'')}</div>
+        <form method="post" action="/app/learn/interview" class="iv-answer">
+          <input type="hidden" name="trade" value="${esc(trade)}">
+          <input type="hidden" name="job" value="${esc(jobId)}">
+          <input type="hidden" name="qi" value="${qi}">
+          <input type="hidden" name="history" value="${esc(JSON.stringify(history))}">
+          <textarea name="answer" id="ivans" rows="3" placeholder="${T('Type or tap the mic and speak your answer…')}" required maxlength="900" autofocus></textarea>
+          <div class="iv-actions">
+            <button type="button" class="mic-btn" id="micbtn" aria-label="${esc(T('Speak your answer'))}">${icon('bell')} <span>${T('Speak')}</span></button>
+            <button class="btn">${T('Answer')} →</button>
+          </div>
+        </form>
+        <p class="muted sm">${T('Answer like the real thing — use STAR (Situation, Task, Action, Result) and a specific example. The coach scores each answer.')}${aiOn?'':` ${T('(Offline coach: scored on specifics & detail.)')}`}</p>
+      </div>
+      <script>(function(){var b=document.getElementById('micbtn'),a=document.getElementById('ivans');
+        var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+        if(!SR||!b){if(b)b.style.display='none';return;}
+        var rec=new SR();rec.lang=(document.documentElement.lang||'en').indexOf('es')===0?'es-US':'en-US';rec.interimResults=true;rec.continuous=true;var base='',on=false;
+        rec.onresult=function(e){var s='';for(var i=e.resultIndex;i<e.results.length;i++)s+=e.results[i][0].transcript;a.value=(base?base+' ':'')+s;};
+        rec.onend=function(){on=false;b.classList.remove('rec');};
+        b.onclick=function(){if(on){rec.stop();return;}base=a.value.trim();try{rec.start();on=true;b.classList.add('rec');}catch(e){}};
+      })();</script>`}
   </section>`;
 }
 function workerTraining({ have = [], hiring = [] }) {
