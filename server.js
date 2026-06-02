@@ -1591,8 +1591,22 @@ const server = http.createServer(async (req,res)=>{
   }
 });
 
+// Live job ingestion from companies' public job boards (Greenhouse). Runs in the
+// background after boot, at most every 6h, so prod stays full of real current postings.
+const { ingestLiveJobs } = require('./jobs_live');
+async function refreshLiveJobs(){
+  try {
+    const last = await db.prepare("SELECT v FROM meta WHERE k='live_at'").get();
+    const age = last ? (Date.now() - Number(last.v)) : Infinity;
+    if(age < 6*3600*1000) return; // refreshed recently
+    const r = await ingestLiveJobs(db);
+    await db.prepare("INSERT INTO meta(k,v) VALUES('live_at',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").run(String(Date.now()));
+    console.log(`[live] ingested ${r.added} new real jobs (scanned ${r.scanned})`);
+  } catch(e){ console.error('[live] ingest skipped (non-fatal):', e.message); }
+}
+
 init()
   .then(loadTranslations)
   .then(()=> server.listen(PORT, ()=>console.log(`Rivet × Crewline running → http://localhost:${PORT}`)))
-  .then(()=> { prewarmEs().catch(()=>{}); })
+  .then(()=> { prewarmEs().catch(()=>{}); setTimeout(()=>{ refreshLiveJobs(); }, 3000); })
   .catch(err=>{ console.error('init failed', err); process.exit(1); });
