@@ -1045,7 +1045,32 @@ const server = http.createServer(async (req,res)=>{
       }
       if(p==='/app/training' && method==='GET'){
         const have = (await getCreds(user.id)).map(c=>c.kind);
-        return send(res, V.layout({title:'Learn & get certified',user,active:'training',body:V.workerTraining({have})}));
+        // career tracks ordered by what's actually hiring on Rivet (open jobs by trade)
+        const hot = await db.prepare("SELECT trade, COUNT(*) c FROM jobs WHERE status='open' GROUP BY trade ORDER BY c DESC").all();
+        const hiring = hot.map(r=>r.trade).filter(t=>V.LEARN_TRACKS[t]);
+        return send(res, V.layout({title:'Learn & get hired',user,active:'training',body:V.workerTraining({have, hiring})}));
+      }
+      if(p==='/app/learn/interview' && method==='GET'){
+        const trade = (url.searchParams.get('trade')||'').trim();
+        return send(res, V.layout({title:'Mock interview',user,active:'training',body:V.mockInterview({trade, history:[], aiOn:LLM.enabled})}));
+      }
+      if(p==='/app/learn/interview' && method==='POST'){
+        const b = await readBody(req);
+        const trade = String(b.trade||'').trim();
+        const answer = String(b.answer||'').slice(0,600);
+        const label = (M.TRADES[trade]||trade);
+        const qbank = (V.LEARN_TRACKS[trade]||{}).qs || [];
+        let history = [];
+        try { history = JSON.parse(b.history||'[]'); } catch(e){}
+        history.push({role:'you', text:answer});
+        let reply = '';
+        if(LLM.enabled){
+          const prompt = `You are a friendly hiring coach running a mock interview for a ${label} role. The candidate just answered: "${answer}". In 2-3 short sentences: give one specific, encouraging piece of feedback on that answer, then ask ONE new relevant interview question for a ${label}. Plain language, no markdown.`;
+          try { reply = await LLM.chat(prompt, 160, 8000); } catch(e){}
+        }
+        if(!reply){ const next = qbank[(history.filter(m=>m.role==='them').length)%(qbank.length||1)] || 'Tell me more about your hands-on experience.'; reply = `Good — be specific with a real example next time. ${next}`; }
+        history.push({role:'them', text:reply});
+        return send(res, V.layout({title:'Mock interview',user,active:'training',body:V.mockInterview({trade, history, aiOn:LLM.enabled})}));
       }
       if(p==='/app/applications' && method==='GET'){
         const apps = await db.prepare(`SELECT a.*, j.title,j.trade,j.pay_min,j.pay_max,j.city,j.zip,u.company,u.id employer_id

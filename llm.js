@@ -134,4 +134,4 @@ async function sourceLine(d){
   return (d.reasons && d.reasons.length) ? d.reasons.join(' · ') : `Strong ${d.tradeLabel} match (${d.score}/100).`;
 }
 
-module.exports = { enabled, workerAbout, translateBatch, coachLine, screen, sourceLine };
+module.exports = { enabled, chat, workerAbout, translateBatch, coachLine, screen, sourceLine };

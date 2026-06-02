@@ -456,7 +456,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=81">
+  <link rel="stylesheet" href="/styles.css?v=82">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1276,14 +1276,73 @@ function trainCard(kind, have){
     <a class="nav-link" style="color:var(--brand-d);font-weight:700" href="${esc(tr.url)}" target="_blank" rel="noopener noreferrer">${T('How to earn it ↗')}</a>
   </div>`;
 }
-function workerTraining({ have = [] }) {
+// Curated career tracks for the roles that are actually hiring on Rivet right now.
+// why=one-liner, pay=typical hourly, cert=[label,url], vid=YouTube search, qs=interview bank.
+const LEARN_TRACKS = {
+  equipment_tech: { why:'Keep the machines that build everything running — the #1 role hiring on Rivet right now.', pay:'$28–44/hr', cert:['OSHA 10 + manufacturer training','https://www.osha.gov/training/outreach'], vid:'equipment maintenance technician day in the life', qs:['Walk me through how you troubleshoot a machine that stopped mid-shift.','How do you follow a lockout/tagout (LOTO) procedure?','Tell me about a time you prevented downtime with preventive maintenance.','How comfortable are you reading electrical and pneumatic schematics?'] },
+  maintenance_tech: { why:'Industrial maintenance techs are in demand at every plant and DC.', pay:'$26–40/hr', cert:['OSHA 30','https://www.osha.gov/training/outreach'], vid:'industrial maintenance technician training', qs:['What PMs do you run on conveyors or pumps?','Describe a hydraulic or pneumatic repair you’ve done.','How do you prioritize when three machines are down at once?','What’s your experience with PLCs?'] },
+  machinist: { why:'CNC machinists make precision parts for aerospace, EVs and chips.', pay:'$26–42/hr', cert:['NIMS Machining','https://www.nims-skills.org'], vid:'cnc machinist day in the life', qs:['How do you read a blueprint and set tolerances?','Walk me through setting up a CNC mill or lathe.','How do you use calipers and micrometers to verify a part?','Tell me about a time you scrapped a part — what did you learn?'] },
+  welder: { why:'Welders are chronically short-staffed — shipyards, aerospace, structural.', pay:'$26–42/hr', cert:['AWS Certified Welder','https://www.aws.org/certification'], vid:'aws welding certification test 3g 4g', qs:['Which processes are you certified in — MIG, TIG, stick, flux-core?','What positions can you weld (1G–6G)?','How do you read a welding symbol on a drawing?','How do you prep and inspect a weld for porosity or undercut?'] },
+  electrician: { why:'Data-center and EV buildouts are pulling electricians at premium pay.', pay:'$30–46/hr', cert:['Electrical apprenticeship + OSHA 10','https://www.electricaltrainingalliance.org'], vid:'electrician apprenticeship explained', qs:['Are you a helper, apprentice, or journeyman — and licensed where?','How do you work safely around energized equipment / arc-flash?','Walk me through bending and running conduit.','How do you troubleshoot a circuit that keeps tripping?'] },
+  machine_operator: { why:'Production operators are the entry door into manufacturing — train on the job.', pay:'$20–30/hr', cert:['OSHA 10 (helpful, not required)','https://www.osha.gov/training/outreach'], vid:'production machine operator job', qs:['Are you comfortable standing and on rotating shifts?','How do you keep quality consistent over a long run?','Describe following a work instruction or SOP exactly.','How do you handle a machine fault — stop, tag, escalate?'] },
+  assembler: { why:'Assemblers build EVs, rockets, robots and electronics.', pay:'$20–30/hr', cert:['IPC-A-610 (electronics)','https://www.ipc.org/ipc-certification'], vid:'assembly technician manufacturing', qs:['Have you used hand and power tools to spec?','How do you follow torque specs and a build sheet?','Tell me about doing repetitive work with high accuracy.','Comfortable with soldering or harnessing?'] },
+  quality_inspector: { why:'Quality inspectors keep parts to spec — every plant needs them.', pay:'$22–34/hr', cert:['ASQ Certified Quality Inspector','https://asq.org/cert'], vid:'quality inspector manufacturing measuring tools', qs:['How do you use calipers, micrometers, and gauges?','What’s your experience reading GD&T?','Walk me through a first-article inspection.','What do you do when a lot fails inspection?'] },
+  automotive_tech: { why:'Service & fleet technicians keep vehicles (and robotaxis) on the road.', pay:'$24–40/hr', cert:['ASE Certification','https://www.ase.com'], vid:'automotive technician ASE day in the life', qs:['Which ASE areas are you certified in?','Walk me through diagnosing a no-start.','How do you use a scan tool and read codes?','Do you have your own tools?'] },
+  hvac: { why:'HVAC techs ride the data-center and housing demand wave.', pay:'$28–42/hr', cert:['EPA 608','https://www.epa.gov/section608'], vid:'hvac technician epa 608 explained', qs:['Do you hold EPA 608 (which type)?','How do you charge a system and check superheat/subcooling?','Walk me through diagnosing no cooling.','Comfortable on rooftops and in tight spaces?'] },
+  process_tech: { why:'Fab/process techs run the tools that make semiconductors — CHIPS Act boom.', pay:'$24–36/hr', cert:['Employer cleanroom training','https://www.semi.org'], vid:'semiconductor process technician fab', qs:['Are you okay gowning up and working in a cleanroom?','How do you follow a detailed process recipe exactly?','How do you document and escalate an out-of-spec reading?','Comfortable on 12-hour rotating shifts?'] },
+  cna: { why:'CNAs are the fastest path into healthcare — huge, steady demand.', pay:'$18–25/hr', cert:['State CNA certification','https://www.redcross.org/take-a-class/nurse-assistant-training'], vid:'CNA day in the life certified nursing assistant', qs:['Are you certified in your state — and is it current?','How do you help with ADLs while protecting dignity?','How do you handle a combative or confused patient?','Tell me about teamwork on a busy floor.'] },
+  sterile_processing: { why:'Sterile processing techs keep ORs running — strong hospital demand.', pay:'$19–27/hr', cert:['CRCST (HSPA)','https://myhspa.org'], vid:'sterile processing technician day in the life', qs:['Do you hold CRCST or are you working toward it?','Walk me through decontamination → assembly → sterilization.','How do you track instrument trays and counts?','How do you handle a recall or failed biological indicator?'] },
+};
+function ytSearch(q){ return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q); }
+function learnTrackCard(key){
+  const t = LEARN_TRACKS[key]; if(!t) return '';
+  return `<div class="card track-card">
+    <div class="track-h"><span class="trend-ic">${tradeEmoji(key)}</span><div><b>${esc(TRADES[key]||key)}</b><div class="muted sm">${t.pay} · ${T('hiring now')}</div></div></div>
+    <p class="track-why">${T(t.why)}</p>
+    <div class="track-links">
+      <a class="track-link vid" href="${ytSearch(t.vid)}" target="_blank" rel="noopener noreferrer">${icon('star')} ${T('Watch: day in the life')}</a>
+      <a class="track-link" href="${esc(t.cert[1])}" target="_blank" rel="noopener noreferrer">${icon('shield')} ${esc(t.cert[0])} ↗</a>
+      <a class="track-link prep" href="/app/learn/interview?trade=${key}">${icon('spark')} ${T('Practice the interview')}</a>
+    </div>
+  </div>`;
+}
+function mockInterview({ trade, history = [], aiOn = false }){
+  const t = LEARN_TRACKS[trade];
+  const label = TRADES[trade] || trade;
+  const qs = t ? t.qs : ['Tell me about your experience.','Why do you want this role?','Describe a hard problem you solved.','Why should we hire you?'];
+  return `<section class="wrap narrow">
+    <a class="back" href="/app/training">← ${T('Back to Learn')}</a>
+    <div class="sec-h big">${T('Mock interview')} <span class="muted">${esc(label)}</span></div>
+    <div class="card">
+      <div class="sec-h" style="margin-top:0">${T('Common questions for this role')}</div>
+      <ol class="iv-qs">${qs.map(q=>`<li>${T(q)}</li>`).join('')}</ol>
+      <p class="muted sm">${T('Tip: answer out loud using STAR — Situation, Task, Action, Result. Keep it to 60–90 seconds.')}</p>
+    </div>
+    <div class="card">
+      <div class="sec-h" style="margin-top:0">${icon('spark','xic')} ${T('Practice with the AI coach')}</div>
+      ${aiOn ? `<div class="iv-chat" id="ivchat">${history.map(m=>`<div class="iv-msg ${m.role==='you'?'me':'them'}">${esc(m.text)}</div>`).join('') || `<div class="iv-msg them">${T('Ready when you are. Tell me about your experience as a')} ${esc(label)}.</div>`}</div>
+      <form method="post" action="/app/learn/interview" class="iv-form">
+        <input type="hidden" name="trade" value="${esc(trade)}">
+        <input type="hidden" name="history" value="${esc(JSON.stringify(history))}">
+        <input name="answer" placeholder="${T('Type your answer…')}" autocomplete="off" required maxlength="600" autofocus>
+        <button class="btn-sm">${T('Send')}</button>
+      </form>
+      <p class="muted sm">${T('The coach asks role-specific questions and gives quick feedback. Practice as many times as you like.')}</p>`
+      : `<p class="muted">${T('AI practice is warming up. For now, rehearse the questions above out loud — record yourself on your phone and watch it back.')}</p>`}
+    </div>
+  </section>`;
+}
+function workerTraining({ have = [], hiring = [] }) {
   const haveSet = new Set(have);
   const all = Object.keys(TRAINING);
   const todo = all.filter(k=>!haveSet.has(k));
   const done = all.filter(k=>haveSet.has(k));
   return `<section class="wrap">
-    <div class="sec-h big">${T('Learn & get certified')} <span class="muted">${T('Real credentials open more jobs and raise your readiness score')}</span></div>
-    <div class="card info-card">${T('Certifications are the fastest way to stand out. Every one you add to your Work Card is verified and boosts how you match to jobs. Below is how to earn each — most can be done online or through a local provider.')}</div>
+    <div class="sec-h big">${T('Learn & get hired')} <span class="muted">${T('Real career tracks for the roles hiring on Rivet right now')}</span></div>
+    ${(()=>{ const keys=(hiring&&hiring.length?hiring:Object.keys(LEARN_TRACKS)).filter(k=>LEARN_TRACKS[k]).slice(0,8); return keys.length?`
+    <div class="sec-h" style="margin-top:4px">${icon('flame','xic')} ${T('Career tracks — hiring now')}</div>
+    <div class="track-grid">${keys.map(learnTrackCard).join('')}</div>`:''; })()}
+    <div class="card info-card" style="margin-top:18px">${T('Certifications are the fastest way to stand out. Every one you add to your Work Card is verified and boosts how you match to jobs. Below is how to earn each — most can be done online or through a local provider.')}</div>
     <div class="sec-h">${T('Recommended — not on your card yet')}</div>
     <div class="traingrid">${todo.map(k=>trainCard(k,false)).join('') || `<p class="muted">${T('You’ve added every credential we track. Impressive.')}</p>`}</div>
     ${done.length?`<div class="sec-h">${T('Already on your Work Card')}</div><div class="traingrid">${done.map(k=>trainCard(k,true)).join('')}</div>`:''}
@@ -2241,4 +2300,4 @@ function whyRivetBlock(){
 }
 
 module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage };
+  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS };

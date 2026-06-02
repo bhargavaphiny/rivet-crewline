@@ -507,6 +507,26 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .cta-band b{font-size:17px}
 .cta-band .muted{color:#c3cfd6!important}
 @media(max-width:560px){.role-grid,.why-grid{grid-template-columns:1fr}}
+/* ---- Learn: career tracks + mock interview ---- */
+.track-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.track-card{margin:0}
+.track-h{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.track-why{font-size:13.5px;color:var(--slate);margin:0 0 10px}
+.track-links{display:flex;flex-direction:column;gap:6px}
+.track-link{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:var(--steel);text-decoration:none;padding:7px 10px;border:1px solid var(--line);border-radius:9px}
+.track-link svg{width:14px;height:14px}
+.track-link:hover{border-color:var(--brand);color:var(--brand-d)}
+.track-link.vid{color:#b7322a}.track-link.prep{color:#2156a3}
+.narrow{max-width:680px}
+.iv-qs{margin:6px 0 8px;padding-left:20px}
+.iv-qs li{padding:4px 0;font-size:14px}
+.iv-chat{display:flex;flex-direction:column;gap:8px;max-height:340px;overflow:auto;margin-bottom:12px}
+.iv-msg{max-width:85%;padding:9px 12px;border-radius:13px;font-size:14px;line-height:1.4}
+.iv-msg.them{background:var(--card-2,#f3ece0);align-self:flex-start;border-bottom-left-radius:4px}
+.iv-msg.me{background:var(--brand);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+.iv-form{display:flex;gap:8px}
+.iv-form input[name=answer]{flex:1}
+@media(max-width:560px){.track-grid{grid-template-columns:1fr}}
 .jobpin.near svg{filter:drop-shadow(0 0 4px rgba(31,169,113,.55)) drop-shadow(0 1.5px 2px rgba(0,0,0,.3))}
 .map-tools{display:flex;align-items:center;gap:9px;margin:0 0 12px;flex-wrap:wrap}
 .map-tools .mt-label{font-size:12.5px;font-weight:800;color:var(--steel)}
