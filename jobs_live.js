@@ -29,6 +29,22 @@ const SOURCES = [
   ['carbonhealth','Carbon Health','healthcare'],['devotedhealth','Devoted Health','healthcare'],
   ['includedhealth','Included Health','healthcare'],['cityblock','Cityblock Health','healthcare'],
   ['medely','Medely','healthcare'],['vivianhealth','Vivian Health','healthcare'],
+  // ---- more advanced manufacturing / energy / aerospace / robotics (real Greenhouse boards) ----
+  ['archer','Archer Aviation','manufacturing'],['jobyaviation','Joby Aviation','manufacturing'],
+  ['betatechnologies','BETA Technologies','manufacturing'],['wisk','Wisk Aero','manufacturing'],
+  ['zeroavia','ZeroAvia','manufacturing'],['universalhydrogen','Universal Hydrogen','manufacturing'],
+  ['enovix','Enovix','manufacturing'],['factorialenergy','Factorial Energy','manufacturing'],
+  ['bostonmetal','Boston Metal','manufacturing'],['geckorobotics','Gecko Robotics','manufacturing'],
+  ['chefrobotics','Chef Robotics','manufacturing'],['collaborativerobotics','Collaborative Robotics','manufacturing'],
+  ['diligentrobotics','Diligent Robotics','manufacturing'],['saronic','Saronic','manufacturing'],
+  ['hermeus','Hermeus','manufacturing'],['ursamajor','Ursa Major','manufacturing'],
+  ['stokespace','Stoke Space','manufacturing'],['k2space','K2 Space','manufacturing'],
+  ['muonspace','Muon Space','manufacturing'],['evgo','EVgo','manufacturing'],
+  ['baseload','Base Power','manufacturing'],['fervo','Fervo Energy','manufacturing'],
+  ['crusoeenergy','Crusoe','manufacturing'],['scaleai','Scale','manufacturing'],
+  ['dmatrix','d-Matrix','semiconductor'],['rivosinc','Rivos','semiconductor'],
+  ['celestialai','Celestial AI','semiconductor'],['extropic','Extropic','semiconductor'],
+  ['normalcomputing','Normal Computing','semiconductor'],['untether','Untether AI','semiconductor'],
 ];
 
 // Title → trade. Order matters (first match wins). Drives the "is this blue-collar?" gate too.

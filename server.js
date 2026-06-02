@@ -1623,7 +1623,8 @@ async function refreshLiveJobs(){
   try {
     const last = await db.prepare("SELECT v FROM meta WHERE k='live_at'").get();
     const age = last ? (Date.now() - Number(last.v)) : Infinity;
-    if(age < 6*3600*1000) return; // refreshed recently
+    const liveCount = (await db.prepare("SELECT COUNT(*) c FROM jobs WHERE apply_url LIKE '%greenhouse%' OR apply_url LIKE '%psiquantum%'").get()).c;
+    if(age < 6*3600*1000 && liveCount >= 400) return; // fresh enough and well-stocked
     const r = await ingestLiveJobs(db);
     await db.prepare("INSERT INTO meta(k,v) VALUES('live_at',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").run(String(Date.now()));
     console.log(`[live] ingested ${r.added} new real jobs (scanned ${r.scanned})`);
