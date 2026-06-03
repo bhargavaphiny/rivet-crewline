@@ -263,6 +263,10 @@ async function createSchema() {
     CREATE INDEX IF NOT EXISTS idx_jobs_employer ON jobs(employer_id);
     CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
     CREATE INDEX IF NOT EXISTS idx_jobs_trade ON jobs(trade);
+    CREATE INDEX IF NOT EXISTS idx_jobs_status_sector ON jobs(status, sector);
+    CREATE INDEX IF NOT EXISTS idx_jobs_status_trade ON jobs(status, trade);
+    CREATE INDEX IF NOT EXISTS idx_jobs_apply ON jobs(apply_url);
+    CREATE INDEX IF NOT EXISTS idx_jobs_last_seen ON jobs(last_seen);
     CREATE INDEX IF NOT EXISTS idx_worker_profiles_zip ON worker_profiles(zip);
   `);
 }

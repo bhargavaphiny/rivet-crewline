@@ -122,7 +122,18 @@ function qid(p){ const m=p.match(/(\d+)/); return m?Number(m[1]):null; }
 const getProfile = uid => db.prepare('SELECT * FROM worker_profiles WHERE user_id=?').get(uid);
 const getCreds   = uid => db.prepare('SELECT * FROM credentials WHERE user_id=? ORDER BY id').all(uid);
 const getWorkHistory = uid => db.prepare('SELECT * FROM work_history WHERE user_id=? ORDER BY current DESC, COALESCE(end_year,9999) DESC, COALESCE(start_year,0) DESC, id DESC').all(uid);
-const openJobs   = () => db.prepare(`SELECT j.*, u.company FROM jobs j JOIN users u ON u.id=j.employer_id WHERE j.status='open' ORDER BY j.created_at DESC`).all();
+// ---- lightweight in-memory cache for heavy job aggregates (board changes only every ~6h) ----
+const _jcache = new Map();
+async function cached(key, ttlMs, fn){
+  const e = _jcache.get(key);
+  if(e && (Date.now() - e.t) < ttlMs) return e.v;
+  const v = await fn();
+  _jcache.set(key, { t: Date.now(), v });
+  return v;
+}
+function clearJobCache(){ _jcache.clear(); }
+const _openJobsRaw = () => db.prepare(`SELECT j.*, u.company FROM jobs j JOIN users u ON u.id=j.employer_id WHERE j.status='open' ORDER BY j.created_at DESC`).all();
+const openJobs   = () => cached('openJobs', 300000, _openJobsRaw);
 
 // normalize a checkbox field (string | array | undefined) to a clean list of valid trade keys
 function normTrades(v){
@@ -183,7 +194,8 @@ const metroDemand  = (city, real=0) => (METRO_BASE[city] || 600) + real*45;
 const metroTalent  = (city, real=0) => Math.round((METRO_BASE[city] || 600) * 0.7) + real*30;
 
 // aggregated candidate locations for the recruiter US map (with per-location candidate list)
-async function candidateGeo(){
+const candidateGeo = () => cached('candgeo', 300000, _candidateGeoRaw);
+async function _candidateGeoRaw(){
   const rows = await db.prepare(`SELECT u.id, u.name, p.city, p.zip, z.lat, z.lon, p.trade, p.readiness
     FROM worker_profiles p JOIN users u ON u.id=p.user_id JOIN zip_geo z ON z.zip=p.zip
     ORDER BY p.readiness DESC`).all();
@@ -200,7 +212,8 @@ async function candidateGeo(){
   }).sort((a,b)=>b.n-a.n);
 }
 // open-job map points, optionally scoped to a GTM sector (semiconductor|manufacturing|healthcare)
-async function jobGeoAll(sector){
+const jobGeoAll = (sector) => cached('jobgeo:'+(sector||'all'), 300000, ()=>_jobGeoAllRaw(sector));
+async function _jobGeoAllRaw(sector){
   const rows = sector
     ? await db.prepare(`SELECT j.id, j.title, j.trade, j.pay_min, j.pay_max, j.zip, z.lat, z.lon, z.city, u.company
         FROM jobs j JOIN zip_geo z ON z.zip=j.zip JOIN users u ON u.id=j.employer_id WHERE j.status='open' AND j.sector=?`).all(sector)
@@ -219,7 +232,8 @@ async function jobGeoAll(sector){
   }).sort((a,b)=>b.n-a.n);
 }
 // GTM sector page data: real employers, role types, pay band, metro count + map
-async function sectorStats(sector){
+const sectorStats = (sector) => cached('sectorstats:'+sector, 300000, ()=>_sectorStatsRaw(sector));
+async function _sectorStatsRaw(sector){
   const jobs = await db.prepare(`SELECT j.trade, j.pay_min, j.pay_max, j.zip, u.company, u.company_city
     FROM jobs j JOIN users u ON u.id=j.employer_id WHERE j.status='open' AND j.sector=?`).all(sector);
   const employers = {}, roles = {}; const metros = new Set(); let lo = Infinity, hi = 0;
@@ -1896,6 +1910,7 @@ async function refreshLiveJobs(){
     try { await retagSemiconductor(); } catch(e){}
     await purgeSeeds();
     await pruneNonGTM();
+    clearJobCache(); // fresh data → drop cached aggregates so pages reflect the new board
   } catch(e){ console.error('[live] ingest skipped (non-fatal):', e.message); }
 }
 
