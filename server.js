@@ -124,6 +124,7 @@ const getCreds   = uid => db.prepare('SELECT * FROM credentials WHERE user_id=? 
 const getWorkHistory = uid => db.prepare('SELECT * FROM work_history WHERE user_id=? ORDER BY current DESC, COALESCE(end_year,9999) DESC, COALESCE(start_year,0) DESC, id DESC').all(uid);
 // ---- lightweight in-memory cache for heavy job aggregates (board changes only every ~6h) ----
 const _jcache = new Map();
+const CACHE_TTL = 45*60*1000; // long: data changes ~6h. Kept warm by prewarm + post-ingest refresh.
 async function cached(key, ttlMs, fn){
   const e = _jcache.get(key);
   if(e && (Date.now() - e.t) < ttlMs) return e.v;
@@ -132,8 +133,18 @@ async function cached(key, ttlMs, fn){
   return v;
 }
 function clearJobCache(){ _jcache.clear(); }
+// Compute the heavy aggregates ahead of any user request so nobody ever hits the cold (full-scan) path.
+async function prewarmJobCache(){
+  try {
+    await Promise.all([
+      openJobs(), candidateGeo(), jobGeoAll(),
+      sectorStats('semiconductor'), sectorStats('manufacturing'), sectorStats('healthcare'),
+      jobGeoAll('semiconductor'), jobGeoAll('manufacturing'), jobGeoAll('healthcare'),
+    ]);
+  } catch(e){ console.error('[cache] prewarm skipped:', e.message); }
+}
 const _openJobsRaw = () => db.prepare(`SELECT j.*, u.company FROM jobs j JOIN users u ON u.id=j.employer_id WHERE j.status='open' ORDER BY j.created_at DESC`).all();
-const openJobs   = () => cached('openJobs', 300000, _openJobsRaw);
+const openJobs   = () => cached('openJobs', CACHE_TTL, _openJobsRaw);
 
 // normalize a checkbox field (string | array | undefined) to a clean list of valid trade keys
 function normTrades(v){
@@ -194,7 +205,7 @@ const metroDemand  = (city, real=0) => (METRO_BASE[city] || 600) + real*45;
 const metroTalent  = (city, real=0) => Math.round((METRO_BASE[city] || 600) * 0.7) + real*30;
 
 // aggregated candidate locations for the recruiter US map (with per-location candidate list)
-const candidateGeo = () => cached('candgeo', 300000, _candidateGeoRaw);
+const candidateGeo = () => cached('candgeo', CACHE_TTL, _candidateGeoRaw);
 async function _candidateGeoRaw(){
   const rows = await db.prepare(`SELECT u.id, u.name, p.city, p.zip, z.lat, z.lon, p.trade, p.readiness
     FROM worker_profiles p JOIN users u ON u.id=p.user_id JOIN zip_geo z ON z.zip=p.zip
@@ -212,7 +223,7 @@ async function _candidateGeoRaw(){
   }).sort((a,b)=>b.n-a.n);
 }
 // open-job map points, optionally scoped to a GTM sector (semiconductor|manufacturing|healthcare)
-const jobGeoAll = (sector) => cached('jobgeo:'+(sector||'all'), 300000, ()=>_jobGeoAllRaw(sector));
+const jobGeoAll = (sector) => cached('jobgeo:'+(sector||'all'), CACHE_TTL, ()=>_jobGeoAllRaw(sector));
 async function _jobGeoAllRaw(sector){
   const rows = sector
     ? await db.prepare(`SELECT j.id, j.title, j.trade, j.pay_min, j.pay_max, j.zip, z.lat, z.lon, z.city, u.company
@@ -232,7 +243,7 @@ async function _jobGeoAllRaw(sector){
   }).sort((a,b)=>b.n-a.n);
 }
 // GTM sector page data: real employers, role types, pay band, metro count + map
-const sectorStats = (sector) => cached('sectorstats:'+sector, 300000, ()=>_sectorStatsRaw(sector));
+const sectorStats = (sector) => cached('sectorstats:'+sector, CACHE_TTL, ()=>_sectorStatsRaw(sector));
 async function _sectorStatsRaw(sector){
   const jobs = await db.prepare(`SELECT j.trade, j.pay_min, j.pay_max, j.zip, u.company, u.company_city
     FROM jobs j JOIN users u ON u.id=j.employer_id WHERE j.status='open' AND j.sector=?`).all(sector);
@@ -1910,13 +1921,15 @@ async function refreshLiveJobs(){
     try { await retagSemiconductor(); } catch(e){}
     await purgeSeeds();
     await pruneNonGTM();
-    clearJobCache(); // fresh data → drop cached aggregates so pages reflect the new board
+    clearJobCache(); await prewarmJobCache(); // fresh data → drop + immediately re-warm so pages stay fast
   } catch(e){ console.error('[live] ingest skipped (non-fatal):', e.message); }
 }
 
 init()
   .then(loadTranslations)
   .then(()=> server.listen(PORT, ()=>console.log(`Rivet × Crewline running → http://localhost:${PORT}`)))
-  .then(()=> { prewarmEs().catch(()=>{}); setTimeout(()=>{ refreshLiveJobs(); }, 3000);
-    setInterval(()=>{ refreshLiveJobs(); }, 6*3600*1000); }) // self-maintaining: re-ingest + refresh freshness + prune stale every 6h
+  .then(()=> { prewarmEs().catch(()=>{}); prewarmJobCache(); // warm the cache on boot so the first visitor never waits
+    setTimeout(()=>{ refreshLiveJobs(); }, 3000);
+    setInterval(()=>{ refreshLiveJobs(); }, 6*3600*1000);     // self-maintaining: re-ingest + freshness + prune every 6h
+    setInterval(()=>{ prewarmJobCache(); }, 30*60*1000); })   // keep the cache warm (TTL is 45m) so pages stay fast
   .catch(err=>{ console.error('init failed', err); process.exit(1); });
