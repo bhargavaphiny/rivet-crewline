@@ -52,14 +52,14 @@ const ADZUNA_CATS = [
   ['other-general-jobs','general'],
 ];
 // Keyword queries to feed sectors the category API misses (healthcare blue-collar, semiconductor).
+// Interleaved so both priority sectors get API budget even if the free tier throttles mid-run.
 const ADZUNA_KW = [
-  ['certified nursing assistant','healthcare'],['patient care technician','healthcare'],
-  ['medical assistant','healthcare'],['sterile processing','healthcare'],
-  ['surgical technician','healthcare'],['phlebotomist','healthcare'],
-  ['caregiver','healthcare'],['home health aide','healthcare'],
-  ['semiconductor technician','semiconductor'],['fab technician','semiconductor'],
-  ['cleanroom technician','semiconductor'],['wafer fabrication','semiconductor'],
-  ['semiconductor process technician','semiconductor'],
+  ['semiconductor technician','semiconductor'],['certified nursing assistant','healthcare'],
+  ['fab technician','semiconductor'],['patient care technician','healthcare'],
+  ['cleanroom technician','semiconductor'],['medical assistant','healthcare'],
+  ['wafer fabrication','semiconductor'],['sterile processing','healthcare'],
+  ['semiconductor process technician','semiconductor'],['surgical technician','healthcare'],
+  ['phlebotomist','healthcare'],['caregiver','healthcare'],['home health aide','healthcare'],
 ];
 async function ingestAdzuna(db, w, seen){
   const id = process.env.ADZUNA_APP_ID, key = process.env.ADZUNA_APP_KEY;

@@ -1822,17 +1822,21 @@ async function purgeSeeds(){
     console.log(`[purge] removed ${ids.length} seeded jobs + seeded shifts — site is now 100% real (${real} real jobs)`);
   } catch(e){ console.error('[purge] skipped (non-fatal):', e.message); }
 }
+const INGEST_VERSION = '2'; // bump to force a one-time re-ingest on the next deploy (e.g. after source/sector changes)
 async function refreshLiveJobs(){
   try {
     const last = await db.prepare("SELECT v FROM meta WHERE k='live_at'").get();
     const age = last ? (Date.now() - Number(last.v)) : Infinity;
     const liveCount = await realJobCount();
     const stale = age >= 6*3600*1000;
-    if(!stale && liveCount >= 800){ await purgeSeeds(); return; } // well-stocked; still keep fakes out
+    const ver = (await db.prepare("SELECT v FROM meta WHERE k='ingest_ver'").get()||{}).v;
+    const forced = ver !== INGEST_VERSION; // code changed how/what we ingest → refresh once regardless of freshness
+    if(!forced && !stale && liveCount >= 800){ await purgeSeeds(); return; } // well-stocked; still keep fakes out
     const r = await ingestLiveJobs(db);
     let agg = { added:0, scanned:0 };
     if(aggregatorsConfigured()) agg = await ingestAggregators(db);
     await db.prepare("INSERT INTO meta(k,v) VALUES('live_at',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").run(String(Date.now()));
+    await db.prepare("INSERT INTO meta(k,v) VALUES('ingest_ver',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").run(INGEST_VERSION);
     console.log(`[live] ingested ${r.added} (keyless ATS) + ${agg.added} (aggregators) real jobs; scanned ${r.scanned+agg.scanned}` + (agg.providers?` ${JSON.stringify(Object.fromEntries(Object.entries(agg.providers).map(([k,v])=>[k,v.added])))}`:''));
     try { const nt = await normalizeTitles(db); if(nt) console.log(`[live] tidied ${nt} job titles`); } catch(e){}
     await purgeSeeds();
