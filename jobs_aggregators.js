@@ -118,14 +118,21 @@ async function ingestAdzuna(db, w, seen, touched=[]){
   return { added, scanned };
 }
 
-// ---- USAJOBS: federal non-IT roles by keyword (huge real trades/health/maintenance pool) ----
-const USAJOBS_TERMS = ['nursing assistant','medical support assistant','maintenance mechanic','electrician','welding','plumber','pipefitter','heavy mobile equipment','motor vehicle operator','food service','custodian','warehouse','machinist','laborer','hvac','boiler'];
+// ---- USAJOBS: GTM-only federal roles (VA healthcare + federal manufacturing/maintenance). ----
+const USAJOBS_TERMS = [
+  ['certified nursing assistant','healthcare'],['nursing assistant','healthcare'],
+  ['medical support assistant','healthcare'],['health technician','healthcare'],
+  ['sterile processing','healthcare'],['practical nurse','healthcare'],
+  ['maintenance mechanic','manufacturing'],['machinist','manufacturing'],
+  ['industrial equipment mechanic','manufacturing'],['electronics mechanic','manufacturing'],
+  ['production controller','manufacturing'],['equipment specialist','manufacturing'],
+];
 async function ingestUsajobs(db, w, seen, touched=[]){
   const key = process.env.USAJOBS_KEY; if(!key) return { added:0, scanned:0 };
   const email = process.env.USAJOBS_EMAIL || 'jobs@rivet-crewline.onrender.com';
   const headers = { 'Host':'data.usajobs.gov', 'User-Agent':email, 'Authorization-Key':key };
   let added=0, scanned=0;
-  for(const term of USAJOBS_TERMS){
+  for(const [term, sector] of USAJOBS_TERMS){
     for(let page=1; page<=2; page++){
       const url = `https://data.usajobs.gov/api/search?Keyword=${encodeURIComponent(term)}&ResultsPerPage=50&Page=${page}`;
       const j = await httpJSON(url, { headers });
@@ -153,7 +160,7 @@ async function ingestUsajobs(db, w, seen, touched=[]){
         if(rem){ const per = rem.RateIntervalCode==='Per Hour'||rem.RateIntervalCode==='PH'; lo = per?Math.round(Number(rem.MinimumRange)||0):toHourly(rem.MinimumRange); hi = per?Math.round(Number(rem.MaximumRange)||0):toHourly(rem.MaximumRange); }
         if(!lo||!hi){ const band = PAY[trade]||[18,30]; lo=lo||band[0]; hi=hi||band[1]; }
         const descr = `${title} — ${company}, ${city}, ${st}. Federal opening; apply on USAJOBS.`;
-        try { await w.insJob.run(eid,title,trade,lo,hi,city,zipKey,'Day',CRED[trade]||'',descr,'Full-time',company,apply,'government','biweekly','Ongoing','authorized'); added++; } catch(e){}
+        try { await w.insJob.run(eid,title,trade,lo,hi,city,zipKey,'Day',CRED[trade]||'',descr,'Full-time',company,apply,sector,'biweekly','Ongoing','authorized'); added++; } catch(e){}
       }
       if(items.length < 50) break;
     }

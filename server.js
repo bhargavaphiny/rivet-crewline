@@ -1822,7 +1822,23 @@ async function purgeSeeds(){
     console.log(`[purge] removed ${ids.length} seeded jobs + seeded shifts — site is now 100% real (${real} real jobs)`);
   } catch(e){ console.error('[purge] skipped (non-fatal):', e.message); }
 }
-const INGEST_VERSION = '5'; // bump to force a one-time re-ingest on the next deploy (e.g. after source/sector changes)
+const INGEST_VERSION = '6'; // bump to force a one-time re-ingest on the next deploy (e.g. after source/sector changes)
+const GTM_SECTORS = ['semiconductor','manufacturing','healthcare']; // sector-wise GTM focus order: semi → mfg → health
+// Keep the board focused on the GTM sectors: drop live (aggregated) jobs in other sectors so
+// plumbing/energy/logistics don't crowd out semiconductor/manufacturing/healthcare. Employer-
+// posted jobs (apply_url NULL) are never touched. Reversible — widen GTM_SECTORS to re-open others.
+async function pruneNonGTM(){
+  try {
+    const ph = GTM_SECTORS.map(()=>'?').join(',');
+    const rows = await db.prepare(`SELECT id FROM jobs WHERE apply_url IS NOT NULL AND (sector IS NULL OR sector NOT IN (${ph}))`).all(...GTM_SECTORS);
+    const ids = rows.map(r=>r.id);
+    if(!ids.length) return;
+    const iph = ids.map(()=>'?').join(',');
+    for(const tbl of ['applications','interviews','quotes','job_media','saved_jobs']){ try { await db.prepare(`DELETE FROM ${tbl} WHERE job_id IN (${iph})`).run(...ids); } catch(e){} }
+    await db.prepare(`DELETE FROM jobs WHERE id IN (${iph})`).run(...ids);
+    console.log(`[gtm] pruned ${ids.length} non-GTM live jobs — board focused on ${GTM_SECTORS.join('/')}`);
+  } catch(e){ console.error('[gtm] prune skipped:', e.message); }
+}
 // Freshness: stamp every posting we just saw live in its feed, then drop ones that have gone
 // stale (filled/closed → stopped appearing). Gated on a healthy run so a failed ingest can't mass-delete.
 async function refreshFreshness(touched){
@@ -1860,6 +1876,7 @@ async function refreshLiveJobs(){
     try { const nt = await normalizeTitles(db); if(nt) console.log(`[live] tidied ${nt} job titles`); } catch(e){}
     try { await refreshFreshness([...(r.touched||[]), ...(agg.touched||[])]); } catch(e){ console.error('[fresh] skipped:', e.message); }
     await purgeSeeds();
+    await pruneNonGTM();
   } catch(e){ console.error('[live] ingest skipped (non-fatal):', e.message); }
 }
 

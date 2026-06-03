@@ -218,18 +218,13 @@ function fetchJSON(url, headers){
 
 // Additional KEYLESS public ATS boards with real blue-collar (non-IT) volume — probed live,
 // kept only the ones that actually return US blue-collar roles. (provider, token, company, sector)
+// GTM-only (semiconductor/manufacturing/healthcare). Non-GTM employers (Gopuff/Securitas/
+// Sodexo/Equinox/Aramark/Penske/Veho) removed — depth in the 3 sectors first.
 const EXTRA_SOURCES = [
-  ['lever','gopuff','Gopuff','logistics'],
-  ['lever','veho','Veho','logistics'],
   ['lever','everlywell','Everly Health','healthcare'],
   ['ashby','clipboard','Clipboard Health','healthcare'],
-  ['smartrecruiters','Securitas','Securitas','security'],
-  ['smartrecruiters','Sodexo','Sodexo','facilities'],
   ['smartrecruiters','Continental','Continental','manufacturing'],
   ['smartrecruiters','WesternDigital','Western Digital','manufacturing'],
-  ['smartrecruiters','Equinox','Equinox','facilities'],
-  ['smartrecruiters','Aramark','Aramark','facilities'],
-  ['smartrecruiters','Penske','Penske','logistics'],
 ];
 
 // KEYLESS Workday public career feeds (the public CXS API that powers their careers sites) —
