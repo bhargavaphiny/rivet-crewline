@@ -61,7 +61,7 @@ const ADZUNA_KW = [
   ['semiconductor process technician','semiconductor'],['surgical technician','healthcare'],
   ['phlebotomist','healthcare'],['caregiver','healthcare'],['home health aide','healthcare'],
 ];
-async function ingestAdzuna(db, w, seen){
+async function ingestAdzuna(db, w, seen, touched=[]){
   const id = process.env.ADZUNA_APP_ID, key = process.env.ADZUNA_APP_KEY;
   if(!id || !key) return { added:0, scanned:0 };
   let added=0, scanned=0;
@@ -72,7 +72,7 @@ async function ingestAdzuna(db, w, seen){
       if(!title || DENY.test(title)) continue;
       const sec = typeof sector==='function' ? sector(title) : sector;
       const trade = tradeFor(title); if(!trade) continue;
-      const apply = r.redirect_url; if(!apply || seen.has(apply)) continue;
+      const apply = r.redirect_url; if(!apply) continue; touched.push(apply); if(seen.has(apply)) continue;
       const area = (r.location && Array.isArray(r.location.area)) ? r.location.area : [];
       const display = (r.location && r.location.display_name) || area.slice(1).reverse().join(', ');
       const loc = parseLoc(display) || (area.length>=3 ? parseLoc(`${area[area.length-1]}, ${area[1]}`) : null);
@@ -118,7 +118,7 @@ async function ingestAdzuna(db, w, seen){
 
 // ---- USAJOBS: federal non-IT roles by keyword (huge real trades/health/maintenance pool) ----
 const USAJOBS_TERMS = ['nursing assistant','medical support assistant','maintenance mechanic','electrician','welding','plumber','pipefitter','heavy mobile equipment','motor vehicle operator','food service','custodian','warehouse','machinist','laborer','hvac','boiler'];
-async function ingestUsajobs(db, w, seen){
+async function ingestUsajobs(db, w, seen, touched=[]){
   const key = process.env.USAJOBS_KEY; if(!key) return { added:0, scanned:0 };
   const email = process.env.USAJOBS_EMAIL || 'jobs@rivet-crewline.onrender.com';
   const headers = { 'Host':'data.usajobs.gov', 'User-Agent':email, 'Authorization-Key':key };
@@ -135,7 +135,7 @@ async function ingestUsajobs(db, w, seen){
         const title = String(d.PositionTitle||'').trim();
         if(!title || DENY.test(title)) continue;
         const trade = tradeFor(title); if(!trade) continue;
-        const apply = (Array.isArray(d.ApplyURI) && d.ApplyURI[0]) || d.PositionURI; if(!apply || seen.has(apply)) continue;
+        const apply = (Array.isArray(d.ApplyURI) && d.ApplyURI[0]) || d.PositionURI; if(!apply) continue; touched.push(apply); if(seen.has(apply)) continue;
         const pl = (Array.isArray(d.PositionLocation) && d.PositionLocation[0]) || null;
         let city = pl && pl.CityName, st = pl && (pl.CountrySubDivisionCode || '');
         let lat = pl && pl.Latitude, lon = pl && pl.Longitude;
@@ -171,7 +171,7 @@ const JOOBLE_TERMS = [
   ['HVAC electrician plumber pipefitter','trades'],
   ['janitor custodian security guard landscaper','facilities'],
 ];
-async function ingestJooble(db, w, seen){
+async function ingestJooble(db, w, seen, touched=[]){
   const key = process.env.JOOBLE_KEY; if(!key) return { added:0, scanned:0 };
   let added=0, scanned=0;
   for(const [kw, sector] of JOOBLE_TERMS){
@@ -184,7 +184,7 @@ async function ingestJooble(db, w, seen){
         const title = String(r.title||'').trim();
         if(!title || DENY.test(title)) continue;
         const trade = tradeFor(title); if(!trade) continue;
-        const apply = r.link; if(!apply || seen.has(apply)) continue;
+        const apply = r.link; if(!apply) continue; touched.push(apply); if(seen.has(apply)) continue;
         const loc = parseLoc(r.location||''); if(!loc) continue;
         const ll = geocode(loc.city, loc.st); if(!ll) continue;
         seen.add(apply);
@@ -211,13 +211,14 @@ async function ingestAggregators(db){
   const w = makeWriters(db);
   const seenRows = await db.prepare("SELECT apply_url FROM jobs WHERE apply_url IS NOT NULL").all();
   const seen = new Set(seenRows.map(r=>r.apply_url));
+  const touched = []; // every apply_url seen live in a feed this run → for freshness refresh
   const providers = {};
   for(const [name, fn] of [['adzuna',ingestAdzuna],['usajobs',ingestUsajobs],['jooble',ingestJooble]]){
-    try { providers[name] = await fn(db, w, seen); } catch(e){ providers[name] = { added:0, scanned:0, error:e.message }; }
+    try { providers[name] = await fn(db, w, seen, touched); } catch(e){ providers[name] = { added:0, scanned:0, error:e.message }; }
   }
   const added = Object.values(providers).reduce((a,p)=>a+(p.added||0),0);
   const scanned = Object.values(providers).reduce((a,p)=>a+(p.scanned||0),0);
-  return { added, scanned, providers };
+  return { added, scanned, providers, touched };
 }
 
 module.exports = { ingestAggregators, aggregatorsConfigured };

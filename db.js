@@ -1318,6 +1318,8 @@ async function migrate() {
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN custom_trade TEXT'); } catch (e) { /* column exists */ }
   try { await db.exec("ALTER TABLE jobs ADD COLUMN source TEXT DEFAULT 'Rivet'"); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE jobs ADD COLUMN apply_url TEXT'); } catch (e) { /* column exists */ }
+  try { await db.exec('ALTER TABLE jobs ADD COLUMN last_seen TEXT'); } catch (e) { /* freshness: when this live posting was last seen open in its source feed */ }
+  try { await db.exec("UPDATE jobs SET last_seen=created_at WHERE last_seen IS NULL"); } catch (e) { /* backfill once */ }
   try { await db.exec('ALTER TABLE users ADD COLUMN company_about TEXT'); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE users ADD COLUMN company_website TEXT'); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE users ADD COLUMN company_city TEXT'); } catch (e) { /* column exists */ }

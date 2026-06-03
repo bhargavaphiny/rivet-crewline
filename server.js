@@ -1823,6 +1823,25 @@ async function purgeSeeds(){
   } catch(e){ console.error('[purge] skipped (non-fatal):', e.message); }
 }
 const INGEST_VERSION = '4'; // bump to force a one-time re-ingest on the next deploy (e.g. after source/sector changes)
+// Freshness: stamp every posting we just saw live in its feed, then drop ones that have gone
+// stale (filled/closed → stopped appearing). Gated on a healthy run so a failed ingest can't mass-delete.
+async function refreshFreshness(touched){
+  const urls = Array.from(new Set((touched||[]).filter(Boolean)));
+  for(let i=0;i<urls.length;i+=150){
+    const chunk = urls.slice(i,i+150); const ph = chunk.map(()=>'?').join(',');
+    try { await db.prepare(`UPDATE jobs SET last_seen=datetime('now') WHERE apply_url IN (${ph})`).run(...chunk); } catch(e){}
+  }
+  const recent = (await db.prepare("SELECT COUNT(*) c FROM jobs WHERE apply_url IS NOT NULL AND last_seen >= datetime('now','-2 hours')").get()).c;
+  if(recent < 200) { console.log(`[fresh] refreshed ${urls.length} postings; prune skipped (only ${recent} stamped this run)`); return; }
+  const stale = await db.prepare("SELECT id FROM jobs WHERE apply_url IS NOT NULL AND (last_seen IS NULL OR last_seen < datetime('now','-14 days'))").all();
+  const ids = stale.map(r=>r.id);
+  if(ids.length){
+    const ph = ids.map(()=>'?').join(',');
+    for(const tbl of ['applications','interviews','quotes','job_media','saved_jobs']){ try { await db.prepare(`DELETE FROM ${tbl} WHERE job_id IN (${ph})`).run(...ids); } catch(e){} }
+    await db.prepare(`DELETE FROM jobs WHERE id IN (${ph})`).run(...ids);
+  }
+  console.log(`[fresh] refreshed ${urls.length} live postings; pruned ${ids.length} stale (filled/expired)`);
+}
 async function refreshLiveJobs(){
   try {
     const last = await db.prepare("SELECT v FROM meta WHERE k='live_at'").get();
@@ -1839,6 +1858,7 @@ async function refreshLiveJobs(){
     await db.prepare("INSERT INTO meta(k,v) VALUES('ingest_ver',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").run(INGEST_VERSION);
     console.log(`[live] ingested ${r.added} (keyless ATS) + ${agg.added} (aggregators) real jobs; scanned ${r.scanned+agg.scanned}` + (agg.providers?` ${JSON.stringify(Object.fromEntries(Object.entries(agg.providers).map(([k,v])=>[k,v.added])))}`:''));
     try { const nt = await normalizeTitles(db); if(nt) console.log(`[live] tidied ${nt} job titles`); } catch(e){}
+    try { await refreshFreshness([...(r.touched||[]), ...(agg.touched||[])]); } catch(e){ console.error('[fresh] skipped:', e.message); }
     await purgeSeeds();
   } catch(e){ console.error('[live] ingest skipped (non-fatal):', e.message); }
 }
@@ -1846,5 +1866,6 @@ async function refreshLiveJobs(){
 init()
   .then(loadTranslations)
   .then(()=> server.listen(PORT, ()=>console.log(`Rivet × Crewline running → http://localhost:${PORT}`)))
-  .then(()=> { prewarmEs().catch(()=>{}); setTimeout(()=>{ refreshLiveJobs(); }, 3000); })
+  .then(()=> { prewarmEs().catch(()=>{}); setTimeout(()=>{ refreshLiveJobs(); }, 3000);
+    setInterval(()=>{ refreshLiveJobs(); }, 6*3600*1000); }) // self-maintaining: re-ingest + refresh freshness + prune stale every 6h
   .catch(err=>{ console.error('init failed', err); process.exit(1); });

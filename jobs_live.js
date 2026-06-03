@@ -353,7 +353,9 @@ async function processJob(ctx, empKey, company, sector, item){
   title = cleanTitle(title);
   if(!title || ctx.DENY.test(title)) return 0;
   const trade = tradeFor(title); if(!trade) return 0;
-  if(!url || ctx.seen.has(url)) return 0;
+  if(!url) return 0;
+  ctx.touched.push(url);                 // posting is live in its feed right now → refresh freshness
+  if(ctx.seen.has(url)) return 0;
   if(lat==null || lon==null){ if(!city || !st) return 0; const ll=geocode(city,st); if(!ll) return 0; lat=ll[0]; lon=ll[1]; }
   if(!city || isNaN(lat) || isNaN(lon)) return 0;
   ctx.seen.add(url);
@@ -378,7 +380,7 @@ async function ingestLiveJobs(db){
   let added = 0, scanned = 0;
   const seenRows = await db.prepare("SELECT apply_url FROM jobs WHERE apply_url IS NOT NULL").all();
   const ctx = {
-    db, DENY, seen: new Set(seenRows.map(r=>r.apply_url)), empCache: {}, pw: '$rivet$live',
+    db, DENY, seen: new Set(seenRows.map(r=>r.apply_url)), touched: [], empCache: {}, pw: '$rivet$live',
     insZip: db.prepare('INSERT OR IGNORE INTO zip_geo(zip,lat,lon,city) VALUES(?,?,?,?)'),
     insEmp: db.prepare('INSERT INTO users(email,pass,role,name,company,company_city,company_size,company_about) VALUES(?,?,?,?,?,?,?,?)'),
     insJob: db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type,source,apply_url,sector,pay_cadence,duration,sponsorship) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`),
@@ -392,7 +394,7 @@ async function ingestLiveJobs(db){
     const empKey = provider==='greenhouse' ? token : `${provider}-${token}`;
     for(const it of items){ added += await processJob(ctx, empKey, company, sector, it); }
   }
-  return { added, scanned };
+  return { added, scanned, touched: ctx.touched };
 }
 
 // One-time tidy of already-ingested live titles (idempotent; cleans rows from before cleanTitle).
