@@ -1023,3 +1023,8 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 /* ===== Curated training video (Learn / Career guide) ===== */
 .lv-wrap{position:relative;width:100%;aspect-ratio:16/9;border-radius:12px;overflow:hidden;border:1px solid var(--line);margin:6px 0 10px;background:#000}
 .lv-frame{position:absolute;inset:0;width:100%;height:100%;border:0}
+
+/* ===== Interview "what good looks like" coaching ===== */
+.iv-aim{background:rgba(23,99,166,.06);border:1px solid rgba(23,99,166,.18);border-radius:12px;padding:10px 13px;margin:10px 0;font-size:13.5px;line-height:1.5;color:var(--slate)}
+.iv-aim svg{width:14px;height:14px;stroke:var(--brand);vertical-align:-2px}
+.iv-aim b{color:var(--ink)}

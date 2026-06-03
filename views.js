@@ -459,7 +459,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=91">
+  <link rel="stylesheet" href="/styles.css?v=92">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1429,6 +1429,12 @@ function learnTrackCard(key){
 // Kickass AI interview: job/role-aware, scores every answer, ends with a readiness verdict.
 // state = { trade, jobId, company, questions:[...], history:[{q,a,rating,tip}], qi, done, verdict }
 const RATE_META = { strong:['Strong','rate-strong'], solid:['Solid','rate-solid'], weak:['Needs work','rate-weak'] };
+// Per-sector "what good looks like" so the interview teaches, not just quizzes.
+const IV_AIM = {
+  semiconductor: 'Show you follow process recipes exactly, keep the cleanroom contamination-free, document and escalate out-of-spec readings, and can handle 12-hour rotating shifts.',
+  manufacturing: 'Lead with safety (lockout/tagout, PPE), reading blueprints/specs and using measuring tools, precision, and a specific time you prevented downtime or scrap — with a number.',
+  healthcare: 'Center patient safety and dignity, staying calm under pressure, your current certification, and teamwork on a busy floor — with a real example.',
+};
 function mockInterview(st){
   const { trade, jobId='', company='', questions=[], history=[], qi=0, done=false, verdict=null, aiOn=false } = st;
   const label = TRADES[trade] || trade;
@@ -1460,6 +1466,7 @@ function mockInterview(st){
       </div>`
     : `<div class="card iv-current">
         <div class="iv-q big">${icon('spark')} ${esc(curQ||'')}</div>
+        ${(()=>{ const sec = ROLE_BLS[trade] && ROLE_BLS[trade].sector; const aim = IV_AIM[sec]; return aim?`<div class="iv-aim">${icon('star')} <b>${T('What a strong answer shows')}:</b> ${T(aim)}</div>`:''; })()}
         <form method="post" action="/app/learn/interview" class="iv-answer">
           <input type="hidden" name="trade" value="${esc(trade)}">
           <input type="hidden" name="job" value="${esc(jobId)}">
