@@ -2688,13 +2688,13 @@ function ogImage() {
 const SECTOR_META = {
   semiconductor: { label:'Semiconductor', emoji:'🔬', color:'#3F7CAC',
     tag:'Build the chips that power America',
-    blurb:'The CHIPS Act is funding the biggest semiconductor build-out in U.S. history. TSMC, Intel, Micron, GlobalFoundries and Samsung are hiring thousands of equipment, process and facilities technicians right now — paid training, no four-year degree required.' },
+    blurb:'The CHIPS Act is funding the biggest semiconductor build-out in U.S. history — fabs nationwide need equipment, process and facilities technicians. Paid training, no four-year degree required. Browse the real openings below.' },
   manufacturing: { label:'Manufacturing', emoji:'🏭', color:'#E8923A',
     tag:'Make the things that move the world',
-    blurb:'From EVs to jet engines, American manufacturers need welders, machinists, assemblers and maintenance techs. Real wages, real benefits, real ladders — at GM, Ford, Boeing, Caterpillar, Tesla and more.' },
+    blurb:'From EVs to jet engines, American manufacturers need welders, machinists, assemblers and maintenance techs. Real wages, real benefits, real ladders. Every role below is a live opening with a direct apply link.' },
   healthcare: { label:'Healthcare', emoji:'🏥', color:'#E0556E',
     tag:'Frontline healthcare careers',
-    blurb:'Hospitals and clinics are short-staffed nationwide. Start as a CNA, patient-care, sterile-processing or surgical tech at HCA, Kaiser, Cleveland Clinic, Mayo and more — with a clear path up to nursing.' },
+    blurb:'Hospitals and clinics are short-staffed nationwide. Start as a CNA, patient-care, sterile-processing or surgical tech — with a clear path up to nursing. Browse the real openings below.' },
 };
 function sectorHub(cards = []){
   return `<section class="wrap">
@@ -2705,7 +2705,7 @@ function sectorHub(cards = []){
         <div class="sector-emoji">${m.emoji}</div>
         <div class="sector-nm">${T(m.label)}</div>
         <p class="muted sm">${T(m.tag)}</p>
-        <div class="sector-stats"><span><b>${c.count?(c.count*180).toLocaleString():'—'}</b> ${T('openings')}</span><span><b>${c.employers}</b> ${T('top employers')}</span>${c.payHi?`<span><b>$${c.payLo}–${c.payHi}</b>/hr</span>`:''}</div>
+        <div class="sector-stats"><span><b>${(c.count||0).toLocaleString()}</b> ${T('live openings')}</span><span><b>${c.employers}</b> ${T('top employers')}</span>${c.payHi?`<span><b>$${c.payLo}–${c.payHi}</b>/hr</span>`:''}</div>
         <span class="sector-go">${T('Explore')} ${m.label} →</span>
       </a>`;}).join('')}
     </div>
@@ -2714,7 +2714,6 @@ function sectorHub(cards = []){
 }
 function sectorPage({ key, count, metros, payLo, payHi, employers = [], roles = [], geo = [] }){
   const m = SECTOR_META[key];
-  const scaled = (count*180).toLocaleString(); // platform-scale estimate, consistent with the demand map
   return `<section class="wrap">
     <a class="back" href="/sectors">← ${T('All industries')}</a>
     <div class="card sector-hero" style="--sc:${m.color}">
@@ -2722,8 +2721,9 @@ function sectorPage({ key, count, metros, payLo, payHi, employers = [], roles = 
       <h1>${T(m.label)} ${T('jobs on Rivet')}</h1>
       <p class="sector-tag">${T(m.tag)}</p>
       <p class="sector-blurb">${T(m.blurb)}</p>
+      ${count===0?`<p class="muted sm" style="margin-top:-4px">${T('We’re actively adding verified openings in this sector right now — check back soon, or sign up to get alerted the moment they land.')}</p>`:''}
       <div class="sector-kpis">
-        <div class="skpi"><b>${scaled}</b><span>${T('open roles (U.S.)')}</span></div>
+        <div class="skpi"><b>${count.toLocaleString()}</b><span>${T('live openings on Rivet')}</span></div>
         <div class="skpi"><b>${employers.length}</b><span>${T('hiring employers')}</span></div>
         <div class="skpi"><b>${metros}</b><span>${T('metros')}</span></div>
         ${payHi?`<div class="skpi"><b>$${payLo}–${payHi}</b><span>${T('typical pay/hr')}</span></div>`:''}
