@@ -1780,6 +1780,7 @@ function voiceAgent(mode){
       var role=null; for(var i=0;i<ROLES.length;i++){ if(q.indexOf(ROLES[i][1])>=0){ role=ROLES[i]; break; } }
       if(WORKER && role && /shift|gig|per ?diem/.test(q)) return go('/app/shifts','Finding '+role[1]+' shifts');
       if(WORKER && role) return go('/app/jobs?q='+encodeURIComponent(role[0]),'Finding '+role[1]+' jobs');
+      if(!WORKER && role) return go('/console/source?trade='+encodeURIComponent(role[0]),'Sourcing '+role[1]+' candidates');
       for(var j=0;j<INTENTS.length;j++){ if(new RegExp(INTENTS[j].re).test(q)) return go(INTENTS[j].url, INTENTS[j].say, INTENTS[j].post); }
       statusEl.textContent='Hmm, try “'+(WORKER?'open shifts':'post a shift')+'” or “'+(WORKER?'find welder jobs':'source CNAs')+'”.';
       speak('Sorry, I did not catch that. Try again.');
