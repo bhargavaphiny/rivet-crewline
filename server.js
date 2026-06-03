@@ -1792,15 +1792,49 @@ const server = http.createServer(async (req,res)=>{
 // Live job ingestion from companies' public job boards (Greenhouse). Runs in the
 // background after boot, at most every 6h, so prod stays full of real current postings.
 const { ingestLiveJobs } = require('./jobs_live');
+const { ingestAggregators, aggregatorsConfigured } = require('./jobs_aggregators');
+// Real-job count = anything with a real external apply link, excluding the old USAJOBS search-link seeds.
+async function realJobCount(){
+  return (await db.prepare("SELECT COUNT(*) c FROM jobs WHERE apply_url IS NOT NULL AND apply_url NOT LIKE '%/Search/Results%'").get()).c;
+}
+// Surgically remove seeded/fake jobs + shifts. Runs ONLY once enough real jobs exist, so the
+// site is never left empty. Never touches real apply-link jobs or jobs posted by real employers.
+async function purgeSeeds(){
+  try {
+    const real = await realJobCount();
+    if(real < 30){ console.log(`[purge] skipped — only ${real} real jobs (keeping seeds so site isn't empty)`); return; }
+    // fake jobs: no real apply link AND owned by a seed employer (*.test), or the old USAJOBS search-link seeds
+    const fake = await db.prepare(`SELECT j.id FROM jobs j JOIN users u ON u.id=j.employer_id
+      WHERE (j.apply_url IS NULL AND u.email LIKE '%.test') OR j.source='USAJOBS'`).all();
+    const ids = fake.map(r=>r.id);
+    if(ids.length){
+      const ph = ids.map(()=>'?').join(',');
+      for(const tbl of ['applications','interviews','quotes','job_media','saved_jobs']){
+        try { await db.prepare(`DELETE FROM ${tbl} WHERE job_id IN (${ph})`).run(...ids); } catch(e){}
+      }
+      await db.prepare(`DELETE FROM jobs WHERE id IN (${ph})`).run(...ids);
+    }
+    // fake shifts (seeded=1) + their claims; real employer-posted shifts (seeded=0) are kept
+    try {
+      await db.exec("DELETE FROM shift_claims WHERE shift_id IN (SELECT id FROM shifts WHERE seeded=1)");
+      await db.exec("DELETE FROM shifts WHERE seeded=1");
+    } catch(e){}
+    console.log(`[purge] removed ${ids.length} seeded jobs + seeded shifts — site is now 100% real (${real} real jobs)`);
+  } catch(e){ console.error('[purge] skipped (non-fatal):', e.message); }
+}
 async function refreshLiveJobs(){
   try {
     const last = await db.prepare("SELECT v FROM meta WHERE k='live_at'").get();
     const age = last ? (Date.now() - Number(last.v)) : Infinity;
-    const liveCount = (await db.prepare("SELECT COUNT(*) c FROM jobs WHERE apply_url LIKE '%greenhouse%' OR apply_url LIKE '%psiquantum%'").get()).c;
-    if(age < 6*3600*1000 && liveCount >= 400) return; // fresh enough and well-stocked
+    const liveCount = await realJobCount();
+    const stale = age >= 6*3600*1000;
+    if(!stale && liveCount >= 800){ await purgeSeeds(); return; } // well-stocked; still keep fakes out
     const r = await ingestLiveJobs(db);
+    let agg = { added:0, scanned:0 };
+    if(aggregatorsConfigured()) agg = await ingestAggregators(db);
     await db.prepare("INSERT INTO meta(k,v) VALUES('live_at',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").run(String(Date.now()));
-    console.log(`[live] ingested ${r.added} new real jobs (scanned ${r.scanned})`);
+    console.log(`[live] ingested ${r.added} (greenhouse) + ${agg.added} (aggregators) real jobs; scanned ${r.scanned+agg.scanned}` + (agg.providers?` ${JSON.stringify(Object.fromEntries(Object.entries(agg.providers).map(([k,v])=>[k,v.added])))}`:''));
+    await purgeSeeds();
   } catch(e){ console.error('[live] ingest skipped (non-fatal):', e.message); }
 }
 

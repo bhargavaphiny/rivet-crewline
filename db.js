@@ -972,6 +972,9 @@ async function seedSectors(){
 // ---- Verified shift & contract marketplace: rolling open shifts for the money roles ----
 // Self-refreshing: drops past shifts, tops up to a live set of upcoming per-diem/contract gigs.
 async function seedShifts(){
+  // Real product: do NOT generate fake shifts. Only real employer-posted shifts (seeded=0) appear.
+  // Set RIVET_SEED_DEMO=1 to restore demo shift supply for a throwaway/local environment.
+  if(process.env.RIVET_SEED_DEMO !== '1') return;
   const { TRADES } = require('./matching');
   const today = new Date().toISOString().slice(0,10);
   try { await db.exec(`DELETE FROM shift_claims WHERE shift_id IN (SELECT id FROM shifts WHERE seeded=1 AND date < '${today}')`); } catch(e){}
