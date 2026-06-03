@@ -2225,9 +2225,11 @@ function usMap(points = [], opts = {}){
         var arr=[];pts.forEach(function(d,i){var c=catCount(d,cat);if(c>0)arr.push({d:d,i:i,c:c});});
         arr.sort(function(a,b){return (b.d.near?1:0)-(a.d.near?1:0) || (a.d.near?(a.d.dist-b.d.dist):(b.c-a.c));});
         ul.innerHTML=arr.slice(0,8).map(function(o){return '<li class="'+(o.d.near?'near':'')+'" onclick="${id}_show('+o.i+')"><span>'+(o.d.near?'<i class="ml-pin"></i>':'')+o.d.c+(o.d.dist!=null?' <em class="mi-tag">'+o.d.dist+' mi</em>':'')+'</span><b>'+o.c.toLocaleString()+'</b></li>';}).join('')||'<li class="muted">'+emptyCat+'</li>';}
-      // cluster overlapping metros on the local (worker) map; national maps stay spread out
-      var cluster = (L.markerClusterGroup && ${hasHome?'true':'false'}) ? L.markerClusterGroup({
-        maxClusterRadius:36, showCoverageOnHover:false, spiderfyOnMaxZoom:true,
+      // Cluster overlapping metros so the map never looks crowded; zoom into a region to split them.
+      // National view clusters more aggressively (bigger radius, splits at a lower zoom) than the local map.
+      var cluster = L.markerClusterGroup ? L.markerClusterGroup({
+        maxClusterRadius:${hasHome?40:60}, showCoverageOnHover:false, spiderfyOnMaxZoom:true, chunkedLoading:true,
+        disableClusteringAtZoom:${hasHome?11:6},
         iconCreateFunction:function(c){ var ms=c.getAllChildMarkers(), sum=0,i; for(i=0;i<ms.length;i++) sum+=(ms[i].__n||0);
           var z=sum>=10000?48:sum>=1000?42:36; return L.divIcon({className:'jclust',html:'<div class="jc-b" style="width:'+z+'px;height:'+z+'px">'+nf(sum)+'</div>',iconSize:[z,z]}); }
       }) : null;

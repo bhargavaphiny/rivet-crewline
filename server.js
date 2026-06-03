@@ -747,7 +747,8 @@ const server = http.createServer(async (req,res)=>{
     if(p==='/' && method==='GET'){
       if(user) return redirect(res, user.role==='employer'?'/console':'/app');
       const demandGeo = await jobGeoAll();
-      return send(res, V.layout({title:'Hire & get hired in the trades', user:null, body:V.landing(demandGeo)}));
+      // Hero map: show the top markets (sorted by demand) so it reads clean, not crowded with tiny metros.
+      return send(res, V.layout({title:'Hire & get hired in the trades', user:null, body:V.landing(demandGeo.slice(0,70))}));
     }
     if(p==='/signup' && method==='GET')
       return send(res, V.layout({title:'Sign up', user:null, body:V.authForm('signup',{role:url.searchParams.get('role')||'worker', google:googleEnabled})}));
