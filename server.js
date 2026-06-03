@@ -168,7 +168,12 @@ function bestMatch(prof, creds, job){
 
 async function rankJobsForWorker(uid){
   const prof = await getProfile(uid); const creds = await getCreds(uid);
-  const jobs = await openJobs();
+  let jobs = await openJobs();
+  // Perf: only score jobs in the worker's trade + adjacent set (others score ~0 on fit and never
+  // surface). Cuts the per-request scoring loop from the whole board (~5k+) to a relevant few hundred.
+  const _tr = profTrades(prof);
+  if(_tr.length){ const broad = new Set(_tr); for(const t of _tr) for(const a of (M.ADJACENT[t]||[])) broad.add(a); jobs = jobs.filter(j=>broad.has(j.trade)); }
+  else { jobs = jobs.slice(0, 300); }
   const home = prof ? await geocodeZip(prof.zip) : null;
   const zc = {};
   const out = [];

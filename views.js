@@ -838,8 +838,8 @@ function agentsHub({ mode }){
   ];
   const recruiter = [
     { title:T('Sourcing Agent'), desc:T('Ranks verified workers for your hardest-to-fill roles and verifies every credential against its official public registry.'), action:`<a class="btn-sm" href="/console/source">${T('Open Sourcing →')}</a>` },
-    { title:T('Screening Agent'), desc:T('Generates tailored pre-qualifying questions and a fit summary for any candidate.'), action:`<a class="btn-sm" href="/console/search">${T('Open a candidate →')}</a>` },
-    { title:T('Scheduling Agent'), desc:T('Proposes interview times to a shortlisted candidate in one click.'), action:`<a class="btn-sm" href="/console/search">${T('Open a candidate →')}</a>` },
+    { title:T('Screening Agent'), desc:T('Reads a candidate’s verified Work Card against your job, then writes tailored screening questions and a clear fit summary — in seconds.'), action:`<a class="btn-sm" href="/console/search">${T('Open a candidate →')}</a>` },
+    { title:T('Scheduling Agent'), desc:T('Proposes three interview times to a pipelined candidate and messages them automatically — one click, no back-and-forth.'), action:`<a class="btn-sm" href="/console/search">${T('Open a candidate →')}</a>` },
   ];
   const items = mode==='employer' ? recruiter : worker;
   return `<section class="wrap">
@@ -1405,7 +1405,8 @@ function ytSearch(q){ return 'https://www.youtube.com/results?search_query=' + e
 const ROLE_VIDEO = {
   process_tech:'6hy8_mQB1Hk', cleanroom_op:'B5nvSSvSnXo', equipment_tech:'WOhE31hxvtI',
   machinist:'z4XXutxFpx4', machine_operator:'L96D7c9tNIQ', welder:'CuDwydMjgGg', hvac:'qGDqbJCeiXc',
-  cna:'Dc_sQpfhKfc', surgical_tech:'RuSx08nMfME', medical_assistant:'s-lM2uwiwyQ',
+  electrician:'lifunadBZ3U', maintenance_tech:'lmMi3ACL-Jk',
+  cna:'Dc_sQpfhKfc', patient_care_tech:'Dc_sQpfhKfc', surgical_tech:'RuSx08nMfME', medical_assistant:'s-lM2uwiwyQ',
   phlebotomist:'tvTG8DD4q2Y', sterile_processing:'i2TvrUa-C_Q',
 };
 // Embed the real curated video if we have one; otherwise fall back to a YouTube topic search.
