@@ -1822,7 +1822,7 @@ async function purgeSeeds(){
     console.log(`[purge] removed ${ids.length} seeded jobs + seeded shifts — site is now 100% real (${real} real jobs)`);
   } catch(e){ console.error('[purge] skipped (non-fatal):', e.message); }
 }
-const INGEST_VERSION = '4'; // bump to force a one-time re-ingest on the next deploy (e.g. after source/sector changes)
+const INGEST_VERSION = '5'; // bump to force a one-time re-ingest on the next deploy (e.g. after source/sector changes)
 // Freshness: stamp every posting we just saw live in its feed, then drop ones that have gone
 // stale (filled/closed → stopped appearing). Gated on a healthy run so a failed ingest can't mass-delete.
 async function refreshFreshness(touched){

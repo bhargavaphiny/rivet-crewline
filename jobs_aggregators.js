@@ -43,23 +43,24 @@ function makeWriters(db){
   return { insZip, insJob, employer };
 }
 
-// ---- Adzuna: query by blue-collar category (broad, high yield), filter to real trades ----
+// ---- Adzuna: GTM-first. Categories limited to the GTM sectors (manufacturing + healthcare);
+// semiconductor has no category so it's covered by deep keyword queries below. ----
 const ADZUNA_CATS = [
-  ['healthcare-nursing-jobs','healthcare'], ['manufacturing-jobs','manufacturing'],
-  ['trade-construction-jobs','trades'], ['logistics-warehouse-jobs','logistics'],
-  ['maintenance-jobs','facilities'], ['energy-oil-gas-jobs','energy'],
-  ['hospitality-catering-jobs','hospitality'], ['domestic-help-cleaning-jobs','facilities'],
-  ['other-general-jobs','general'],
+  ['manufacturing-jobs','manufacturing'], ['healthcare-nursing-jobs','healthcare'],
 ];
 // Keyword queries to feed sectors the category API misses (healthcare blue-collar, semiconductor).
-// Interleaved so both priority sectors get API budget even if the free tier throttles mid-run.
+// GTM depth, semiconductor-FIRST (priority order semi > manufacturing > healthcare), interleaved
+// so the priority sector still gets budget if the free tier throttles mid-run.
 const ADZUNA_KW = [
-  ['semiconductor technician','semiconductor'],['certified nursing assistant','healthcare'],
-  ['fab technician','semiconductor'],['patient care technician','healthcare'],
-  ['cleanroom technician','semiconductor'],['medical assistant','healthcare'],
-  ['wafer fabrication','semiconductor'],['sterile processing','healthcare'],
-  ['semiconductor process technician','semiconductor'],['surgical technician','healthcare'],
-  ['phlebotomist','healthcare'],['caregiver','healthcare'],['home health aide','healthcare'],
+  ['semiconductor technician','semiconductor'],['CNC machinist','manufacturing'],['certified nursing assistant','healthcare'],
+  ['fab technician','semiconductor'],['welder fabricator','manufacturing'],['patient care technician','healthcare'],
+  ['cleanroom technician','semiconductor'],['assembly technician','manufacturing'],['medical assistant','healthcare'],
+  ['semiconductor process technician','semiconductor'],['production maintenance technician','manufacturing'],['sterile processing','healthcare'],
+  ['wafer fabrication technician','semiconductor'],['quality inspector','manufacturing'],['surgical technician','healthcare'],
+  ['photolithography technician','semiconductor'],['phlebotomist','healthcare'],
+  ['etch deposition technician','semiconductor'],['caregiver','healthcare'],
+  ['metrology technician','semiconductor'],['home health aide','healthcare'],
+  ['ion implant technician','semiconductor'],['semiconductor equipment maintenance','semiconductor'],
 ];
 async function ingestAdzuna(db, w, seen, touched=[]){
   const id = process.env.ADZUNA_APP_ID, key = process.env.ADZUNA_APP_KEY;
@@ -91,7 +92,8 @@ async function ingestAdzuna(db, w, seen, touched=[]){
       try { await w.insJob.run(eid,title,trade,lo,hi,city,zipKey,'Day',CRED[trade]||'',descr,'Full-time',company,apply,sec,'biweekly','Ongoing','authorized'); added++; } catch(e){}
     }
   };
-  const semiSectorOf = t => /semiconductor|wafer|\bfab\b|cleanroom|litho|etch|\bcvd\b|\bpvd\b|photo|deposition|implant|metrology|process tech/i.test(t) ? 'semiconductor' : 'manufacturing';
+  // Only genuine fab signals → semiconductor; generic "process/maintenance technician" → manufacturing.
+  const semiSectorOf = t => /semiconductor|wafer|\bfab\b|cleanroom|photolith|\blitho\b|\betch\b|\bcvd\b|\bpvd\b|deposition|ion implant|epitax|\bcmp\b|nanofab|microelectronic/i.test(t) ? 'semiconductor' : 'manufacturing';
   const base = `https://api.adzuna.com/v1/api/jobs/us/search`;
   const auth = `app_id=${id}&app_key=${key}&results_per_page=50&content-type=application/json&max_days_old=30`;
   for(const [cat, sector] of ADZUNA_CATS){
@@ -160,16 +162,15 @@ async function ingestUsajobs(db, w, seen, touched=[]){
 }
 
 // ---- Jooble: aggregator (POST). Each keyword group is tagged to a sector so keys deepen sector pages. ----
+// GTM-first, semiconductor leading. (Non-GTM groups dropped — depth in the 3 sectors first.)
 const JOOBLE_TERMS = [
+  ['semiconductor equipment technician cleanroom wafer fab','semiconductor'],
+  ['semiconductor process technician etch deposition photolithography','semiconductor'],
+  ['CNC machinist welder fabricator assembler','manufacturing'],
+  ['production operator maintenance technician quality inspector','manufacturing'],
   ['CNA caregiver home health aide','healthcare'],
   ['medical assistant phlebotomist patient care technician','healthcare'],
   ['sterile processing surgical technician','healthcare'],
-  ['semiconductor equipment technician process technician cleanroom','semiconductor'],
-  ['welder machinist CNC assembler','manufacturing'],
-  ['production operator quality inspector maintenance technician','manufacturing'],
-  ['warehouse forklift CDL truck driver','logistics'],
-  ['HVAC electrician plumber pipefitter','trades'],
-  ['janitor custodian security guard landscaper','facilities'],
 ];
 async function ingestJooble(db, w, seen, touched=[]){
   const key = process.env.JOOBLE_KEY; if(!key) return { added:0, scanned:0 };
