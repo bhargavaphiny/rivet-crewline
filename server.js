@@ -1791,7 +1791,7 @@ const server = http.createServer(async (req,res)=>{
 
 // Live job ingestion from companies' public job boards (Greenhouse). Runs in the
 // background after boot, at most every 6h, so prod stays full of real current postings.
-const { ingestLiveJobs } = require('./jobs_live');
+const { ingestLiveJobs, normalizeTitles } = require('./jobs_live');
 const { ingestAggregators, aggregatorsConfigured } = require('./jobs_aggregators');
 // Real-job count = anything with a real external apply link, excluding the old USAJOBS search-link seeds.
 async function realJobCount(){
@@ -1833,7 +1833,8 @@ async function refreshLiveJobs(){
     let agg = { added:0, scanned:0 };
     if(aggregatorsConfigured()) agg = await ingestAggregators(db);
     await db.prepare("INSERT INTO meta(k,v) VALUES('live_at',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").run(String(Date.now()));
-    console.log(`[live] ingested ${r.added} (greenhouse) + ${agg.added} (aggregators) real jobs; scanned ${r.scanned+agg.scanned}` + (agg.providers?` ${JSON.stringify(Object.fromEntries(Object.entries(agg.providers).map(([k,v])=>[k,v.added])))}`:''));
+    console.log(`[live] ingested ${r.added} (keyless ATS) + ${agg.added} (aggregators) real jobs; scanned ${r.scanned+agg.scanned}` + (agg.providers?` ${JSON.stringify(Object.fromEntries(Object.entries(agg.providers).map(([k,v])=>[k,v.added])))}`:''));
+    try { const nt = await normalizeTitles(db); if(nt) console.log(`[live] tidied ${nt} job titles`); } catch(e){}
     await purgeSeeds();
   } catch(e){ console.error('[live] ingest skipped (non-fatal):', e.message); }
 }

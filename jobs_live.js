@@ -146,6 +146,15 @@ const CRED = { welder:'aws_welding',electrician:'osha10',equipment_tech:'osha10'
 
 function tradeFor(title){ for(const [re,tr] of TRADE_RULES){ if(re.test(title)) return tr; } return null; }
 
+// Tidy feed titles that bake in store numbers / city,state (e.g. "Barista, Austin, TX, #1630").
+function cleanTitle(t){
+  let s = String(t||'').replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim();
+  s = s.replace(/\s*[,\-–]\s*#\s*\d+\s*$/i,'');              // trailing store number
+  s = s.replace(/\s*,\s*[A-Za-z .'\/]+,\s*[A-Z]{2}\s*$/,''); // trailing ", City, ST"
+  s = s.replace(/\s*,\s*[A-Z]{2}\s*$/,'');                   // trailing ", ST"
+  return s.trim();
+}
+
 // ---- geocoding: precise for major metros, state-centroid fallback so every US job maps ----
 const STATE_CENTROID = {
   AL:[32.8,-86.8],AK:[64.2,-149.5],AZ:[34.2,-111.7],AR:[34.9,-92.4],CA:[37.2,-119.7],CO:[39.0,-105.5],
@@ -260,6 +269,7 @@ async function fetchProvider(provider, token){
 // Filter to a real blue-collar US role, geocode, ensure employer, insert. Returns 1 if added.
 async function processJob(ctx, empKey, company, sector, item){
   let { title, url, city, st, lat, lon } = item;
+  title = cleanTitle(title);
   if(!title || ctx.DENY.test(title)) return 0;
   const trade = tradeFor(title); if(!trade) return 0;
   if(!url || ctx.seen.has(url)) return 0;
@@ -302,4 +312,12 @@ async function ingestLiveJobs(db){
   return { added, scanned };
 }
 
-module.exports = { ingestLiveJobs, SOURCES, EXTRA_SOURCES, fetchProvider, tradeFor, parseLoc, geocode, PAY, CRED, DENY, TRADE_RULES, fetchJSON };
+// One-time tidy of already-ingested live titles (idempotent; cleans rows from before cleanTitle).
+async function normalizeTitles(db){
+  const rows = await db.prepare("SELECT id,title FROM jobs WHERE apply_url IS NOT NULL").all();
+  let n=0;
+  for(const r of rows){ const c=cleanTitle(r.title); if(c && c!==r.title){ try { await db.prepare('UPDATE jobs SET title=? WHERE id=?').run(c, r.id); n++; } catch(e){} } }
+  return n;
+}
+
+module.exports = { ingestLiveJobs, normalizeTitles, SOURCES, EXTRA_SOURCES, fetchProvider, tradeFor, cleanTitle, parseLoc, geocode, PAY, CRED, DENY, TRADE_RULES, fetchJSON };
