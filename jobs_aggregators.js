@@ -133,12 +133,22 @@ async function ingestUsajobs(db, w, seen){
   return { added, scanned };
 }
 
-// ---- Jooble: aggregator (POST) ----
-const JOOBLE_TERMS = ['CNA caregiver home health','welder machinist CNC','warehouse forklift driver','HVAC electrician plumber','maintenance technician mechanic','medical assistant phlebotomist','CDL truck driver','janitor custodian security guard'];
+// ---- Jooble: aggregator (POST). Each keyword group is tagged to a sector so keys deepen sector pages. ----
+const JOOBLE_TERMS = [
+  ['CNA caregiver home health aide','healthcare'],
+  ['medical assistant phlebotomist patient care technician','healthcare'],
+  ['sterile processing surgical technician','healthcare'],
+  ['semiconductor equipment technician process technician cleanroom','semiconductor'],
+  ['welder machinist CNC assembler','manufacturing'],
+  ['production operator quality inspector maintenance technician','manufacturing'],
+  ['warehouse forklift CDL truck driver','logistics'],
+  ['HVAC electrician plumber pipefitter','trades'],
+  ['janitor custodian security guard landscaper','facilities'],
+];
 async function ingestJooble(db, w, seen){
   const key = process.env.JOOBLE_KEY; if(!key) return { added:0, scanned:0 };
   let added=0, scanned=0;
-  for(const kw of JOOBLE_TERMS){
+  for(const [kw, sector] of JOOBLE_TERMS){
     for(let page=1; page<=3; page++){
       const j = await httpJSON(`https://jooble.org/api/${key}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:{ keywords:kw, location:'United States', page } });
       const rows = j && Array.isArray(j.jobs) ? j.jobs : null;
@@ -159,7 +169,7 @@ async function ingestJooble(db, w, seen){
         try { await w.insZip.run(zipKey, ll[0], ll[1], loc.city); } catch(e){}
         const band = PAY[trade]||[18,30];
         const descr = `${title} — ${company}, ${loc.city}, ${loc.st}. Live opening; apply on the employer's site (via Jooble).`;
-        try { await w.insJob.run(eid,title,trade,band[0],band[1],loc.city,zipKey,'Day',CRED[trade]||'',descr,'Full-time',company,apply,'general','biweekly','Ongoing','authorized'); added++; } catch(e){}
+        try { await w.insJob.run(eid,title,trade,band[0],band[1],loc.city,zipKey,'Day',CRED[trade]||'',descr,'Full-time',company,apply,sector,'biweekly','Ongoing','authorized'); added++; } catch(e){}
       }
       if(rows.length < 10) break;
     }
