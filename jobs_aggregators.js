@@ -51,39 +51,65 @@ const ADZUNA_CATS = [
   ['hospitality-catering-jobs','hospitality'], ['domestic-help-cleaning-jobs','facilities'],
   ['other-general-jobs','general'],
 ];
+// Keyword queries to feed sectors the category API misses (healthcare blue-collar, semiconductor).
+const ADZUNA_KW = [
+  ['certified nursing assistant','healthcare'],['patient care technician','healthcare'],
+  ['medical assistant','healthcare'],['sterile processing','healthcare'],
+  ['surgical technician','healthcare'],['phlebotomist','healthcare'],
+  ['caregiver','healthcare'],['home health aide','healthcare'],
+  ['semiconductor technician','semiconductor'],['fab technician','semiconductor'],
+  ['cleanroom technician','semiconductor'],['wafer fabrication','semiconductor'],
+  ['semiconductor process technician','semiconductor'],
+];
 async function ingestAdzuna(db, w, seen){
   const id = process.env.ADZUNA_APP_ID, key = process.env.ADZUNA_APP_KEY;
   if(!id || !key) return { added:0, scanned:0 };
   let added=0, scanned=0;
+  const handle = async (rows, sector) => {
+    for(const r of rows){
+      scanned++;
+      const title = String(r.title||'').replace(/<[^>]+>/g,'').trim();
+      if(!title || DENY.test(title)) continue;
+      const sec = typeof sector==='function' ? sector(title) : sector;
+      const trade = tradeFor(title); if(!trade) continue;
+      const apply = r.redirect_url; if(!apply || seen.has(apply)) continue;
+      const area = (r.location && Array.isArray(r.location.area)) ? r.location.area : [];
+      const display = (r.location && r.location.display_name) || area.slice(1).reverse().join(', ');
+      const loc = parseLoc(display) || (area.length>=3 ? parseLoc(`${area[area.length-1]}, ${area[1]}`) : null);
+      let lat = r.latitude, lon = r.longitude, city = loc && loc.city, st = loc && loc.st;
+      if((lat==null||lon==null) && city && st){ const ll = geocode(city, st); if(ll){ lat=ll[0]; lon=ll[1]; } }
+      if(lat==null || lon==null || !city) continue;
+      seen.add(apply);
+      const company = (r.company && r.company.display_name) || 'Employer';
+      const slug = String(company).toLowerCase().replace(/[^a-z0-9]+/g,'-').slice(0,40) || 'employer';
+      const eid = await w.employer(slug, company, `${city}, ${st||''}`); if(!eid) continue;
+      const zipKey = `AZ:${city},${st||''}`.slice(0,40);
+      try { await w.insZip.run(zipKey, lat, lon, city); } catch(e){}
+      let lo = toHourly(r.salary_min), hi = toHourly(r.salary_max);
+      if(!lo || !hi){ const band = PAY[trade]||[18,30]; lo = lo||band[0]; hi = hi||band[1]; }
+      const descr = `${title} — ${company}, ${city}${st?', '+st:''}. Live opening; apply on the employer's site (via Adzuna).`;
+      try { await w.insJob.run(eid,title,trade,lo,hi,city,zipKey,'Day',CRED[trade]||'',descr,'Full-time',company,apply,sec,'biweekly','Ongoing','authorized'); added++; } catch(e){}
+    }
+  };
+  const semiSectorOf = t => /semiconductor|wafer|\bfab\b|cleanroom|litho|etch|\bcvd\b|\bpvd\b|photo|deposition|implant|metrology|process tech/i.test(t) ? 'semiconductor' : 'manufacturing';
+  const base = `https://api.adzuna.com/v1/api/jobs/us/search`;
+  const auth = `app_id=${id}&app_key=${key}&results_per_page=50&content-type=application/json&max_days_old=30`;
   for(const [cat, sector] of ADZUNA_CATS){
-    for(let page=1; page<=5; page++){
-      const url = `https://api.adzuna.com/v1/api/jobs/us/search/${page}?app_id=${id}&app_key=${key}&results_per_page=50&category=${cat}&content-type=application/json&max_days_old=30`;
-      const j = await httpJSON(url);
+    for(let page=1; page<=3; page++){
+      const j = await httpJSON(`${base}/${page}?${auth}&category=${cat}`);
       const rows = j && Array.isArray(j.results) ? j.results : null;
       if(!rows || !rows.length) break;
-      for(const r of rows){
-        scanned++;
-        const title = String(r.title||'').replace(/<[^>]+>/g,'').trim();
-        if(!title || DENY.test(title)) continue;
-        const trade = tradeFor(title); if(!trade) continue;
-        const apply = r.redirect_url; if(!apply || seen.has(apply)) continue;
-        const area = (r.location && Array.isArray(r.location.area)) ? r.location.area : [];
-        const display = (r.location && r.location.display_name) || area.slice(1).reverse().join(', ');
-        const loc = parseLoc(display) || (area.length>=3 ? parseLoc(`${area[area.length-1]}, ${area[1]}`) : null);
-        let lat = r.latitude, lon = r.longitude, city = loc && loc.city, st = loc && loc.st;
-        if((lat==null||lon==null) && city && st){ const ll = geocode(city, st); if(ll){ lat=ll[0]; lon=ll[1]; } }
-        if(lat==null || lon==null || !city) continue;
-        seen.add(apply);
-        const company = (r.company && r.company.display_name) || 'Employer';
-        const slug = String(company).toLowerCase().replace(/[^a-z0-9]+/g,'-').slice(0,40) || 'employer';
-        const eid = await w.employer(slug, company, `${city}, ${st||''}`); if(!eid) continue;
-        const zipKey = `AZ:${city},${st||''}`.slice(0,40);
-        try { await w.insZip.run(zipKey, lat, lon, city); } catch(e){}
-        let lo = toHourly(r.salary_min), hi = toHourly(r.salary_max);
-        if(!lo || !hi){ const band = PAY[trade]||[18,30]; lo = lo||band[0]; hi = hi||band[1]; }
-        const descr = `${title} — ${company}, ${city}${st?', '+st:''}. Live opening; apply on the employer's site (via Adzuna).`;
-        try { await w.insJob.run(eid,title,trade,lo,hi,city,zipKey,'Day',CRED[trade]||'',descr,'Full-time',company,apply,sector,'biweekly','Ongoing','authorized'); added++; } catch(e){}
-      }
+      await handle(rows, sector);
+      if(rows.length < 50) break;
+    }
+  }
+  for(const [term, sector] of ADZUNA_KW){
+    const sectorOf = sector==='semiconductor' ? semiSectorOf : sector;
+    for(let page=1; page<=2; page++){
+      const j = await httpJSON(`${base}/${page}?${auth}&what=${encodeURIComponent(term)}`);
+      const rows = j && Array.isArray(j.results) ? j.results : null;
+      if(!rows || !rows.length) break;
+      await handle(rows, sectorOf);
       if(rows.length < 50) break;
     }
   }
