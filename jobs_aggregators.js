@@ -25,6 +25,9 @@ function httpJSON(url, { method = 'GET', headers = {}, body = null } = {}){
   });
 }
 const toHourly = n => { n = Number(n)||0; if(!n) return 0; return n > 400 ? Math.round(n/2080) : Math.round(n); };
+// Genuine semiconductor-fab signal in a job title (used to keep the semiconductor sector accurate).
+const FAB_RX = /semiconductor|wafer|\bfab\b|cleanroom|photolith|\blitho\b|\betch\b|\bcvd\b|\bpvd\b|deposition|ion implant|epitax|\bcmp\b|nanofab|microelectronic|diffusion|thin film|photomask|reticle|die attach|wire bond|wafer sort|sputter|\bsubfab\b|dopant|metrology/i;
+const isFabTitle = t => FAB_RX.test(String(t||''));
 
 // ---- shared DB writers (mirror jobs_live insert shape) ----
 function makeWriters(db){
@@ -61,6 +64,8 @@ const ADZUNA_KW = [
   ['etch deposition technician','semiconductor'],['caregiver','healthcare'],
   ['metrology technician','semiconductor'],['home health aide','healthcare'],
   ['ion implant technician','semiconductor'],['semiconductor equipment maintenance','semiconductor'],
+  ['wafer sort technician','semiconductor'],['die attach wire bond technician','semiconductor'],
+  ['thin film deposition technician','semiconductor'],['semiconductor test technician','semiconductor'],
 ];
 async function ingestAdzuna(db, w, seen, touched=[]){
   const id = process.env.ADZUNA_APP_ID, key = process.env.ADZUNA_APP_KEY;
@@ -93,7 +98,7 @@ async function ingestAdzuna(db, w, seen, touched=[]){
     }
   };
   // Only genuine fab signals → semiconductor; generic "process/maintenance technician" → manufacturing.
-  const semiSectorOf = t => /semiconductor|wafer|\bfab\b|cleanroom|photolith|\blitho\b|\betch\b|\bcvd\b|\bpvd\b|deposition|ion implant|epitax|\bcmp\b|nanofab|microelectronic/i.test(t) ? 'semiconductor' : 'manufacturing';
+  const semiSectorOf = t => isFabTitle(t) ? 'semiconductor' : 'manufacturing';
   const base = `https://api.adzuna.com/v1/api/jobs/us/search`;
   const auth = `app_id=${id}&app_key=${key}&results_per_page=50&content-type=application/json&max_days_old=30`;
   for(const [cat, sector] of ADZUNA_CATS){
@@ -173,6 +178,7 @@ async function ingestUsajobs(db, w, seen, touched=[]){
 const JOOBLE_TERMS = [
   ['semiconductor equipment technician cleanroom wafer fab','semiconductor'],
   ['semiconductor process technician etch deposition photolithography','semiconductor'],
+  ['wafer sort die attach wire bond test technician semiconductor','semiconductor'],
   ['CNC machinist welder fabricator assembler','manufacturing'],
   ['production operator maintenance technician quality inspector','manufacturing'],
   ['CNA caregiver home health aide','healthcare'],
@@ -229,4 +235,4 @@ async function ingestAggregators(db){
   return { added, scanned, providers, touched };
 }
 
-module.exports = { ingestAggregators, aggregatorsConfigured };
+module.exports = { ingestAggregators, aggregatorsConfigured, isFabTitle };

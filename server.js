@@ -1792,7 +1792,17 @@ const server = http.createServer(async (req,res)=>{
 // Live job ingestion from companies' public job boards (Greenhouse). Runs in the
 // background after boot, at most every 6h, so prod stays full of real current postings.
 const { ingestLiveJobs, normalizeTitles } = require('./jobs_live');
-const { ingestAggregators, aggregatorsConfigured } = require('./jobs_aggregators');
+const { ingestAggregators, aggregatorsConfigured, isFabTitle } = require('./jobs_aggregators');
+// Keep the semiconductor sector accurate: aggregator jobs tagged semiconductor must have a real fab
+// signal in the title (employer-sourced fab jobs from Workday are exempt). Demote the rest to mfg.
+async function retagSemiconductor(){
+  try {
+    const rows = await db.prepare("SELECT id,title FROM jobs WHERE sector='semiconductor' AND apply_url IS NOT NULL AND (apply_url LIKE '%adzuna%' OR apply_url LIKE '%jooble%' OR apply_url LIKE '%usajobs%')").all();
+    const bad = rows.filter(r=>!isFabTitle(r.title)).map(r=>r.id);
+    for(let i=0;i<bad.length;i+=200){ const c=bad.slice(i,i+200); const ph=c.map(()=>'?').join(','); try { await db.prepare(`UPDATE jobs SET sector='manufacturing' WHERE id IN (${ph})`).run(...c); } catch(e){} }
+    if(bad.length) console.log(`[gtm] re-tagged ${bad.length} non-fab jobs: semiconductor → manufacturing`);
+  } catch(e){ console.error('[gtm] retag skipped:', e.message); }
+}
 // Real-job count = anything with a real external apply link, excluding the old USAJOBS search-link seeds.
 async function realJobCount(){
   return (await db.prepare("SELECT COUNT(*) c FROM jobs WHERE apply_url IS NOT NULL AND apply_url NOT LIKE '%/Search/Results%'").get()).c;
@@ -1822,7 +1832,7 @@ async function purgeSeeds(){
     console.log(`[purge] removed ${ids.length} seeded jobs + seeded shifts — site is now 100% real (${real} real jobs)`);
   } catch(e){ console.error('[purge] skipped (non-fatal):', e.message); }
 }
-const INGEST_VERSION = '6'; // bump to force a one-time re-ingest on the next deploy (e.g. after source/sector changes)
+const INGEST_VERSION = '7'; // bump to force a one-time re-ingest on the next deploy (e.g. after source/sector changes)
 const GTM_SECTORS = ['semiconductor','manufacturing','healthcare']; // sector-wise GTM focus order: semi → mfg → health
 // Keep the board focused on the GTM sectors: drop live (aggregated) jobs in other sectors so
 // plumbing/energy/logistics don't crowd out semiconductor/manufacturing/healthcare. Employer-
@@ -1875,6 +1885,7 @@ async function refreshLiveJobs(){
     console.log(`[live] ingested ${r.added} (keyless ATS) + ${agg.added} (aggregators) real jobs; scanned ${r.scanned+agg.scanned}` + (agg.providers?` ${JSON.stringify(Object.fromEntries(Object.entries(agg.providers).map(([k,v])=>[k,v.added])))}`:''));
     try { const nt = await normalizeTitles(db); if(nt) console.log(`[live] tidied ${nt} job titles`); } catch(e){}
     try { await refreshFreshness([...(r.touched||[]), ...(agg.touched||[])]); } catch(e){ console.error('[fresh] skipped:', e.message); }
+    try { await retagSemiconductor(); } catch(e){}
     await purgeSeeds();
     await pruneNonGTM();
   } catch(e){ console.error('[live] ingest skipped (non-fatal):', e.message); }
