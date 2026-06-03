@@ -242,8 +242,16 @@ const WD_SOURCES = [
   ['micron','Micron','semiconductor',{host:'micron.wd1.myworkdayjobs.com',site:'External'}],
   ['analogdevices','Analog Devices','semiconductor',{host:'analogdevices.wd1.myworkdayjobs.com',site:'External'}],
   ['kla','KLA','semiconductor',{host:'kla.wd1.myworkdayjobs.com',site:'Search'}],
+  ['entegris','Entegris','semiconductor',{host:'entegris.wd1.myworkdayjobs.com',site:'EntegrisCareers'}],
+  ['cree','Wolfspeed','semiconductor',{host:'cree.wd108.myworkdayjobs.com',site:'EXT'}],
+  ['microchiphr','Microchip','semiconductor',{host:'microchiphr.wd5.myworkdayjobs.com',site:'external'}],
   ['trinityhealth','Trinity Health','healthcare',{host:'trinityhealth.wd1.myworkdayjobs.com',site:'Jobs'}],
   ['sutterhealth','Sutter Health','healthcare',{host:'sutterhealth.wd1.myworkdayjobs.com',site:'SH',defaultState:'CA'}],
+  ['methodisthealthsystem','Methodist Health System','healthcare',{host:'methodisthealthsystem.wd1.myworkdayjobs.com',site:'MHS_Careers'}],
+  ['massgeneralbrigham','Mass General Brigham','healthcare',{host:'massgeneralbrigham.wd1.myworkdayjobs.com',site:'MGBExternal'}],
+  ['geisinger','Geisinger','healthcare',{host:'geisinger.wd5.myworkdayjobs.com',site:'GeisingerExternal'}],
+  ['houstonmethodist','Houston Methodist','healthcare',{host:'houstonmethodist.wd12.myworkdayjobs.com',site:'GTI',defaultState:'TX',defaultCity:'Houston'}],
+  ['methodisthealth','Methodist Le Bonheur','healthcare',{host:'methodisthealth.wd5.myworkdayjobs.com',site:'MLH',defaultState:'TN',defaultCity:'Memphis'}],
 ];
 
 // POST helper for Workday CXS endpoints.
@@ -262,7 +270,7 @@ const isCountryTok = t => /^(u\.?s\.?a?|usa|united states.*)$/i.test(String(t).t
 // Loose location parse for varied Workday formats: "ST - City", "US, State, City", "USA - A - B", "City, ST".
 function parseLocLoose(raw){
   raw = String(raw||'').trim();
-  let m = raw.match(/^([A-Z]{2})\s*-\s*(.+)$/);
+  let m = raw.match(/^([A-Z]{2})\s*-\s*([^-]+)/); // "ST - City" or "ST - City - Facility" → take first segment
   if(m && m[1]!=='US' && STATE_ABBR.has(m[1])) return { st:m[1], city:m[2].trim() };
   const toks = raw.split(/[,\-–\/]/).map(s=>s.trim()).filter(Boolean);
   let st=null, i=-1;
@@ -274,18 +282,19 @@ function parseLocLoose(raw){
   if(!city || /america|united|^\d/i.test(city)) return null;
   return { city, st };
 }
-// Workday location → {city,st} (US only). Falls back to a per-source defaultState for bare-city feeds.
-function workdayLoc(text, defState){
-  if(!text) return null;
-  const raw = String(text).trim();
-  if(/locations?$/i.test(raw) || /\bremote\b|work from home|virtual|multiple/i.test(raw)) return null; // multi/remote
-  const p = parseLocLoose(raw);
-  if(p) return p;
-  if(defState){
-    let city = raw.replace(/\(.*?\)/g,'').replace(/^[A-Z]{2}\s*-\s*/,'').split(/\s{2,}|,|\|/)[0].trim();
-    if(!city || /\d/.test(city) || city.length<2) return null;
-    return { city, st:defState };
+// Workday location → {city,st} (US only). Per-source defaultState handles bare-city feeds;
+// defaultCity handles single-metro systems whose location field is just a facility name.
+function workdayLoc(text, defState, defCity){
+  const raw = String(text||'').trim();
+  if(raw && !(/locations?$/i.test(raw) || /\bremote\b|work from home|virtual|multiple/i.test(raw))){
+    const p = parseLocLoose(raw);
+    if(p) return p;
+    if(defState && !defCity){
+      let city = raw.replace(/\(.*?\)/g,'').replace(/^[A-Z]{2}\s*-\s*/,'').split(/\s{2,}|,|\|/)[0].trim();
+      if(city && !/\d/.test(city) && city.length>=2) return { city, st:defState };
+    }
   }
+  if(defCity && defState) return { city:defCity, st:defState }; // single-metro system fallback
   return null;
 }
 const STATE_ABBR = new Set(Object.values({'alabama':'AL','alaska':'AK','arizona':'AZ','arkansas':'AR','california':'CA','colorado':'CO','connecticut':'CT','delaware':'DE','florida':'FL','georgia':'GA','hawaii':'HI','idaho':'ID','illinois':'IL','indiana':'IN','iowa':'IA','kansas':'KS','kentucky':'KY','louisiana':'LA','maine':'ME','maryland':'MD','massachusetts':'MA','michigan':'MI','minnesota':'MN','mississippi':'MS','missouri':'MO','montana':'MT','nebraska':'NE','nevada':'NV','newhampshire':'NH','newjersey':'NJ','newmexico':'NM','newyork':'NY','northcarolina':'NC','northdakota':'ND','ohio':'OH','oklahoma':'OK','oregon':'OR','pennsylvania':'PA','rhodeisland':'RI','southcarolina':'SC','southdakota':'SD','tennessee':'TN','texas':'TX','utah':'UT','vermont':'VT','virginia':'VA','washington':'WA','westvirginia':'WV','wisconsin':'WI','wyoming':'WY','dc':'DC'}));
@@ -300,7 +309,7 @@ async function fetchProvider(provider, token, opts){
         const j = await fetchJSONPost(o.host, `/wday/cxs/${token}/${o.site}/jobs`, {appliedFacets:{}, limit:20, offset:off, searchText:''});
         const rows = j && Array.isArray(j.jobPostings) ? j.jobPostings : [];
         if(!rows.length) break;
-        for(const x of rows){ const loc = workdayLoc(x.locationsText, o.defaultState); if(!loc) continue;
+        for(const x of rows){ const loc = workdayLoc(x.locationsText, o.defaultState, o.defaultCity); if(!loc) continue;
           out.push({ title:(x.title||'').trim(), url: x.externalPath?`https://${o.host}/en-US/${o.site}${x.externalPath}`:null, city:loc.city, st:loc.st }); }
         if(rows.length < 20) break;
       }

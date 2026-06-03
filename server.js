@@ -1822,7 +1822,7 @@ async function purgeSeeds(){
     console.log(`[purge] removed ${ids.length} seeded jobs + seeded shifts — site is now 100% real (${real} real jobs)`);
   } catch(e){ console.error('[purge] skipped (non-fatal):', e.message); }
 }
-const INGEST_VERSION = '2'; // bump to force a one-time re-ingest on the next deploy (e.g. after source/sector changes)
+const INGEST_VERSION = '3'; // bump to force a one-time re-ingest on the next deploy (e.g. after source/sector changes)
 async function refreshLiveJobs(){
   try {
     const last = await db.prepare("SELECT v FROM meta WHERE k='live_at'").get();
