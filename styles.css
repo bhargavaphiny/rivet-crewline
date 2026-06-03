@@ -1019,3 +1019,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .va-tips{display:flex;flex-wrap:wrap;gap:6px}
 .va-chip{font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:9px;border:1px solid var(--line);background:var(--paper);color:var(--slate);cursor:pointer}
 .va-chip:hover{border-color:var(--brand);color:var(--brand-d)}
+
+/* ===== Curated training video (Learn / Career guide) ===== */
+.lv-wrap{position:relative;width:100%;aspect-ratio:16/9;border-radius:12px;overflow:hidden;border:1px solid var(--line);margin:6px 0 10px;background:#000}
+.lv-frame{position:absolute;inset:0;width:100%;height:100%;border:0}

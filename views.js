@@ -459,7 +459,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=90">
+  <link rel="stylesheet" href="/styles.css?v=91">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1334,6 +1334,11 @@ const LEARN_TRACKS = {
   process_tech: { why:'Fab/process techs run the tools that make semiconductors — CHIPS Act boom.', pay:'$24–36/hr', cert:['Employer cleanroom training','https://www.semi.org'], vid:'semiconductor process technician fab', qs:['Are you okay gowning up and working in a cleanroom?','How do you follow a detailed process recipe exactly?','How do you document and escalate an out-of-spec reading?','Comfortable on 12-hour rotating shifts?'] },
   cna: { why:'CNAs are the fastest path into healthcare — huge, steady demand.', pay:'$18–25/hr', cert:['State CNA certification','https://www.redcross.org/take-a-class/nurse-assistant-training'], vid:'CNA day in the life certified nursing assistant', qs:['Are you certified in your state — and is it current?','How do you help with ADLs while protecting dignity?','How do you handle a combative or confused patient?','Tell me about teamwork on a busy floor.'] },
   sterile_processing: { why:'Sterile processing techs keep ORs running — strong hospital demand.', pay:'$19–27/hr', cert:['CRCST (HSPA)','https://myhspa.org'], vid:'sterile processing technician day in the life', qs:['Do you hold CRCST or are you working toward it?','Walk me through decontamination → assembly → sterilization.','How do you track instrument trays and counts?','How do you handle a recall or failed biological indicator?'] },
+  cleanroom_op: { why:'Cleanroom operators are the entry door into the CHIPS-Act fab boom — paid training, no degree.', pay:'$21–30/hr', cert:['Employer cleanroom training / SEMI','https://www.semi.org'], vid:'cleanroom operator semiconductor', qs:['Are you comfortable gowning up and working in a cleanroom a full shift?','How do you follow a process recipe exactly and log every reading?','How do you keep contamination out — no makeup, careful movements?','Comfortable on 12-hour rotating day/night shifts?'] },
+  patient_care_tech: { why:'PCTs are the hospital-floor step above CNA — a fast ladder toward LPN/RN.', pay:'$18–25/hr', cert:['CNA certification + employer training','https://www.redcross.org/take-a-class/nurse-assistant-training'], vid:'patient care technician day in the life', qs:['Are you a current, certified CNA?','How do you take vitals and run an EKG accurately?','How do you support nurses on a busy floor while keeping patients safe?','Tell me about staying calm in an emergency.'] },
+  surgical_tech: { why:'Surgical techs run the OR sterile field — high respect, faster-than-average growth.', pay:'$25–36/hr', cert:['CST (NBSTSA)','https://www.nbstsa.org'], vid:'surgical technologist day in the life', qs:['Are you CST-certified or working toward it?','Walk me through setting up and protecting the sterile field.','How do you pass instruments and anticipate the surgeon’s needs?','How do you handle an instrument/sponge count discrepancy?'] },
+  medical_assistant: { why:'MAs are the fastest-growing clinic role and open the whole healthcare ladder.', pay:'$20–30/hr', cert:['CMA (AAMA) or RMA','https://www.aama-ntl.org'], vid:'medical assistant day in the life', qs:['Are you a certified MA (CMA/RMA)?','How do you room a patient and take accurate vitals?','Comfortable with injections, EKGs and blood draws?','How do you work in an EHR and protect patient privacy?'] },
+  phlebotomist: { why:'Phlebotomy is one of the fastest healthcare entries — months of training, not years.', pay:'$19–27/hr', cert:['Phlebotomy Technician (NHA CPT)','https://www.nhanow.com/certifications/phlebotomy-technician'], vid:'phlebotomist day in the life', qs:['Are you a certified phlebotomy technician (CPT)?','How do you perform a venipuncture and handle a difficult stick?','How do you calm a nervous patient?','How do you label and handle samples to avoid mix-ups?'] },
 };
 // Real labor-market data per role — U.S. Bureau of Labor Statistics, Occupational Outlook Handbook (May 2024).
 // med=median annual wage, low/high=10th–90th pctile, growth=2024–34 projection, openings=avg/yr.
@@ -1381,13 +1386,26 @@ const ROLE_DEEP = {
   sterile_processing:{ reality:'Behind the scenes of the OR — decontaminate, assemble and sterilize instrument trays. Methodical, standards-driven, often early or evening shifts. No patient contact if that’s your preference.', thrive:'you’re detail-driven and like clear procedures', onramp:'A sterile-processing certificate + CRCST gets you in; some hospitals train and certify you on the job.', link:COS, linkLabel:'Find a sterile-processing program near you ↗' },
 };
 function ytSearch(q){ return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q); }
+// Real, curated "day in the life" / training videos per role (verified YouTube IDs).
+const ROLE_VIDEO = {
+  process_tech:'6hy8_mQB1Hk', cleanroom_op:'B5nvSSvSnXo', equipment_tech:'WOhE31hxvtI',
+  machinist:'z4XXutxFpx4', machine_operator:'L96D7c9tNIQ', welder:'CuDwydMjgGg', hvac:'qGDqbJCeiXc',
+  cna:'Dc_sQpfhKfc', surgical_tech:'RuSx08nMfME', medical_assistant:'s-lM2uwiwyQ',
+  phlebotomist:'tvTG8DD4q2Y', sterile_processing:'i2TvrUa-C_Q',
+};
+// Embed the real curated video if we have one; otherwise fall back to a YouTube topic search.
+function learnVideo(trade, searchTerm){
+  const id = ROLE_VIDEO[trade];
+  if(id) return `<div class="lv-wrap"><iframe class="lv-frame" src="https://www.youtube-nocookie.com/embed/${id}" title="${T('Day in the life')}" allow="encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`;
+  return `<a class="track-link vid" href="${ytSearch(searchTerm||trade)}" target="_blank" rel="noopener noreferrer">${icon('star')} ${T('Watch: day in the life')}</a>`;
+}
 function learnTrackCard(key){
   const t = LEARN_TRACKS[key]; if(!t) return '';
   return `<div class="card track-card">
     <div class="track-h"><span class="trend-ic">${tradeEmoji(key)}</span><div><b>${ROLE_BLS[key]?`<a class="cand-link" href="/careers/${key}">${esc(TRADES[key]||key)}</a>`:esc(TRADES[key]||key)}</b><div class="muted sm">${t.pay} · ${T('hiring now')}</div></div></div>
     <p class="track-why">${T(t.why)}</p>
+    ${learnVideo(key, t.vid)}
     <div class="track-links">
-      <a class="track-link vid" href="${ytSearch(t.vid)}" target="_blank" rel="noopener noreferrer">${icon('star')} ${T('Watch: day in the life')}</a>
       <a class="track-link" href="${esc(t.cert[1])}" target="_blank" rel="noopener noreferrer">${icon('shield')} ${esc(t.cert[0])} ↗</a>
       <a class="track-link prep" href="/app/learn/interview?trade=${key}">${icon('spark')} ${T('Practice the interview')}</a>
     </div>
@@ -1788,7 +1806,7 @@ function careerGuide({ trade, employers = [], metros = [], openCount = 0 }){
         <a class="btn-sm" href="/app/training" style="margin-top:10px">${T('Get certified on Rivet →')}</a>
       </div>
       <div class="card"><div class="sec-h" style="margin-top:0">${T('Learn the role')}</div>
-        ${lt?`<a class="track-link vid" href="${ytSearch(lt.vid)}" target="_blank" rel="noopener noreferrer">${icon('star')} ${T('Watch: day in the life')}</a>`:''}
+        ${lt?learnVideo(trade, lt.vid):''}
         <a class="track-link prep" href="/app/learn/interview?trade=${trade}" style="margin-top:8px">${icon('spark')} ${T('AI mock interview')}</a>
         ${lt?`<div style="margin-top:12px"><b class="sm">${T('You may be asked:')}</b><ul class="iv-qs">${lt.qs.slice(0,3).map(q=>`<li>${T(q)}</li>`).join('')}</ul></div>`:''}
       </div>
