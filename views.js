@@ -953,7 +953,8 @@ function credRow(c, editable = false){
 }
 
 // ---------- worker: all matches ----------
-function workerJobs({ matches, filters = {}, jobsGeo = null, needZip = false }) {
+function workerJobs({ matches, total = null, filters = {}, jobsGeo = null, needZip = false }) {
+  if(total==null) total = matches.length;
   const zipBanner = needZip ? `<a class="zip-banner" href="/app/profile">${icon('pin','xic')} ${T('Add your ZIP to your Work Card to see how far each job is.')}</a>` : '';
   const tradeOpts = `<option value="">${T('All trades')}</option>`+Object.entries(TRADES).map(([k,v])=>`<option value="${k}" ${filters.trade===k?'selected':''}>${esc(T(v))}</option>`).join('');
   const shifts = ['Day','Night','4x10','Any'];
@@ -961,7 +962,7 @@ function workerJobs({ matches, filters = {}, jobsGeo = null, needZip = false }) 
   const typeOpts = `<option value="">${T('Any type')}</option>`+JOB_TYPES.map(t=>`<option value="${t}" ${filters.jtype===t?'selected':''}>${esc(T(t))}</option>`).join('');
   const active = (filters.q||filters.trade||filters.city||filters.minpay||filters.shift||filters.jtype);
   return `<section class="wrap">
-    <div class="sec-h big">${T('Find work')} <span class="muted">${matches.length} ${matches.length===1?T('job'):T('jobs')}${active?' · '+T('filtered'):' · '+T('ranked by fit')}</span></div>
+    <div class="sec-h big">${T('Find work')} <span class="muted">${total} ${total===1?T('job'):T('jobs')}${active?' · '+T('filtered'):' · '+T('ranked by fit')}${total>matches.length?' · '+T('showing top')+' '+matches.length:''}</span></div>
     <div class="card agent-card row">
       <div><div class="agent-h">${icon('spark','xic')} ${T('Apply Agent')}</div>
         <p class="agent-line">${T('Let Rivet auto-apply you to the best-fit jobs near you — verified Work Card attached.')}</p></div>

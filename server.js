@@ -269,7 +269,8 @@ async function _sectorStatsRaw(sector){
   };
 }
 // open-job locations relevant to a worker: their trades (direct) + adjacent trades (related)
-async function jobGeoForWorker(prof){
+const jobGeoForWorker = (prof) => cached('jgw:'+profTrades(prof).join(',')+':'+((prof&&prof.zip)||'')+':'+((prof&&prof.commute_mi)||0), CACHE_TTL, ()=>_jobGeoForWorkerRaw(prof));
+async function _jobGeoForWorkerRaw(prof){
   const trades = profTrades(prof);
   if(!trades.length) return { points: [] };
   const direct = new Set(trades);
@@ -286,7 +287,7 @@ async function jobGeoForWorker(prof){
     b.n++; if(isDirect) b.anyDirect = true;
     const c=M.tradeCategory(r.trade); b.catReal[c]=(b.catReal[c]||0)+1;
     if(r.trade===primary) b.primJobs++;
-    b.items.push({ label:`${r.title} · $${r.pay_min}–${r.pay_max}/hr`, sub:`${r.company||''} · ${M.TRADES[r.trade]||r.trade}`, href:`/app/jobs/${r.id}` });
+    if(b.items.length<12) b.items.push({ label:`${r.title} · $${r.pay_min}–${r.pay_max}/hr`, sub:`${r.company||''} · ${M.TRADES[r.trade]||r.trade}`, href:`/app/jobs/${r.id}` });
   }
   // worker-supply in the primary trade per metro → per-metro market tightness for that trade
   const wkRows = await db.prepare(`SELECT z.city, COUNT(*) n FROM worker_profiles p JOIN zip_geo z ON z.zip=p.zip WHERE p.trade=? GROUP BY z.city`).all(primary);
@@ -1012,8 +1013,9 @@ const server = http.createServer(async (req,res)=>{
         // distance is precomputed in rankJobsForWorker (cached; null when geo unavailable)
         if(f.maxmi) matches = matches.filter(m=> m.distance!=null && m.distance<=f.maxmi);
         if(f.sort==='distance') matches.sort((a,b)=> (a.distance==null?1e9:a.distance)-(b.distance==null?1e9:b.distance));
+        const total = matches.length;
         const jobsGeo = await jobGeoForWorker(prof);
-        return send(res, V.layout({title:'Find work',user,active:'jobs',body:V.workerJobs({matches, filters:f, jobsGeo, needZip})}));
+        return send(res, V.layout({title:'Find work',user,active:'jobs',body:V.workerJobs({matches: matches.slice(0,60), total, filters:f, jobsGeo, needZip})}));
       }
       if(p==='/app/profile' && method==='GET'){
         const portfolio = await db.prepare("SELECT * FROM media WHERE user_id=? AND target='portfolio' ORDER BY created_at DESC, id DESC").all(user.id);
