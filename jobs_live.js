@@ -196,9 +196,9 @@ function parseLoc(name){
   return { city, st };
 }
 
-function fetchJSON(url){
+function fetchJSON(url, headers){
   return new Promise(resolve=>{
-    const req = https.get(url, {headers:{'User-Agent':'RivetJobs/1.0 (jobs@rivet-crewline.onrender.com)','Accept':'application/json'}}, res=>{
+    const req = https.get(url, {headers:{'User-Agent':'RivetJobs/1.0 (jobs@rivet-crewline.onrender.com)','Accept':'application/json', ...(headers||{})}}, res=>{
       let d=''; res.on('data',c=>d+=c); res.on('end',()=>{ try{ resolve(JSON.parse(d)); }catch(e){ resolve(null); } });
     });
     req.on('error',()=>resolve(null));
@@ -206,57 +206,100 @@ function fetchJSON(url){
   });
 }
 
-// Main: fetch all sources, keep blue-collar US roles, insert deduped by apply_url. Returns {added, scanned}.
+// Additional KEYLESS public ATS boards with real blue-collar (non-IT) volume — probed live,
+// kept only the ones that actually return US blue-collar roles. (provider, token, company, sector)
+const EXTRA_SOURCES = [
+  ['lever','gopuff','Gopuff','logistics'],
+  ['lever','veho','Veho','logistics'],
+  ['lever','everlywell','Everly Health','healthcare'],
+  ['ashby','clipboard','Clipboard Health','healthcare'],
+  ['smartrecruiters','Securitas','Securitas','security'],
+  ['smartrecruiters','Sodexo','Sodexo','facilities'],
+  ['smartrecruiters','Continental','Continental','manufacturing'],
+  ['smartrecruiters','WesternDigital','Western Digital','manufacturing'],
+  ['smartrecruiters','Equinox','Equinox','facilities'],
+  ['smartrecruiters','Aramark','Aramark','facilities'],
+  ['smartrecruiters','Penske','Penske','logistics'],
+];
+
+// Normalize one company's public board to [{title,url,city,st,lat,lon}] — US roles only.
+async function fetchProvider(provider, token){
+  try {
+    if(provider==='greenhouse'){
+      const j = await fetchJSON(`https://boards-api.greenhouse.io/v1/boards/${token}/jobs`);
+      if(!j || !Array.isArray(j.jobs)) return [];
+      return j.jobs.map(x=>{ const loc=parseLoc((x.location&&x.location.name)||'')||{}; return {title:(x.title||'').trim(), url:x.absolute_url, city:loc.city, st:loc.st}; });
+    }
+    if(provider==='lever'){
+      const a = await fetchJSON(`https://api.lever.co/v0/postings/${token}?mode=json`);
+      if(!Array.isArray(a)) return [];
+      return a.filter(x=>!x.country || x.country==='US').map(x=>{ const loc=parseLoc((x.categories&&x.categories.location)||'')||{}; return {title:(x.text||'').trim(), url:x.hostedUrl||x.applyUrl, city:loc.city, st:loc.st}; });
+    }
+    if(provider==='ashby'){
+      const j = await fetchJSON(`https://api.ashbyhq.com/posting-api/job-board/${token}`);
+      if(!j || !Array.isArray(j.jobs)) return [];
+      return j.jobs.map(x=>{ const loc=parseLoc(x.location||'')||{}; return {title:(x.title||'').trim(), url:x.jobUrl||x.applyUrl, city:loc.city, st:loc.st}; });
+    }
+    if(provider==='smartrecruiters'){
+      const out=[];
+      for(let off=0; off<400; off+=100){
+        const j = await fetchJSON(`https://api.smartrecruiters.com/v1/companies/${token}/postings?limit=100&offset=${off}`);
+        const rows = j && Array.isArray(j.content) ? j.content : [];
+        if(!rows.length) break;
+        for(const x of rows){ const L=x.location||{}; if(String(L.country||'').toLowerCase()!=='us') continue;
+          out.push({ title:(x.name||'').trim(), url:`https://jobs.smartrecruiters.com/${token}/${x.id}`, city:L.city, st:L.region,
+            lat: L.latitude!=null?parseFloat(L.latitude):null, lon: L.longitude!=null?parseFloat(L.longitude):null }); }
+        if(rows.length < 100) break;
+      }
+      return out;
+    }
+  } catch(e){}
+  return [];
+}
+
+// Filter to a real blue-collar US role, geocode, ensure employer, insert. Returns 1 if added.
+async function processJob(ctx, empKey, company, sector, item){
+  let { title, url, city, st, lat, lon } = item;
+  if(!title || ctx.DENY.test(title)) return 0;
+  const trade = tradeFor(title); if(!trade) return 0;
+  if(!url || ctx.seen.has(url)) return 0;
+  if(lat==null || lon==null){ if(!city || !st) return 0; const ll=geocode(city,st); if(!ll) return 0; lat=ll[0]; lon=ll[1]; }
+  if(!city || isNaN(lat) || isNaN(lon)) return 0;
+  ctx.seen.add(url);
+  let eid = ctx.empCache[empKey];
+  if(!eid){
+    const email = `live.${empKey}@rivet.test`.slice(0,80);
+    const ex = await ctx.db.prepare('SELECT id FROM users WHERE email=?').get(email);
+    if(ex) eid = ex.id;
+    else { try { eid = (await ctx.insEmp.run(email, ctx.pw, 'employer', company, company, `${city}, ${st||''}`, '500+', `${company} — live openings via their official careers site.`)).lastInsertRowid; } catch(e){ const ex2=await ctx.db.prepare('SELECT id FROM users WHERE email=?').get(email); eid = ex2 && ex2.id; } }
+    ctx.empCache[empKey] = eid;
+  }
+  if(!eid) return 0;
+  const zipKey = `L:${city},${st||''}`.slice(0,40);
+  try { await ctx.insZip.run(zipKey, lat, lon, city); } catch(e){}
+  const band = PAY[trade] || [18,30];
+  const descr = `${title} at ${company} — ${city}${st?', '+st:''}. Live opening; apply on ${company}'s official careers site.`;
+  try { await ctx.insJob.run(eid, title, trade, band[0], band[1], city, zipKey, 'Day', CRED[trade]||'', descr, 'Full-time', company, url, sector, 'biweekly', 'Ongoing', 'authorized'); return 1; } catch(e){ return 0; }
+}
+
+// Main: fetch every keyless source, keep blue-collar US roles, insert deduped by apply_url.
 async function ingestLiveJobs(db){
   let added = 0, scanned = 0;
-  // existing apply_urls (dedupe across all feeds)
   const seenRows = await db.prepare("SELECT apply_url FROM jobs WHERE apply_url IS NOT NULL").all();
-  const seen = new Set(seenRows.map(r=>r.apply_url));
-  const empCache = {};
-  const insZip = db.prepare('INSERT OR IGNORE INTO zip_geo(zip,lat,lon,city) VALUES(?,?,?,?)');
-  const insEmp = db.prepare('INSERT INTO users(email,pass,role,name,company,company_city,company_size,company_about) VALUES(?,?,?,?,?,?,?,?)');
-  const insJob = db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type,source,apply_url,sector,pay_cadence,duration,sponsorship) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
-  const pw = (db._livePw || '$rivet$live'); // workers can't log into these feed accounts; not used for auth
-  for(const [token, company, sector] of SOURCES){
-    const j = await fetchJSON(`https://boards-api.greenhouse.io/v1/boards/${token}/jobs`);
-    if(!j || !Array.isArray(j.jobs)) continue;
-    let eid = null;
-    for(const job of j.jobs){
-      scanned++;
-      const title = (job.title||'').trim();
-      if(DENY.test(title)) continue;                         // white-collar / corporate
-      const trade = tradeFor(title);
-      if(!trade) continue;                                   // not a blue-collar role
-      const loc = parseLoc((job.location && job.location.name) || '');
-      if(!loc) continue;                                     // not a parseable US location
-      const ll = geocode(loc.city, loc.st);
-      if(!ll) continue;
-      const url = job.absolute_url;
-      if(!url || seen.has(url)) continue;
-      seen.add(url);
-      // ensure employer exists for this company
-      if(!eid){
-        if(empCache[token]) eid = empCache[token];
-        else {
-          const email = `live.${token}@rivet.test`;
-          const ex = await db.prepare('SELECT id FROM users WHERE email=?').get(email);
-          if(ex) eid = ex.id;
-          else { try { eid = (await insEmp.run(email, pw, 'employer', company, company, loc.city+', '+loc.st, '500+', `${company} — live openings via their official careers site.`)).lastInsertRowid; } catch(e){ const ex2=await db.prepare('SELECT id FROM users WHERE email=?').get(email); eid = ex2 && ex2.id; } }
-          empCache[token] = eid;
-        }
-      }
-      if(!eid) continue;
-      const zipKey = `L:${loc.city},${loc.st}`.slice(0,40);
-      try { await insZip.run(zipKey, ll[0], ll[1], loc.city); } catch(e){}
-      const band = PAY[trade] || [0,0];
-      const descr = `${title} at ${company} — ${loc.city}, ${loc.st}. Live opening; apply on ${company}'s official careers site.`;
-      try {
-        await insJob.run(eid, title, trade, band[0], band[1], loc.city, zipKey, 'Day', CRED[trade]||'', descr, 'Full-time', company, url, sector, 'biweekly', 'Ongoing', 'authorized');
-        added++;
-      } catch(e){}
-    }
+  const ctx = {
+    db, DENY, seen: new Set(seenRows.map(r=>r.apply_url)), empCache: {}, pw: '$rivet$live',
+    insZip: db.prepare('INSERT OR IGNORE INTO zip_geo(zip,lat,lon,city) VALUES(?,?,?,?)'),
+    insEmp: db.prepare('INSERT INTO users(email,pass,role,name,company,company_city,company_size,company_about) VALUES(?,?,?,?,?,?,?,?)'),
+    insJob: db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type,source,apply_url,sector,pay_cadence,duration,sponsorship) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`),
+  };
+  const all = SOURCES.map(([t,c,s])=>['greenhouse',t,c,s]).concat(EXTRA_SOURCES);
+  for(const [provider, token, company, sector] of all){
+    const items = await fetchProvider(provider, token);
+    scanned += items.length;
+    const empKey = provider==='greenhouse' ? token : `${provider}-${token}`;
+    for(const it of items){ added += await processJob(ctx, empKey, company, sector, it); }
   }
   return { added, scanned };
 }
 
-module.exports = { ingestLiveJobs, SOURCES, tradeFor, parseLoc, geocode, PAY, CRED, DENY, TRADE_RULES, fetchJSON };
+module.exports = { ingestLiveJobs, SOURCES, EXTRA_SOURCES, fetchProvider, tradeFor, parseLoc, geocode, PAY, CRED, DENY, TRADE_RULES, fetchJSON };
