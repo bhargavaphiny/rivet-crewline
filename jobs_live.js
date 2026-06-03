@@ -58,6 +58,7 @@ const TRADE_RULES = [
   [/nurse(s)? aide|nursing assistant|\bcna\b|certified nurse|geriatric aide/i,'cna'],
   [/home health|caregiver|care giver|personal care (aide|assistant)|\bpca\b|direct support|\bdsp\b|resident (aide|assistant)|companion care/i,'caregiver'],
   [/medical assistant|clinical assistant|\bcma\b/i,'medical_assistant'],
+  [/pharmacy tech/i,'medical_assistant'],
   [/\bemt\b|paramedic|emergency medical/i,'emt'],
   // ---- skilled trades ----
   [/welder|welding|fabricat(or|ion)/i,'welder'],
@@ -121,7 +122,7 @@ const TRADE_RULES = [
 ];
 // Exclude white-collar / IT / corporate even when a weak token matched (e.g. "Welding Engineer").
 // Deliberately does NOT deny lead/head/specialist/coordinator — those are real blue-collar titles.
-const DENY = /\bengineer\b|software|firmware|\bdeveloper\b|\bdevops\b|\bsre\b|data scientist|machine learning|\bfinance\b|accountant|\bmanager\b|\bdirector\b|\bvp\b|\bhead of\b|president|principal|counsel|attorney|paralegal|marketing|\brecruit\w*|\bsales\b|account executive|product (manager|owner|designer)|program manager|project manager|\bdesigner\b|\bux\b|\barchitect\b|\banalyst\b|\bintern\b|controller|\bscientist\b|researcher|strategy|business development|\bconsultant\b|underwriter|people partner|copywriter|content writer/i;
+const DENY = /\bengineer\b|software|firmware|\bdeveloper\b|\bdevops\b|\bsre\b|data scientist|machine learning|\bfinance\b|accountant|\bmanager\b|\bdirector\b|\bvp\b|\bhead of\b|\bchief\b|president|principal|counsel|attorney|paralegal|marketing|\brecruit\w*|\bsales\b|account executive|product (manager|owner|designer)|program manager|project manager|\bdesigner\b|\bux\b|\barchitect\b|\banalyst\b|\bintern\b|controller|\bscientist\b|researcher|strategy|business development|\bconsultant\b|underwriter|people partner|copywriter|content writer|information security|cyber ?security|\bciso\b/i;
 // est. hourly band per trade so cards read real (labelled as estimate when the feed gives no pay)
 const PAY = {
   welder:[26,42],machinist:[26,42],assembler:[20,30],cleanroom_op:[21,30],process_tech:[24,36],
@@ -231,9 +232,80 @@ const EXTRA_SOURCES = [
   ['smartrecruiters','Penske','Penske','logistics'],
 ];
 
+// KEYLESS Workday public career feeds (the public CXS API that powers their careers sites) —
+// the real source for SEMICONDUCTOR fabs + HOSPITAL SYSTEMS. (tenant, company, sector, opts)
+// Only employers whose location format parses accurately are included (verified by live probing).
+const WD_SOURCES = [
+  ['globalfoundries','GlobalFoundries','semiconductor',{host:'globalfoundries.wd1.myworkdayjobs.com',site:'External'}],
+  ['amat','Applied Materials','semiconductor',{host:'amat.wd1.myworkdayjobs.com',site:'External'}],
+  ['intel','Intel','semiconductor',{host:'intel.wd1.myworkdayjobs.com',site:'External'}],
+  ['micron','Micron','semiconductor',{host:'micron.wd1.myworkdayjobs.com',site:'External'}],
+  ['analogdevices','Analog Devices','semiconductor',{host:'analogdevices.wd1.myworkdayjobs.com',site:'External'}],
+  ['kla','KLA','semiconductor',{host:'kla.wd1.myworkdayjobs.com',site:'Search'}],
+  ['trinityhealth','Trinity Health','healthcare',{host:'trinityhealth.wd1.myworkdayjobs.com',site:'Jobs'}],
+  ['sutterhealth','Sutter Health','healthcare',{host:'sutterhealth.wd1.myworkdayjobs.com',site:'SH',defaultState:'CA'}],
+];
+
+// POST helper for Workday CXS endpoints.
+function fetchJSONPost(host, path, body){
+  return new Promise(resolve=>{
+    const data = JSON.stringify(body);
+    const req = https.request({hostname:host, path, method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json','User-Agent':'Mozilla/5.0 RivetJobs/1.0'}}, res=>{
+      let d=''; res.on('data',c=>d+=c); res.on('end',()=>{ try{ resolve(JSON.parse(d)); }catch(e){ resolve(null); } });
+    });
+    req.on('error',()=>resolve(null));
+    req.setTimeout(15000, ()=>{ req.destroy(); resolve(null); });
+    req.write(data); req.end();
+  });
+}
+const isCountryTok = t => /^(u\.?s\.?a?|usa|united states.*)$/i.test(String(t).trim());
+// Loose location parse for varied Workday formats: "ST - City", "US, State, City", "USA - A - B", "City, ST".
+function parseLocLoose(raw){
+  raw = String(raw||'').trim();
+  let m = raw.match(/^([A-Z]{2})\s*-\s*(.+)$/);
+  if(m && m[1]!=='US' && STATE_ABBR.has(m[1])) return { st:m[1], city:m[2].trim() };
+  const toks = raw.split(/[,\-–\/]/).map(s=>s.trim()).filter(Boolean);
+  let st=null, i=-1;
+  for(let k=0;k<toks.length;k++){ const t=toks[k]; if(/^[A-Z]{2}$/.test(t)&&t!=='US'&&STATE_ABBR.has(t)){st=t;i=k;break;} const c=STATE_NAMES[t.toLowerCase()]; if(c){st=c;i=k;break;} }
+  if(!st) return null;
+  let city=null;
+  if(i+1<toks.length && !isCountryTok(toks[i+1])) city=toks[i+1];
+  else if(i-1>=0 && !isCountryTok(toks[i-1]) && !/^[A-Z]{2}$/.test(toks[i-1]) && !STATE_NAMES[toks[i-1].toLowerCase()]) city=toks[i-1];
+  if(!city || /america|united|^\d/i.test(city)) return null;
+  return { city, st };
+}
+// Workday location → {city,st} (US only). Falls back to a per-source defaultState for bare-city feeds.
+function workdayLoc(text, defState){
+  if(!text) return null;
+  const raw = String(text).trim();
+  if(/locations?$/i.test(raw) || /\bremote\b|work from home|virtual|multiple/i.test(raw)) return null; // multi/remote
+  const p = parseLocLoose(raw);
+  if(p) return p;
+  if(defState){
+    let city = raw.replace(/\(.*?\)/g,'').replace(/^[A-Z]{2}\s*-\s*/,'').split(/\s{2,}|,|\|/)[0].trim();
+    if(!city || /\d/.test(city) || city.length<2) return null;
+    return { city, st:defState };
+  }
+  return null;
+}
+const STATE_ABBR = new Set(Object.values({'alabama':'AL','alaska':'AK','arizona':'AZ','arkansas':'AR','california':'CA','colorado':'CO','connecticut':'CT','delaware':'DE','florida':'FL','georgia':'GA','hawaii':'HI','idaho':'ID','illinois':'IL','indiana':'IN','iowa':'IA','kansas':'KS','kentucky':'KY','louisiana':'LA','maine':'ME','maryland':'MD','massachusetts':'MA','michigan':'MI','minnesota':'MN','mississippi':'MS','missouri':'MO','montana':'MT','nebraska':'NE','nevada':'NV','newhampshire':'NH','newjersey':'NJ','newmexico':'NM','newyork':'NY','northcarolina':'NC','northdakota':'ND','ohio':'OH','oklahoma':'OK','oregon':'OR','pennsylvania':'PA','rhodeisland':'RI','southcarolina':'SC','southdakota':'SD','tennessee':'TN','texas':'TX','utah':'UT','vermont':'VT','virginia':'VA','washington':'WA','westvirginia':'WV','wisconsin':'WI','wyoming':'WY','dc':'DC'}));
+
 // Normalize one company's public board to [{title,url,city,st,lat,lon}] — US roles only.
-async function fetchProvider(provider, token){
+async function fetchProvider(provider, token, opts){
   try {
+    if(provider==='workday'){
+      const o = opts||{}; if(!o.host || !o.site) return [];
+      const out=[];
+      for(let off=0; off<240; off+=20){
+        const j = await fetchJSONPost(o.host, `/wday/cxs/${token}/${o.site}/jobs`, {appliedFacets:{}, limit:20, offset:off, searchText:''});
+        const rows = j && Array.isArray(j.jobPostings) ? j.jobPostings : [];
+        if(!rows.length) break;
+        for(const x of rows){ const loc = workdayLoc(x.locationsText, o.defaultState); if(!loc) continue;
+          out.push({ title:(x.title||'').trim(), url: x.externalPath?`https://${o.host}/en-US/${o.site}${x.externalPath}`:null, city:loc.city, st:loc.st }); }
+        if(rows.length < 20) break;
+      }
+      return out;
+    }
     if(provider==='greenhouse'){
       const j = await fetchJSON(`https://boards-api.greenhouse.io/v1/boards/${token}/jobs`);
       if(!j || !Array.isArray(j.jobs)) return [];
@@ -302,9 +374,11 @@ async function ingestLiveJobs(db){
     insEmp: db.prepare('INSERT INTO users(email,pass,role,name,company,company_city,company_size,company_about) VALUES(?,?,?,?,?,?,?,?)'),
     insJob: db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type,source,apply_url,sector,pay_cadence,duration,sponsorship) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`),
   };
-  const all = SOURCES.map(([t,c,s])=>['greenhouse',t,c,s]).concat(EXTRA_SOURCES);
-  for(const [provider, token, company, sector] of all){
-    const items = await fetchProvider(provider, token);
+  const all = SOURCES.map(([t,c,s])=>['greenhouse',t,c,s,null])
+    .concat(EXTRA_SOURCES.map(([p,t,c,s])=>[p,t,c,s,null]))
+    .concat(WD_SOURCES.map(([t,c,s,o])=>['workday',t,c,s,o]));
+  for(const [provider, token, company, sector, opts] of all){
+    const items = await fetchProvider(provider, token, opts);
     scanned += items.length;
     const empKey = provider==='greenhouse' ? token : `${provider}-${token}`;
     for(const it of items){ added += await processJob(ctx, empKey, company, sector, it); }
@@ -320,4 +394,4 @@ async function normalizeTitles(db){
   return n;
 }
 
-module.exports = { ingestLiveJobs, normalizeTitles, SOURCES, EXTRA_SOURCES, fetchProvider, tradeFor, cleanTitle, parseLoc, geocode, PAY, CRED, DENY, TRADE_RULES, fetchJSON };
+module.exports = { ingestLiveJobs, normalizeTitles, SOURCES, EXTRA_SOURCES, WD_SOURCES, fetchProvider, tradeFor, cleanTitle, parseLoc, parseLocLoose, workdayLoc, geocode, PAY, CRED, DENY, TRADE_RULES, fetchJSON };
