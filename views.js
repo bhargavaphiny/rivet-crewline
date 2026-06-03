@@ -770,26 +770,41 @@ function workerCoach({ profile, reco, line }){
       <p class="agent-line big">${esc(line)}</p>
       <p class="muted sm">${T('Based on your trades and what employers are hiring for near you right now.')}</p>
     </div>
-    ${reco && reco.topCred ? `<div class="sec-h">${T('Your highest-impact next credential')}</div>${credCard(reco.topCred, true)}` : `<div class="card muted">${T('Add your trade and ZIP to your Work Card and your coach will map the fastest way to more jobs.')} <a href="/app/profile">${T('Set up my Work Card')}</a></div>`}
+    ${reco && reco.topCred ? `<div class="sec-h">${T('Your highest-impact next credential')}</div>${credCard(reco.topCred, true)}` : (reco && reco.trade ? '' : `<div class="card muted">${T('Add your trade and ZIP to your Work Card and your coach will map the fastest way to more jobs.')} <a href="/app/profile">${T('Set up my Work Card')}</a></div>`)}
     ${reco && reco.alternatives && reco.alternatives.length ? `<div class="sec-h">${T('Other credentials worth earning')}</div>${reco.alternatives.map(c=>credCard(c,false)).join('')}` : ''}
+    ${reco && reco.trade && LEARN_TRACKS[reco.trade] ? `<div class="sec-h">${T('Train for it — free')}</div>
+      <div class="card">
+        ${learnVideo(reco.trade, LEARN_TRACKS[reco.trade].vid)}
+        <div class="track-links">
+          <a class="track-link prep" href="/app/learn/interview?trade=${reco.trade}">${icon('spark')} ${T('Practice the AI interview')}</a>
+          ${ROLE_BLS[reco.trade]?`<a class="track-link" href="/careers/${reco.trade}">${icon('star')} ${T('Full career guide')} →</a>`:''}
+          <a class="track-link" href="/app/jobs">${icon('pin')} ${T('See open jobs near me')} →</a>
+        </div>
+      </div>` : ''}
   </section>`;
 }
 
-function agentApplyResult({ applied = [], already = 0, total = 0 }){
+function agentApplyResult({ applied = [], matches = [], already = 0, total = 0 }){
+  const card = (a, ext) => `<div class="card app-card">
+      <div class="job-row"><div class="badge">${tradeEmoji(a.trade)}</div>
+        <div class="job-main"><h4>${esc(T(a.title))}</h4>
+          <div class="muted">${esc(a.company||'')} · ${esc(a.city)} · $${a.pay_min}–${a.pay_max}/hr${a.distance!=null?` · <b class="dist">${a.distance} ${T('mi away')}</b>`:''}</div></div>
+        <span class="score-tag ${scoreClass(a.score)}">${a.score}</span></div>
+      ${ext?`<div class="app-act"><a class="btn-sm" href="${esc(a.apply_url)}" target="_blank" rel="noopener noreferrer">${T('Apply')} ↗</a><form method="post" action="/app/jobs/${a.id}/save"><button class="btn-sm ghost">☆ ${T('Save')}</button></form></div>`:''}
+    </div>`;
+  const headline = applied.length
+    ? `${T('Done — I applied you to')} ${applied.length} ${applied.length===1?T('job'):T('jobs')}${matches.length?` ${T('and found')} ${matches.length} ${T('more great matches to apply to in one tap')}`:''}.`
+    : (matches.length ? `${T('I found your')} ${matches.length} ${T('best real matches near you — apply in one tap.')}`
+      : (already?T('You’re already on your best matches — nothing new right now.'):T('Add your trade and ZIP to your Work Card and I’ll match you to real jobs near you.')));
   return `<section class="wrap narrow">
     <a class="back" href="/app/jobs">← ${T('Find work')}</a>
     <div class="card agent-card">
       <div class="agent-h">${icon('spark','xic')} ${T('Apply Agent')}</div>
-      ${applied.length
-        ? `<p class="agent-line big">${T('Done — I applied you to')} ${applied.length} ${applied.length===1?T('job'):T('jobs')}.</p>`
-        : `<p class="agent-line big">${already?T('You’re already applied to your best matches — nothing new to do.'):T('No matching open jobs to apply to yet. Add your trade and ZIP to your Work Card.')}</p>`}
+      <p class="agent-line big">${headline}</p>
+      <p class="muted sm">${T('Ranked on your trade, pay, location and credentials — across every real opening on Rivet.')}</p>
     </div>
-    ${applied.length?`<div class="sec-h">${T('Applications submitted')}</div>${applied.map(a=>`<div class="card app-card">
-      <div class="job-row"><div class="badge">${tradeEmoji(a.trade)}</div>
-        <div class="job-main"><h4>${esc(a.title)}</h4>
-          <div class="muted">${esc(a.company||'')} · ${esc(a.city)} · $${a.pay_min}–${a.pay_max}/hr${a.distance!=null?` · <b class="dist">${a.distance} ${T('mi away')}</b>`:''}</div></div>
-        <span class="score-tag ${scoreClass(a.score)}">${a.score}</span></div>
-    </div>`).join('')}<a class="btn" href="/app/applications">${T('View all applications')}</a>`:''}
+    ${applied.length?`<div class="sec-h">${T('Applied for you')}</div>${applied.map(a=>card(a,false)).join('')}<a class="btn-sm" href="/app/applications">${T('View all applications')}</a>`:''}
+    ${matches.length?`<div class="sec-h">${T('Your best matches — apply now')}</div>${matches.map(a=>card(a,true)).join('')}`:''}
   </section>`;
 }
 
@@ -818,7 +833,7 @@ function onboardChat({ question = '', placeholder = '', transcript = [], done = 
 function agentsHub({ mode }){
   const worker = [
     { title:T('Career Coach'), desc:T('Finds the one credential that unlocks the most jobs and pay for you, and how to earn it.'), action:`<a class="btn-sm" href="/app/coach">${T('Open Coach')}</a>` },
-    { title:T('Apply Agent'), desc:T('Auto-applies you to the best-fit, closest open jobs — your verified Work Card attached.'), action:`<form method="post" action="/app/agent/apply">${' '}<button class="btn-sm">${T('Apply for me')}</button></form>` },
+    { title:T('Apply Agent'), desc:T('Ranks every real opening on Rivet by your trade, pay, location and credentials — applies you to Rivet jobs and hands you one-tap apply links for the rest.'), action:`<form method="post" action="/app/agent/apply">${' '}<button class="btn-sm">${T('Find my matches')}</button></form>` },
     { title:T('Onboarding Agent'), desc:T('Builds your Work Card by chat — just answer in your own words, English or Spanish.'), action:`<a class="btn-sm" href="/app/onboard/chat">${T('Start chat')}</a>` },
   ];
   const recruiter = [
@@ -1718,7 +1733,7 @@ function voiceAgent(mode){
   ] : [
     {re:'shift|gig|per ?diem|extra work|this weekend|tonight', url:'/app/shifts', say:'Opening open shifts near you'},
     {re:'job|work near|find work|hiring', url:'/app/jobs', say:'Opening jobs near you'},
-    {re:'apply for me|auto.?apply|apply me', url:'/app/agents', say:'Opening your agents'},
+    {re:'apply for me|auto.?apply|apply me|match me', url:'/app/agent/apply', post:true, say:'Finding and applying you to your best matches'},
     {re:'coach|what should i learn|which (cert|credential)|earn more', url:'/app/coach', say:'Opening your Career Coach'},
     {re:'interview|practice|mock', url:'/app/learn/interview', say:'Opening the mock interview'},
     {re:'train|certif|class|course', url:'/app/training', say:'Opening training'},
@@ -1750,7 +1765,7 @@ function voiceAgent(mode){
     fab.onclick=function(){ panel.hidden?open():close(); };
     document.getElementById('va-x').onclick=close;
     function speak(t){ try{ if(window.speechSynthesis){ var u=new SpeechSynthesisUtterance(t); u.rate=1.05; speechSynthesis.cancel(); speechSynthesis.speak(u);} }catch(e){} }
-    function go(url,say){ statusEl.textContent=say+'…'; speak(say); setTimeout(function(){ location.href=url; }, 650); }
+    function go(url,say,post){ statusEl.textContent=say+'…'; speak(say); setTimeout(function(){ if(post){ var f=document.createElement('form'); f.method='POST'; f.action=url; document.body.appendChild(f); f.submit(); } else { location.href=url; } }, 650); }
     function route(raw){
       var q=(raw||'').toLowerCase().trim(); if(!q) return;
       heard.hidden=false; heard.textContent='"'+raw+'"';
@@ -1758,7 +1773,7 @@ function voiceAgent(mode){
       var role=null; for(var i=0;i<ROLES.length;i++){ if(q.indexOf(ROLES[i][1])>=0){ role=ROLES[i]; break; } }
       if(WORKER && role && /shift|gig|per ?diem/.test(q)) return go('/app/shifts','Finding '+role[1]+' shifts');
       if(WORKER && role) return go('/app/jobs?q='+encodeURIComponent(role[0]),'Finding '+role[1]+' jobs');
-      for(var j=0;j<INTENTS.length;j++){ if(new RegExp(INTENTS[j].re).test(q)) return go(INTENTS[j].url, INTENTS[j].say); }
+      for(var j=0;j<INTENTS.length;j++){ if(new RegExp(INTENTS[j].re).test(q)) return go(INTENTS[j].url, INTENTS[j].say, INTENTS[j].post); }
       statusEl.textContent='Hmm, try “'+(WORKER?'open shifts':'post a shift')+'” or “'+(WORKER?'find welder jobs':'source CNAs')+'”.';
       speak('Sorry, I did not catch that. Try again.');
     }

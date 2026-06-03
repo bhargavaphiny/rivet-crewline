@@ -345,7 +345,8 @@ async function coachReco(uid){
   const have = new Set(creds.map(c=>c.kind));
   const trades = profTrades(prof); if(!trades.length) return null;
   const broad = new Set(trades); for(const t of trades) for(const a of (M.ADJACENT[t]||[])) broad.add(a);
-  const jobs = (await openJobs()).filter(j=>broad.has(j.trade) && !isExternalJob(j));
+  // Ground the coach in the REAL board (includes external/aggregated jobs — that's the whole board now).
+  const jobs = (await openJobs()).filter(j=>broad.has(j.trade));
   const tally = {}; // credKey -> {count, paySum}
   for(const j of jobs){
     const reqs = String(j.req_creds||'').split(',').map(s=>s.trim()).filter(Boolean);
@@ -357,8 +358,9 @@ async function coachReco(uid){
     return { key, label: M.CRED_KINDS[key]||key, jobsUnlocked: t.count, payDelta: Math.max(0, avgPay - floor),
       how: (M.TRAINING[key]||{}).how || '', url: (M.TRAINING[key]||{}).url || '' };
   }).filter(c=>c.jobsUnlocked>0).sort((a,b)=> b.jobsUnlocked-a.jobsUnlocked || b.payDelta-a.payDelta);
-  if(!list.length) return null;
-  return { topCred: list[0], alternatives: list.slice(1,3), marketJobs: jobs.length };
+  const avgHr = jobs.length ? Math.round(jobs.reduce((s,j)=>s+(j.pay_max||0),0)/jobs.length) : 0;
+  // Always return market context so the coach is useful even when there's no credential gap.
+  return { topCred: list[0]||null, alternatives: list.slice(1,3), marketJobs: jobs.length, trade: trades[0], avgHr };
 }
 function coachLineFallback(c){
   const pay = c.payDelta>0 ? ` and pay up to about +$${c.payDelta}/hr` : '';
@@ -919,6 +921,9 @@ const server = http.createServer(async (req,res)=>{
         if(reco && reco.topCred){
           const tradeLabels = profTrades(prof).map(t=>M.TRADES[t]||t);
           line = await LLM.coachLine({ tradeLabels, credLabel:reco.topCred.label, jobsUnlocked:reco.topCred.jobsUnlocked, payDelta:reco.topCred.payDelta });
+        } else if(reco && reco.marketJobs){
+          const tl = M.TRADES[reco.trade]||reco.trade;
+          line = `${reco.marketJobs} real ${tl} ${reco.marketJobs===1?'job':'jobs'} are open near your trades right now${reco.avgHr?`, averaging about $${reco.avgHr}/hr`:''}. You’ve got the credentials — let’s get you applying and interview-ready.`;
         } else {
           line = 'Add your trade and ZIP to your Work Card and I’ll map the fastest way to more, better-paying jobs.';
         }
@@ -927,13 +932,16 @@ const server = http.createServer(async (req,res)=>{
       if(p==='/app/agent/apply' && method==='POST'){
         const matches = await rankJobsForWorker(user.id);
         const appliedIds = new Set((await db.prepare('SELECT job_id FROM applications WHERE worker_id=?').all(user.id)).map(r=>r.job_id));
-        const picks = matches.filter(m=> m.score>=60 && !isExternalJob(m.job) && !appliedIds.has(m.job.id) && (m.distance==null || m.distance<=120)).slice(0,5);
+        const eligible = matches.filter(m=> m.score>=55 && !appliedIds.has(m.job.id) && (m.distance==null || m.distance<=150));
+        // Internal Rivet jobs: the agent can apply for you. External (real aggregated) jobs: surface the
+        // best matches with one-tap apply links — we can't auto-submit on a third-party site.
         const applied = [];
-        for(const m of picks){
+        for(const m of eligible.filter(m=>!isExternalJob(m.job)).slice(0,5)){
           try { await db.prepare('INSERT INTO applications(job_id,worker_id,stage,score) VALUES(?,?,?,?)').run(m.job.id, user.id, 'Sourced', m.score);
             applied.push({...m.job, score:m.score, distance:m.distance}); } catch(e){}
         }
-        return send(res, V.layout({title:'Apply Agent',user,active:'jobs',body:V.agentApplyResult({applied, already:appliedIds.size, total:matches.length})}));
+        const top = eligible.filter(m=>isExternalJob(m.job)).slice(0,10).map(m=>({...m.job, score:m.score, distance:m.distance}));
+        return send(res, V.layout({title:'Apply Agent',user,active:'jobs',body:V.agentApplyResult({applied, matches:top, already:appliedIds.size, total:matches.length})}));
       }
       if(p==='/app/onboard/chat' && method==='GET'){
         const s = ONBOARD_STEPS[0];
