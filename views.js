@@ -2498,14 +2498,18 @@ function usMap(points = [], opts = {}){
       function addM(m){ if(cluster) cluster.addLayer(m); else m.addTo(map); }
       function clearM(){ if(cluster) cluster.clearLayers(); else markers.forEach(function(o){map.removeLayer(o.m);}); }
       var markers=[], bounds=[], cont=[];
-      pts.forEach(function(d,i){ if(d.lat==null)return;
+      var natl=${hasHome?'false':'true'}; // national/pre-login view: frame the lower-48
+      function inFrame(d){ return d.lon>=-125&&d.lon<=-66&&d.lat>=24&&d.lat<=50; }
+      pts.forEach(function(d,i){
+        if(d.lat==null||d.lon==null||!isFinite(+d.lat)||!isFinite(+d.lon))return;
+        if(natl && !inFrame(d))return; // skip AK/HI/territories so no stray pin floats off-frame
         var m=L.marker([d.lat,d.lon],{icon:makeIcon(d,d.n||0,pinColor(d),pinCat(d))});
         m.__n=d.n||0;
         m.bindTooltip(d.c+': '+(d.n||0).toLocaleString()+(d.near?' · near you':''),{direction:'top'});
         m.on('click',function(){show(i);});
         addM(m); markers.push({m:m,d:d});
         bounds.push([d.lat,d.lon]);
-        if(d.lon>=-125&&d.lon<=-66&&d.lat>=24&&d.lat<=50) cont.push([d.lat,d.lon]); // lower-48 framing
+        if(inFrame(d)) cont.push([d.lat,d.lon]); // lower-48 framing
       });
       window['${id}_apply']=function(cat){
         clearM();
