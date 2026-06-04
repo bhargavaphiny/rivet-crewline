@@ -316,6 +316,28 @@ const WD_SOURCES = [
   ['cardinalhealth','Cardinal Health','healthcare',{host:'cardinalhealth.wd1.myworkdayjobs.com',site:'EXT',searchText:'pharmacy technician'}],
   ['mckesson','McKesson','healthcare',{host:'mckesson.wd3.myworkdayjobs.com',site:'External_Careers',searchText:'pharmacy technician'}],
   ['cigna','Express Scripts (Cigna)','healthcare',{host:'cigna.wd5.myworkdayjobs.com',site:'cignacareers',searchText:'pharmacy technician'}],
+  // ---- Manufacturing: auto / heavy-equipment / industrial / food (welder/machinist/assembler/operator/maintenance volume) ----
+  ['magna','Magna','manufacturing',{host:'magna.wd3.myworkdayjobs.com',site:'Magna',maxOffset:600}],
+  ['cat','Caterpillar','manufacturing',{host:'cat.wd5.myworkdayjobs.com',site:'CaterpillarCareers',maxOffset:600}],
+  ['generalmotors','General Motors','manufacturing',{host:'generalmotors.wd5.myworkdayjobs.com',site:'Careers_GM',maxOffset:500}],
+  ['borgwarner','BorgWarner','manufacturing',{host:'borgwarner.wd5.myworkdayjobs.com',site:'BorgWarner_Careers'}],
+  ['aptiv','Aptiv','manufacturing',{host:'aptiv.wd5.myworkdayjobs.com',site:'APTIV_CAREERS'}],
+  ['adient','Adient','manufacturing',{host:'adient.wd3.myworkdayjobs.com',site:'External'}],
+  ['jci','Johnson Controls','manufacturing',{host:'jci.wd5.myworkdayjobs.com',site:'JCI',maxOffset:600}],
+  ['tranetechnologies','Trane Technologies','manufacturing',{host:'tranetechnologies.wd12.myworkdayjobs.com',site:'Trane_Technologies_Careers',maxOffset:600}],
+  ['generac','Generac','manufacturing',{host:'generac.wd5.myworkdayjobs.com',site:'External',maxOffset:400}],
+  ['haier','GE Appliances','manufacturing',{host:'haier.wd3.myworkdayjobs.com',site:'GE_Appliances'}],
+  ['sbdinc','Stanley Black & Decker','manufacturing',{host:'sbdinc.wd1.myworkdayjobs.com',site:'Stanley_Black_Decker_Career_Site',maxOffset:500}],
+  ['rockwellautomation','Rockwell Automation','manufacturing',{host:'rockwellautomation.wd1.myworkdayjobs.com',site:'External_Rockwell_Automation',maxOffset:500}],
+  ['regalrexnord','Regal Rexnord','manufacturing',{host:'regalrexnord.wd1.myworkdayjobs.com',site:'Careers',maxOffset:500}],
+  ['danaher','Danaher','manufacturing',{host:'danaher.wd1.myworkdayjobs.com',site:'DanaherJobs',maxOffset:500}],
+  // ---- Food / beverage / CPG production (operator / packaging / sanitation / material-handler volume) ----
+  ['tysonfoods','Tyson Foods','manufacturing',{host:'tysonfoods.wd5.myworkdayjobs.com',site:'TSN5',maxOffset:500}],
+  ['smithfieldfoods','Smithfield Foods','manufacturing',{host:'smithfieldfoods.wd1.myworkdayjobs.com',site:'Careers',maxOffset:500}],
+  ['conagrabrands','Conagra Brands','manufacturing',{host:'conagrabrands.wd1.myworkdayjobs.com',site:'Careers_US',maxOffset:400}],
+  ['abinbev','Anheuser-Busch','manufacturing',{host:'abinbev.wd1.myworkdayjobs.com',site:'USA',maxOffset:400}],
+  ['clorox','Clorox','manufacturing',{host:'clorox.wd1.myworkdayjobs.com',site:'Clorox',maxOffset:400}],
+  ['kimberlyclark','Kimberly-Clark','manufacturing',{host:'kimberlyclark.wd1.myworkdayjobs.com',site:'GLOBAL',maxOffset:400}],
 ];
 
 // KEYLESS Oracle Recruiting Cloud (Candidate Experience) feeds — the public REST API that powers
@@ -329,6 +351,11 @@ const ORACLE_SOURCES = [
   ['northwell','Northwell Health','healthcare',{host:'eppr.fa.us2.oraclecloud.com',site:'CX_2'}],
   ['brookdale','Brookdale Senior Living','healthcare',{host:'ibmwjb.fa.ocs.oraclecloud.com',site:'CX_1'}],
   ['albertsons','Albertsons','healthcare',{host:'eofd.fa.us6.oraclecloud.com',site:'CX_1001',keyword:'pharmacy'}],
+  // ---- Manufacturing on Oracle Recruiting CX (diesel/maintenance tech, CNC operator, production operator) ----
+  ['cummins','Cummins','manufacturing',{host:'fa-espx-saasfaprod1.fa.ocs.oraclecloud.com',site:'CX_1002'}],
+  ['honeywell','Honeywell','manufacturing',{host:'ibqbjb.fa.ocs.oraclecloud.com',site:'CX_1'}],
+  ['emerson','Emerson Electric','manufacturing',{host:'hdjq.fa.us2.oraclecloud.com',site:'CX_1'}],
+  ['hormel','Hormel Foods','manufacturing',{host:'ekkh.fa.us2.oraclecloud.com',site:'CX_2002'}],
 ];
 
 // POST helper for Workday CXS endpoints.
