@@ -9,7 +9,7 @@
  * (filtered by the shared blue-collar title matcher + white-collar/IT DENY list).
  */
 const https = require('https');
-const { tradeFor, geocode, parseLoc, PAY, CRED, DENY } = require('./jobs_live');
+const { tradeFor, geocode, parseLoc, PAY, CRED, DENY, normalizePay } = require('./jobs_live');
 
 // ---- tiny HTTP helpers ----
 function httpJSON(url, { method = 'GET', headers = {}, body = null } = {}){
@@ -91,8 +91,7 @@ async function ingestAdzuna(db, w, seen, touched=[]){
       const eid = await w.employer(slug, company, `${city}, ${st||''}`); if(!eid) continue;
       const zipKey = `AZ:${city},${st||''}`.slice(0,40);
       try { await w.insZip.run(zipKey, lat, lon, city); } catch(e){}
-      let lo = toHourly(r.salary_min), hi = toHourly(r.salary_max);
-      if(!lo || !hi){ const band = PAY[trade]||[18,30]; lo = lo||band[0]; hi = hi||band[1]; }
+      let [lo, hi] = normalizePay(toHourly(r.salary_min), toHourly(r.salary_max), trade);
       const descr = `${title} — ${company}, ${city}${st?', '+st:''}. Live opening; apply on the employer's site (via Adzuna).`;
       try { await w.insJob.run(eid,title,trade,lo,hi,city,zipKey,'Day',CRED[trade]||'',descr,'Full-time',company,apply,sec,'biweekly','Ongoing','authorized'); added++; } catch(e){}
     }
@@ -163,7 +162,7 @@ async function ingestUsajobs(db, w, seen, touched=[]){
         try { await w.insZip.run(zipKey, lat, lon, city); } catch(e){}
         let lo=0, hi=0; const rem = Array.isArray(d.PositionRemuneration) && d.PositionRemuneration[0];
         if(rem){ const per = rem.RateIntervalCode==='Per Hour'||rem.RateIntervalCode==='PH'; lo = per?Math.round(Number(rem.MinimumRange)||0):toHourly(rem.MinimumRange); hi = per?Math.round(Number(rem.MaximumRange)||0):toHourly(rem.MaximumRange); }
-        if(!lo||!hi){ const band = PAY[trade]||[18,30]; lo=lo||band[0]; hi=hi||band[1]; }
+        [lo,hi] = normalizePay(lo, hi, trade);
         const descr = `${title} — ${company}, ${city}, ${st}. Federal opening; apply on USAJOBS.`;
         try { await w.insJob.run(eid,title,trade,lo,hi,city,zipKey,'Day',CRED[trade]||'',descr,'Full-time',company,apply,sector,'biweekly','Ongoing','authorized'); added++; } catch(e){}
       }

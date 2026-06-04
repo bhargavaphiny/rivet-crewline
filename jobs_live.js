@@ -176,6 +176,21 @@ const PAY = {
   lpn:[24,34],pharmacy_tech:[18,27],radiology_tech:[28,44],med_lab_tech:[24,38],dental_assistant:[20,30],
   monitor_tech:[18,26],behavioral_tech:[18,27],pt_aide:[16,24],dietary_aide:[15,21],
 };
+// Normalize a posting's pay to a sane HOURLY band. Conservative: clears placeholder/sub-minimum
+// and absurd values (and annual/monthly mis-parses) to the curated per-trade band; fills missing;
+// swaps inverted. Keeps legitimate high hourly (e.g. travel roles) up to $200/hr.
+function normalizePay(lo, hi, trade){
+  const B = PAY[trade] || [15,30];
+  const conv = v => { v = Number(v)||0; if(v>400) v = Math.round(v/2080); return v; }; // annual → hourly safety
+  lo = conv(lo); hi = conv(hi);
+  if(lo < 7 || lo > 200) lo = 0;   // sub-min-wage / placeholder / mis-parse → treat as missing
+  if(hi < 7 || hi > 200) hi = 0;
+  if(!lo && !hi){ lo = B[0]; hi = B[1]; }
+  else if(!hi) hi = Math.max(lo, B[1]);
+  else if(!lo) lo = Math.min(hi, B[0]);
+  if(lo > hi){ const t = lo; lo = hi; hi = t; }
+  return [Math.round(lo), Math.round(hi)];
+}
 const CRED = { welder:'aws_welding',electrician:'osha10',equipment_tech:'osha10',maintenance_tech:'osha10',
   diesel_mechanic:'ase',automotive_tech:'ase',warehouse:'forklift',cna:'cna_cert',surgical_tech:'bls',
   sterile_processing:'bls',phlebotomist:'bls',patient_care_tech:'bls',medical_assistant:'bls',
@@ -438,4 +453,4 @@ async function normalizeTitles(db){
   return n;
 }
 
-module.exports = { ingestLiveJobs, normalizeTitles, SOURCES, EXTRA_SOURCES, WD_SOURCES, fetchProvider, tradeFor, cleanTitle, parseLoc, parseLocLoose, workdayLoc, geocode, PAY, CRED, DENY, TRADE_RULES, fetchJSON };
+module.exports = { ingestLiveJobs, normalizeTitles, normalizePay, SOURCES, EXTRA_SOURCES, WD_SOURCES, fetchProvider, tradeFor, cleanTitle, parseLoc, parseLocLoose, workdayLoc, geocode, PAY, CRED, DENY, TRADE_RULES, fetchJSON };

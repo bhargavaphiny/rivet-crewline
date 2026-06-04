@@ -1995,7 +1995,7 @@ const server = http.createServer(async (req,res)=>{
 
 // Live job ingestion from companies' public job boards (Greenhouse). Runs in the
 // background after boot, at most every 6h, so prod stays full of real current postings.
-const { ingestLiveJobs, normalizeTitles, tradeFor } = require('./jobs_live');
+const { ingestLiveJobs, normalizeTitles, tradeFor, normalizePay } = require('./jobs_live');
 const { ingestAggregators, aggregatorsConfigured, isFabTitle } = require('./jobs_aggregators');
 // Keep the semiconductor sector accurate: aggregator jobs tagged semiconductor must have a real fab
 // signal in the title (employer-sourced fab jobs from Workday are exempt). Demote the rest to mfg.
@@ -2038,6 +2038,23 @@ async function retagTrades(){
     await db.prepare("INSERT INTO meta(k,v) VALUES('retag_ver',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").run(RETAG_VERSION);
     console.log(`[retag] refined ${changed} trade labels, corrected ${secFixed} cross-sector mistags (v${RETAG_VERSION})`);
   } catch(e){ console.error('[retag] skipped (non-fatal):', e.message); }
+}
+// One-time: normalize pay across existing live jobs so placeholder/mis-parsed values ($1, monthly-
+// as-hourly, absurd highs) become the curated per-trade band. Prerequisite for pay analytics. Flag-guarded.
+const PAYNORM_VERSION = '1';
+async function normalizePayPass(){
+  try {
+    const done = ((await db.prepare("SELECT v FROM meta WHERE k='paynorm_ver'").get())||{}).v;
+    if(done === PAYNORM_VERSION) return;
+    const rows = await db.prepare("SELECT id,trade,pay_min,pay_max FROM jobs WHERE apply_url IS NOT NULL").all();
+    let fixed = 0;
+    for(const r of rows){
+      const [lo,hi] = normalizePay(r.pay_min, r.pay_max, r.trade);
+      if(lo!==r.pay_min || hi!==r.pay_max){ try { await db.prepare('UPDATE jobs SET pay_min=?,pay_max=? WHERE id=?').run(lo,hi,r.id); fixed++; } catch(e){} }
+    }
+    await db.prepare("INSERT INTO meta(k,v) VALUES('paynorm_ver',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").run(PAYNORM_VERSION);
+    console.log(`[paynorm] normalized pay on ${fixed} jobs (v${PAYNORM_VERSION})`);
+  } catch(e){ console.error('[paynorm] skipped (non-fatal):', e.message); }
 }
 // Real-job count = anything with a real external apply link, excluding the old USAJOBS search-link seeds.
 async function realJobCount(){
@@ -2112,7 +2129,7 @@ async function refreshLiveJobs(){
     const stale = age >= 6*3600*1000;
     const ver = (await db.prepare("SELECT v FROM meta WHERE k='ingest_ver'").get()||{}).v;
     const forced = ver !== INGEST_VERSION; // code changed how/what we ingest → refresh once regardless of freshness
-    if(!forced && !stale && liveCount >= 800){ try { await retagTrades(); } catch(e){} await purgeSeeds(); return; } // well-stocked; still keep fakes out
+    if(!forced && !stale && liveCount >= 800){ try { await retagTrades(); } catch(e){} try { await normalizePayPass(); } catch(e){} await purgeSeeds(); clearJobCache(); await prewarmJobCache(); return; } // well-stocked; still keep fakes out
     const r = await ingestLiveJobs(db);
     let agg = { added:0, scanned:0 };
     if(aggregatorsConfigured()) agg = await ingestAggregators(db);
@@ -2123,6 +2140,7 @@ async function refreshLiveJobs(){
     try { await refreshFreshness([...(r.touched||[]), ...(agg.touched||[])]); } catch(e){ console.error('[fresh] skipped:', e.message); }
     try { await retagSemiconductor(); } catch(e){}
     try { await retagTrades(); } catch(e){}
+    try { await normalizePayPass(); } catch(e){}
     await purgeSeeds();
     await pruneNonGTM();
     clearJobCache(); await prewarmJobCache(); // fresh data → drop + immediately re-warm so pages stay fast
