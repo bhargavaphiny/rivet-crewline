@@ -1375,7 +1375,7 @@ const server = http.createServer(async (req,res)=>{
         const empPay = await payRep(job.employer_id);
         const myQuote = job.quotes_ok ? await db.prepare('SELECT * FROM quotes WHERE job_id=? AND worker_id=?').get(jid, user.id) : null;
         const payMarket = await payRankForJob(job);
-        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied,saved,jobMedia,distance,rules,empRating,workAuth:prof.work_auth||'',empPay,myQuote,payFloor:prof.pay_floor||0,empRehire:await rehireStat(job.employer_id),empSafety:await safetyStat(job.employer_id),payMarket})}));
+        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied,saved,jobMedia,distance,rules,empRating,workAuth:prof.work_auth||'',empPay,myQuote,payFloor:prof.pay_floor||0,empRehire:await rehireStat(job.employer_id),empSafety:await safetyStat(job.employer_id),payMarket,me:user,profile:prof})}));
       }
       if(jid && p===`/app/jobs/${jid}/quote` && method==='POST'){
         const job = await db.prepare('SELECT id,title,employer_id,quotes_ok FROM jobs WHERE id=?').get(jid);

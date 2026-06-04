@@ -1226,3 +1226,14 @@ body.app-mode{margin:0}
   .burger span{display:block;width:22px;height:2.5px;background:#fff;border-radius:2px}
   .nav-cb:checked ~ .app-shell .nav-scrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:75}
 }
+
+/* ---------- Quick-apply pack ---------- */
+.qa-pack{border:1.5px solid rgba(232,146,58,.45);border-radius:12px;padding:0;margin:0 0 10px;background:linear-gradient(180deg,rgba(232,146,58,.07),transparent)}
+.qa-pack>summary{list-style:none;cursor:pointer;padding:12px 14px;font-weight:800;display:flex;align-items:center;gap:8px}
+.qa-pack>summary::-webkit-details-marker{display:none}
+.qa-pack>summary svg{stroke:#c9741f}
+.qa-body{padding:0 14px 14px;display:flex;flex-direction:column;gap:9px}
+.qa-row{display:flex;flex-wrap:wrap;gap:7px}
+.qa-copy{background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 12px;font-weight:700;font-size:13px;cursor:pointer;color:var(--ink)}
+.qa-copy:hover{border-color:#E8923A}
+.qa-pitch{background:var(--wash,#f4f2ec);border:1px solid var(--line);border-left:3px solid #E8923A;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.5;font-style:italic;color:var(--ink)}

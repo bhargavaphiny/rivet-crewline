@@ -486,7 +486,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=105">
+  <link rel="stylesheet" href="/styles.css?v=106">
   </head><body class="${user?'app-mode':'mkt-mode'}">
   <a class="skip" href="#main">Skip to main content</a>
   ${user ? `
@@ -1579,7 +1579,24 @@ function trustCard(v){
     <ul class="trust-list">${v.reasons.map(([k,t])=>`<li class="tr-${k}">${icon(ic[k]||'dot')} <span>${t}</span></li>`).join('')}</ul>
   </div>`;
 }
-function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance = null, rules = null, empRating = {avg:0,count:0}, workAuth = '', empPay = {}, myQuote = null, payFloor = 0, empRehire = 0, empSafety = {}, payMarket = null }) {
+// One-tap "quick-apply pack" — paste-ready details + a tailored pitch for an external ATS.
+function quickApplyPack(me, profile, job){
+  if(!me) return '';
+  const trades = tradesOf(profile).map(t=>TRADES[t]||t);
+  const pitch = `Hi — I'm ${me.name||''}, a ${trades.join(' & ')||'skilled tradesperson'}${profile.years_exp?` with ${profile.years_exp}+ years' experience`:''}${profile.city?`, based in ${profile.city}`:''}. I'm very interested in your ${job.title} role and I'm available to start right away. You can see my full Work Card and verified credentials here: rivet-crewline.onrender.com/p/${me.id}`;
+  const cp = (val,label)=> val?`<button type="button" class="qa-copy" data-cp="${esc(val)}" onclick="navigator.clipboard&&navigator.clipboard.writeText(this.dataset.cp);var o=this.textContent;this.textContent='${T('Copied ✓')}';var b=this;setTimeout(function(){b.textContent=o},1200)">${esc(label)}</button>`:'';
+  return `<details class="qa-pack">
+    <summary>${icon('bolt','xic')} ${T('Quick-apply pack')} — ${T('paste your details fast')}</summary>
+    <div class="qa-body">
+      <p class="muted sm">${T('Most outside sites make you re-type everything. Tap to copy, then paste into their form.')}</p>
+      <div class="qa-row">${cp(me.name,T('Copy name'))}${cp(me.email,T('Copy email'))}${cp(me.phone,T('Copy phone'))}</div>
+      <div class="qa-pitch" id="qaPitch">${esc(pitch)}</div>
+      <button type="button" class="btn-sm" onclick="var t=document.getElementById('qaPitch').innerText;navigator.clipboard&&navigator.clipboard.writeText(t);this.textContent='${T('Pitch copied ✓')}'">${icon('send')} ${T('Copy pitch')}</button>
+      <a class="btn-sm ghost" href="/app/resume">${T('Open my résumé')}</a>
+    </div>
+  </details>`;
+}
+function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance = null, rules = null, empRating = {avg:0,count:0}, workAuth = '', empPay = {}, myQuote = null, payFloor = 0, empRehire = 0, empSafety = {}, payMarket = null, me = null, profile = {} }) {
   const _trust = trustCard(trustVerdict(job, { rating:empRating, pay:empPay, rehire:empRehire, safety:empSafety, payFloor, marketHr: ROLE_BLS[job.trade]?Math.round(ROLE_BLS[job.trade].med/2080):0 }));
   const belowMin = rules && job.pay_min && job.pay_min < rules.minWage;
   const spon = (job.sponsorship)||'authorized';
@@ -1628,7 +1645,7 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
       ${_trust}
       <a class="btn full gameplan-cta" href="/app/land/${job.id}">${icon('spark')} ${T('Get your game plan to land this job')}</a>
       ${isExternal(job)
-        ? `<a class="btn full" href="/app/jobs/${job.id}/apply-ext" target="_blank" rel="noopener noreferrer">${T('Apply on')} ${esc(job.source)} ↗</a>
+        ? `${quickApplyPack(me, profile, job)}<a class="btn full" href="/app/jobs/${job.id}/apply-ext" target="_blank" rel="noopener noreferrer">${T('Apply on')} ${esc(job.source)} ↗</a>
            <p class="muted sm" style="text-align:center;margin-top:8px">${T('You’ll finish on their site — and we’ll track it in')} <a href="/app/applications">${T('your applications')}</a> ${T('so you never lose it.')}</p>`
         : (job.quotes_ok
           ? (myQuote
