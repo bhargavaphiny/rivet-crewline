@@ -78,6 +78,12 @@ async function getUser(req){
   if(!u) return null;
   try { u.unread = (await db.prepare('SELECT COUNT(*) c FROM messages WHERE to_id=? AND read_at IS NULL').get(u.id)).c; }
   catch(e){ u.unread = 0; }
+  if(u.role==='worker'){
+    try { u.offers = (await db.prepare(`SELECT
+        (SELECT COUNT(*) FROM interviews WHERE worker_id=? AND status='proposed')
+      + (SELECT COUNT(*) FROM saved_candidates WHERE worker_id=? AND employer_id NOT IN (SELECT employer_id FROM interviews WHERE worker_id=?)) c`).get(u.id,u.id,u.id)).c; }
+    catch(e){ u.offers = 0; }
+  }
   return u;
 }
 
@@ -309,6 +315,27 @@ async function _jobGeoForWorkerRaw(prof){
   }).sort((a,b)=> (b.near?1:0)-(a.near?1:0) || (a.near ? a.dist-b.dist : b.n-a.n));
   const homePin = home ? { lat:home.lat, lon:home.lon, zip:prof.zip, city:prof.city||'', commute, reachable } : null;
   return { points, home: homePin };
+}
+// Reverse-marketplace inbound demand for a worker: employers who want them.
+// Interview requests (the strong signal) + employers who saved/shortlisted them (soft interest).
+async function inboundForWorker(wid){
+  let requests = [], interested = [];
+  try {
+    requests = await db.prepare(`SELECT iv.*, j.title, j.trade, j.pay_min, j.pay_max, j.city, u.company
+      FROM interviews iv JOIN jobs j ON j.id=iv.job_id JOIN users u ON u.id=iv.employer_id
+      WHERE iv.worker_id=? ORDER BY iv.status='proposed' DESC, iv.created_at DESC`).all(wid);
+  } catch(e){ requests = []; }
+  try {
+    // employers who saved this candidate but haven't sent an interview yet = warm leads
+    interested = await db.prepare(`SELECT sc.created_at, u.id employer_id, u.company,
+        (SELECT j.title FROM jobs j WHERE j.employer_id=u.id AND j.status='open' ORDER BY j.created_at DESC LIMIT 1) sample_job,
+        (SELECT COUNT(*) FROM jobs j WHERE j.employer_id=u.id AND j.status='open') open_jobs
+      FROM saved_candidates sc JOIN users u ON u.id=sc.employer_id
+      WHERE sc.worker_id=? AND sc.employer_id NOT IN (SELECT employer_id FROM interviews WHERE worker_id=?)
+      ORDER BY sc.created_at DESC`).all(wid, wid);
+  } catch(e){ interested = []; }
+  const pending = requests.filter(r=>r.status==='proposed').length;
+  return { requests, interested, pending, count: pending + interested.length };
 }
 // Load all credentials once, grouped by user_id — avoids an N+1 query per worker.
 async function allCredsByUser(){
@@ -950,7 +977,8 @@ const server = http.createServer(async (req,res)=>{
         const seasonTrades = M.seasonalTrades(new Date().getMonth());
         const myInSeason = profTrades(prof).find(t=>seasonTrades.includes(t));
         const seasonHint = myInSeason ? {trade:myInSeason, why:M.SEASON_WHY[myInSeason]||''} : null;
-        return send(res, V.layout({title:'Home',user,active:'home',body:V.workerHome({user,profile:prof,creds,matches,workCount,portCount,jobsGeo,isNew:isNewWorker,coach,needZip,seasonHint})}));
+        const inbound = isNewWorker ? {requests:[],interested:[],pending:0,count:0} : await inboundForWorker(user.id);
+        return send(res, V.layout({title:'Home',user,active:'home',body:V.workerHome({user,profile:prof,creds,matches,workCount,portCount,jobsGeo,isNew:isNewWorker,coach,needZip,seasonHint,inbound})}));
       }
       if(p==='/app/agents' && method==='GET')
         return send(res, V.layout({title:'Agents',user,active:'agents',body:V.agentsHub({mode:'worker'})}));
@@ -1248,7 +1276,13 @@ const server = http.createServer(async (req,res)=>{
             try { await sendMessage(user.id, iv.employer_id, `I confirmed the interview. See you then.`); } catch(e){}
           }
         }
-        return redirect(res, '/app/applications');
+        const ref = String(req.headers.referer||'');
+        return redirect(res, ref.includes('/app/offers') ? '/app/offers' : '/app/applications');
+      }
+      // Reverse marketplace — employers who want to interview YOU
+      if(p==='/app/offers' && method==='GET'){
+        const inbound = await inboundForWorker(user.id);
+        return send(res, V.layout({title:'Employers want you',user,active:'offers',body:V.workerOffers(inbound)}));
       }
       const jid = qid(p);
       if(jid && p===`/app/jobs/${jid}/save` && method==='POST'){

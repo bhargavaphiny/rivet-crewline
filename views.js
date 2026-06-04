@@ -420,7 +420,8 @@ function layout({ title, user, body, active = '', flash = '' }) {
   } else if ((user.mode || user.role) === 'worker') {
     const L = (h,l,k)=>`<a class="nav-link ${active===k?'on':''}" href="${h}">${l}</a>`;
     const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/app/messages">${t('nav_messages')}${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
-    nav = `${L('/app',t('nav_home'),'home')}${L('/app/jobs',t('nav_find_work'),'jobs')}${L('/app/shifts',t('nav_shifts'),'shifts')}${L('/app/agents',t('nav_agents'),'agents')}${L('/app/profile',t('nav_work_card'),'profile')}${L('/app/applications',t('nav_applications'),'apps')}${L('/app/grow',T('Grow'),'grow')}${L('/pulse',t('nav_pulse'),'pulse')}${msg}
+    const offers = `<a class="nav-link ${active==='offers'?'on':''}" href="/app/offers">${T('Offers')}${user.offers?`<span class="ndot hot">${user.offers}</span>`:''}</a>`;
+    nav = `${L('/app',t('nav_home'),'home')}${L('/app/jobs',t('nav_find_work'),'jobs')}${offers}${L('/app/shifts',t('nav_shifts'),'shifts')}${L('/app/agents',t('nav_agents'),'agents')}${L('/app/profile',t('nav_work_card'),'profile')}${L('/app/applications',t('nav_applications'),'apps')}${L('/app/grow',T('Grow'),'grow')}${L('/pulse',t('nav_pulse'),'pulse')}${msg}
            ${modeTg('work')}
            <span class="who">${initials(user.name)}</span>
            <a class="nav-link" href="/logout">${t('nav_logout')}</a>${langTg}`;
@@ -459,7 +460,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=97">
+  <link rel="stylesheet" href="/styles.css?v=98">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -658,7 +659,7 @@ function xToggle(action, on, iconName, onLabel, offLabel, next){
   return `<form method="post" action="${action}" class="xf"><input type="hidden" name="next" value="${next}">
     <button class="xbtn ${on?'on':''}">${icon(iconName,'xic')}<span>${on?onLabel:offLabel}</span></button></form>`;
 }
-function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 0, jobsGeo = null, isNew = false, coach = null, needZip = false, seasonHint = null }) {
+function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 0, jobsGeo = null, isNew = false, coach = null, needZip = false, seasonHint = null, inbound = null }) {
   const top = matches.slice(0,3).map(m=>jobCard(m, isNew)).join('');
   const zipBanner = (!isNew && needZip) ? `<a class="zip-banner" href="/app/profile">${icon('pin','xic')} ${T('Add your ZIP to your Work Card to see how far each job is.')}</a>` : '';
   const expiring = creds.filter(c=>c.expires && c.expires < '2026-08').length;
@@ -688,6 +689,9 @@ function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 
       ${xToggle('/app/extra', profile.open_to_extra, 'bolt', T('Open to extra work ✓'), T('I want extra / multiple jobs'), '/app')}
     </div>
     ${welcome}
+    ${inbound && inbound.count ? `<a class="offer-banner" href="/app/offers">${icon('bell','xic')}
+      <span><b>${inbound.pending?`${inbound.pending} ${inbound.pending===1?T('employer wants to interview you'):T('employers want to interview you')}`:`${inbound.count} ${inbound.count===1?T('employer is interested in you'):T('employers are interested in you')}`}</b>
+      — ${T('verified employers came to you')}</span> <span class="invite-go">${T('View')} →</span></a>` : ''}
     <a class="invite-cta" href="/app/invite">${icon('spark','xic')} <span><b>${T('Invite your crew')}</b> — ${T('bring the people you work with; get hired as a team')}</span> <span class="invite-go">${T('Invite')} →</span></a>
     ${jobsGeo && jobsGeo.points.length ? usMap(jobsGeo.points, {title:isNew?T('Where the work is'):t('home_top'), noun:T('job'), cta:T('Apply'), home:jobsGeo.home,
         legend:isNew?null:`<span class="lg"><i class="d-direct"></i> ${T('Your trades')}</span><span class="lg"><i class="d-related"></i> ${T('Related trades')}</span>`,
@@ -1395,6 +1399,45 @@ function workerApplications({ apps, savedJobs, interviews = [], empReviews = {} 
         <span class="nav-link" style="color:var(--brand-d)">${T('View →')}</span>
       </a>`).join('')
       : `<div class="card muted">${T('No saved jobs yet. Tap ☆ Save on any job to keep it here.')}</div>`}
+  </section>`;
+}
+// Reverse marketplace — "Employers want to interview you" (the Incredible-Health model for blue-collar)
+function workerOffers({ requests = [], interested = [], pending = 0, count = 0 }){
+  const proposed = requests.filter(r=>r.status==='proposed');
+  const confirmed = requests.filter(r=>r.status==='confirmed');
+  return `<section class="wrap">
+    <div class="offers-hero ${count?'live':''}">
+      <div class="oh-ic">${icon('bell','xic')}</div>
+      <div><div class="oh-t">${count?`${count} ${count===1?T('employer wants you'):T('employers want you')}`:T('Employers will reach out here')}</div>
+        <p class="muted sm" style="margin:2px 0 0">${count?T('On Rivet, verified employers come to you. Accept an interview time and you’re in — no application needed.'):T('Complete your Work Card and turn on availability — employers search candidates here and reach out directly.')}</p></div>
+    </div>
+    ${proposed.length ? `<div class="sec-h big">${icon('bell','xic')} ${T('Interview requests')} <span class="hot-ct">${proposed.length}</span></div>
+      ${proposed.map(iv=>`<div class="card offer-card hot">
+        <div class="oc-top"><div class="badge">${tradeEmoji(iv.trade)}</div>
+          <div class="oc-main"><h4>${esc(iv.title||T('Interview'))}</h4>
+            <div class="muted">${esc(iv.company||T('An employer'))}${iv.city?` · ${esc(iv.city)}`:''}${iv.pay_min?` · $${iv.pay_min}–${iv.pay_max}/hr`:''}</div></div>
+          <span class="match-chip">${T('Wants to interview you')}</span></div>
+        ${interviewWorker(iv)}
+        <div class="oc-act"><a class="btn-xs ghost" href="/app/messages">${T('Message employer')}</a></div>
+      </div>`).join('')}` : ''}
+    ${confirmed.length ? `<div class="sec-h big" style="margin-top:22px">${T('Confirmed interviews')}</div>
+      ${confirmed.map(iv=>`<div class="card offer-card ok"><div class="oc-top"><div class="badge">${tradeEmoji(iv.trade)}</div>
+        <div class="oc-main"><h4>${esc(iv.title||'')}</h4><div class="muted">${esc(iv.company||'')}</div></div></div>${interviewWorker(iv)}</div>`).join('')}` : ''}
+    ${interested.length ? `<div class="sec-h big" style="margin-top:22px">${T('Employers interested in you')} <span class="hot-ct soft">${interested.length}</span></div>
+      <p class="muted sm" style="margin-top:-6px">${T('These employers saved your Work Card. Message them to get on their radar before the interview request.')}</p>
+      ${interested.map(e=>`<div class="card offer-card"><div class="oc-top"><div class="badge">${icon('company','xic')}</div>
+        <div class="oc-main"><h4>${esc(e.company||T('An employer'))}</h4>
+          <div class="muted">${e.open_jobs?`${e.open_jobs} ${e.open_jobs===1?T('open role'):T('open roles')}`:T('Saved your Work Card')}${e.sample_job?` · ${esc(e.sample_job)}`:''}</div></div>
+          <span class="match-chip soft">${T('Saved you')}</span></div>
+        ${e.open_jobs?`<div class="oc-act"><a class="btn-xs ghost" href="/app/jobs">${T('See their open roles →')}</a></div>`:''}
+      </div>`).join('')}` : ''}
+    ${!count && !confirmed.length ? `<div class="card" style="margin-top:16px">
+      <div class="sec-h" style="margin-top:0">${T('Get found faster')}</div>
+      <div class="track-links">
+        <a class="track-link" href="/app/profile">${icon('star')} ${T('Finish your Work Card →')}</a>
+        <a class="track-link" href="/app/credentials">${icon('shield')} ${T('Verify a credential →')}</a>
+        <a class="track-link" href="/app/jobs">${icon('search')} ${T('Apply to open roles →')}</a>
+      </div></div>` : ''}
   </section>`;
 }
 function bd(label,val,max){const pct=Math.round(val/max*100);return `<div class="bd"><span>${label}</span><div class="bdbar"><i style="width:${pct}%"></i></div><b>${val}/${max}</b></div>`;}
@@ -3076,4 +3119,4 @@ function whyRivetBlock(){
 }
 
 module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard, earnLearn, credPrep, credPrepIndex, gradeQuiz, growHub, invitePage, shiftsBoard, sourcingAgent, empShifts, empShiftForm, voiceAgent, SHIFT_KINDS, REGISTRY };
+  jobDetail, workerProfile, workerApplications, workerOffers, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard, earnLearn, credPrep, credPrepIndex, gradeQuiz, growHub, invitePage, shiftsBoard, sourcingAgent, empShifts, empShiftForm, voiceAgent, SHIFT_KINDS, REGISTRY };
