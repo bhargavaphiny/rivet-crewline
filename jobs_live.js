@@ -150,7 +150,7 @@ const TRADE_RULES = [
 ];
 // Exclude white-collar / IT / corporate even when a weak token matched (e.g. "Welding Engineer").
 // Deliberately does NOT deny lead/head/specialist/coordinator — those are real blue-collar titles.
-const DENY = /\bengineer\b|software|firmware|\bdeveloper\b|\bdevops\b|\bsre\b|data scientist|machine learning|\bfinance\b|accountant|\bmanager\b|\bdirector\b|\bvp\b|\bhead of\b|\bchief\b|president|principal|counsel|attorney|paralegal|marketing|\brecruit\w*|\bsales\b|account executive|product (manager|owner|designer)|program manager|project manager|\bdesigner\b|\bux\b|\barchitect\b|\banalyst\b|\bintern\b|controller|\bscientist\b|researcher|strategy|business development|\bconsultant\b|underwriter|people partner|copywriter|content writer|information security|cyber ?security|\bciso\b/i;
+const DENY = /\bengineer\b|software|firmware|\bdeveloper\b|\bdevops\b|\bsre\b|data scientist|machine learning|\bfinance\b|accountant|\bmanager\b|\bdirector\b|\bvp\b|\bhead of\b|\bchief\b|president|principal|counsel|attorney|paralegal|marketing|\brecruit\w*|\bsales\b|account executive|product (manager|owner|designer)|program manager|project manager|\bdesigner\b|\bux\b|\barchitect\b|\banalyst\b|\bintern\b|controller|\bscientist\b|researcher|strategy|business development|\bconsultant\b|underwriter|people partner|copywriter|content writer|information security|information systems security|\bisso\b|cyber ?security|\bciso\b/i;
 // est. hourly band per trade so cards read real (labelled as estimate when the feed gives no pay)
 const PAY = {
   welder:[26,42],machinist:[26,42],assembler:[20,30],cleanroom_op:[21,30],process_tech:[24,36],
@@ -304,6 +304,14 @@ const WD_SOURCES = [
   ['methodisthealth','Methodist Le Bonheur','healthcare',{host:'methodisthealth.wd5.myworkdayjobs.com',site:'MLH',defaultState:'TN',defaultCity:'Memphis'}],
 ];
 
+// KEYLESS Oracle Recruiting Cloud (Candidate Experience) feeds — the public REST API that powers
+// careers sites built on Oracle Fusion HCM. The real source for TI + onsemi (biggest fab employers
+// NOT on Workday). (label, company, sector, opts{host,site}). Verified live by probing.
+const ORACLE_SOURCES = [
+  ['TI','Texas Instruments','semiconductor',{host:'edbz.fa.us2.oraclecloud.com',site:'CX'}],
+  ['onsemi','onsemi','semiconductor',{host:'hctz.fa.us2.oraclecloud.com',site:'CX_1001'}],
+];
+
 // POST helper for Workday CXS endpoints.
 function fetchJSONPost(host, path, body){
   return new Promise(resolve=>{
@@ -362,6 +370,25 @@ async function fetchProvider(provider, token, opts){
         for(const x of rows){ const loc = workdayLoc(x.locationsText, o.defaultState, o.defaultCity); if(!loc) continue;
           out.push({ title:(x.title||'').trim(), url: x.externalPath?`https://${o.host}/en-US/${o.site}${x.externalPath}`:null, city:loc.city, st:loc.st }); }
         if(rows.length < 20) break;
+      }
+      return out;
+    }
+    if(provider==='oracle'){
+      const o = opts||{}; if(!o.host || !o.site) return [];
+      const out=[];
+      for(let off=0; off<1000; off+=200){
+        const url = `https://${o.host}/hcmRestApi/resources/latest/recruitingCEJobRequisitions?onlyData=true&expand=requisitionList.secondaryLocations&finder=findReqs;siteNumber=${o.site},limit=200,offset=${off},sortBy=POSTING_DATES_DESC`;
+        const j = await fetchJSON(url);
+        const rows = j && j.items && j.items[0] && Array.isArray(j.items[0].requisitionList) ? j.items[0].requisitionList : [];
+        if(!rows.length) break;
+        for(const x of rows){
+          if(String(x.PrimaryLocationCountry||'').toUpperCase()!=='US') continue;   // US roles only
+          let loc = parseLocLoose(x.PrimaryLocation||'');
+          if(!loc){ for(const s of (x.secondaryLocations||[])){ const p=parseLocLoose(s.Name||s.ShortName||''); if(p){loc=p;break;} } }
+          if(!loc) continue;
+          out.push({ title:(x.Title||'').trim(), url:`https://${o.host}/hcmUI/CandidateExperience/en/sites/${o.site}/job/${x.Id}`, city:loc.city, st:loc.st });
+        }
+        if(rows.length < 200) break;
       }
       return out;
     }
@@ -437,7 +464,8 @@ async function ingestLiveJobs(db){
   };
   const all = SOURCES.map(([t,c,s])=>['greenhouse',t,c,s,null])
     .concat(EXTRA_SOURCES.map(([p,t,c,s])=>[p,t,c,s,null]))
-    .concat(WD_SOURCES.map(([t,c,s,o])=>['workday',t,c,s,o]));
+    .concat(WD_SOURCES.map(([t,c,s,o])=>['workday',t,c,s,o]))
+    .concat(ORACLE_SOURCES.map(([t,c,s,o])=>['oracle',t,c,s,o]));
   for(const [provider, token, company, sector, opts] of all){
     const items = await fetchProvider(provider, token, opts);
     scanned += items.length;
@@ -455,4 +483,4 @@ async function normalizeTitles(db){
   return n;
 }
 
-module.exports = { ingestLiveJobs, normalizeTitles, normalizePay, SOURCES, EXTRA_SOURCES, WD_SOURCES, fetchProvider, tradeFor, cleanTitle, parseLoc, parseLocLoose, workdayLoc, geocode, PAY, CRED, DENY, TRADE_RULES, fetchJSON };
+module.exports = { ingestLiveJobs, normalizeTitles, normalizePay, SOURCES, EXTRA_SOURCES, WD_SOURCES, ORACLE_SOURCES, fetchProvider, tradeFor, cleanTitle, parseLoc, parseLocLoose, workdayLoc, geocode, PAY, CRED, DENY, TRADE_RULES, fetchJSON };

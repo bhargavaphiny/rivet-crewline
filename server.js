@@ -2085,7 +2085,7 @@ async function purgeSeeds(){
     console.log(`[purge] removed ${ids.length} seeded jobs + seeded shifts — site is now 100% real (${real} real jobs)`);
   } catch(e){ console.error('[purge] skipped (non-fatal):', e.message); }
 }
-const INGEST_VERSION = '9'; // bump to force a one-time re-ingest on the next deploy (e.g. after source/sector changes)
+const INGEST_VERSION = '10'; // bump to force a one-time re-ingest on the next deploy (e.g. after source/sector changes)
 const GTM_SECTORS = ['semiconductor','manufacturing','healthcare']; // sector-wise GTM focus order: semi → mfg → health
 // Keep the board focused on the GTM sectors: drop live (aggregated) jobs in other sectors so
 // plumbing/energy/logistics don't crowd out semiconductor/manufacturing/healthcare. Employer-
