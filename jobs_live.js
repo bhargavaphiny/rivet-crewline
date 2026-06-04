@@ -289,6 +289,8 @@ const WD_SOURCES = [
   ['intel','Intel','semiconductor',{host:'intel.wd1.myworkdayjobs.com',site:'External'}],
   ['micron','Micron','semiconductor',{host:'micron.wd1.myworkdayjobs.com',site:'External'}],
   ['analogdevices','Analog Devices','semiconductor',{host:'analogdevices.wd1.myworkdayjobs.com',site:'External'}],
+  ['sec','Samsung','semiconductor',{host:'sec.wd3.myworkdayjobs.com',site:'Samsung_Careers'}],
+  ['nxp','NXP','semiconductor',{host:'nxp.wd3.myworkdayjobs.com',site:'careers'}],
   ['kla','KLA','semiconductor',{host:'kla.wd1.myworkdayjobs.com',site:'Search'}],
   ['entegris','Entegris','semiconductor',{host:'entegris.wd1.myworkdayjobs.com',site:'EntegrisCareers'}],
   ['cree','Wolfspeed','semiconductor',{host:'cree.wd108.myworkdayjobs.com',site:'EXT'}],
