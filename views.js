@@ -459,7 +459,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=93">
+  <link rel="stylesheet" href="/styles.css?v=94">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1235,6 +1235,45 @@ function workHistoryList(items, editable){
   return items.length ? `<div class="explist">${items.map(w=>workRow(w, editable)).join('')}</div>`
     : (editable ? `<p class="muted">${T('No past jobs added yet — add the places you’ve worked below. This is what recruiters trust most.')}</p>` : '');
 }
+// The full set of worker "x-factors" — signals that help match more jobs and rank higher.
+const XFACTORS = [
+  ['/app/available','available','dot','Available for work'],
+  ['/app/work-today','work_today','bolt','Can work today'],
+  ['/app/relocate','relocate','send','Open to relocate'],
+  ['/app/tools','has_tools','toolbox','I have my own tools'],
+  ['/app/transport','has_transport','truck','I have reliable transport'],
+  ['/app/bilingual','bilingual','globe','Bilingual'],
+  ['/app/veteran','veteran','shield','Veteran'],
+  ['/app/subcontract','self_employed','hammer','Subcontract-ready (1099)'],
+  ['/app/extra','open_to_extra','bolt','Open to extra / multiple jobs'],
+  ['/app/alerts','alerts','bell','Text me new job alerts'],
+];
+// Badges for the x-factors that are ON — the at-a-glance "why hire me" strip.
+function xfactorBadges(profile){
+  const on = XFACTORS.filter(([,col])=>profile && profile[col]).filter(([,col])=>col!=='alerts');
+  if(!on.length) return '';
+  return `<div class="xf-badges">${on.map(([,,ic,l])=>`<span class="xf-badge">${icon(ic)} ${T(l)}</span>`).join('')}</div>`;
+}
+// Work Card completeness → drives workers to beef it up.
+function workCardStrength(profile, creds, work, portfolio){
+  const checks = [
+    ['Add a headline', !!profile.headline, '/app/profile'],
+    ['Pick your trades', tradesOf(profile).length>0, '/app/profile'],
+    ['Add your ZIP', !!profile.zip, '/app/profile'],
+    ['Write your About', !!(profile.about && profile.about.length>20), '/app/profile'],
+    ['Add a credential', (creds||[]).length>0, '/app/profile'],
+    ['Add past work history', (work||[]).length>0, '/app/profile'],
+    ['Add a portfolio photo', (portfolio||[]).length>0, '/app/profile'],
+    ['Turn on your strengths', XFACTORS.some(([,c])=>profile && profile[c] && c!=='alerts'), '/app/profile'],
+  ];
+  const done = checks.filter(c=>c[1]).length, pct = Math.round(done/checks.length*100);
+  const next = checks.filter(c=>!c[1]).slice(0,3);
+  return `<div class="wc-strength">
+    <div class="wc-str-top"><b>${T('Work Card strength')}</b><span>${pct}%</span></div>
+    <div class="wc-bar"><i style="width:${pct}%"></i></div>
+    ${next.length?`<div class="wc-todo">${T('To stand out')}: ${next.map(c=>`<span>${T(c[0])}</span>`).join('')}</div>`:`<div class="wc-todo done">${icon('check')} ${T('Your card is complete — you’ll match more and rank higher.')}</div>`}
+  </div>`;
+}
 function workerProfile({ user, profile, creds, error, portfolio = [], work = [], rating = {avg:0,count:0}, crew = [], showUp = {} }) {
   const kinds = Object.entries(CRED_KINDS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
   const trades = tradesOf(profile);
@@ -1246,6 +1285,7 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [],
       <div class="chips">${tradeChips(profile)}</div>
       ${(rating.count||showUp.pct!=null)?`<div class="rating-row">${rating.count?ratingHead(rating):''} ${showUpBadge(showUp)}</div>`:''}
       <p class="muted">${esc(profile.city)} · ${profile.years_exp} yrs · floor $${profile.pay_floor}/hr · ${esc(profile.shift)} shift</p>
+      ${xfactorBadges(profile)}
       <div class="share-row">
         <button class="btn-sm" type="button" onclick="var u=location.origin+'/p/${user.id}';if(navigator.share){navigator.share({title:'My Rivet Work Card',url:u})}else if(navigator.clipboard){navigator.clipboard.writeText(u);this.textContent='${T('Link copied ✓')}'}">${icon('send')} ${T('Share my Work Card')}</button>
         <a class="btn-sm ghost" href="/p/${user.id}" target="_blank" rel="noopener">${T('Preview ↗')}</a>
@@ -1254,20 +1294,18 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [],
       <div class="ministats">
         <div><b>${profile.readiness}</b><span>${T('READINESS')}</span></div>
         <div><b>${creds.filter(c=>c.verified).length}</b><span>${T('VERIFIED')}</span></div>
-        <div><b>${creds.length}</b><span>${T('TOTAL CREDS')}</span></div>
+        <div><b>${work.length}</b><span>${T('PAST JOBS')}</span></div>
+        <div><b>${portfolio.length}</b><span>${T('PHOTOS')}</span></div>
       </div>
+      ${workCardStrength(profile, creds, work, portfolio)}
       <form method="post" action="/app/available" class="avail-form">
         <button class="btn-sm tgl ${profile.available?'':'ghost'}">${icon('dot','xic')}<span>${profile.available?T('Available for work — tap to pause'):T('Paused — tap to go available')}</span></button>
       </form>
-      <form method="post" action="/app/work-today" class="avail-form" style="margin-top:8px">
-        <button class="btn-sm tgl ${profile.work_today?'':'ghost'}">${icon('bolt','xic')}<span>${profile.work_today?T('Can work today — tap to clear'):T('I can work today')}</span></button>
-      </form>
-      <form method="post" action="/app/alerts" class="avail-form" style="margin-top:8px">
-        <button class="btn-sm tgl ${profile.alerts?'':'ghost'}">${icon('bell','xic')}<span>${profile.alerts?T('Job alerts on — tap to stop'):T('Text me new job alerts')}</span></button>
-      </form>
-      <form method="post" action="/app/relocate" class="avail-form" style="margin-top:8px">
-        <button class="btn-sm tgl ${profile.relocate?'':'ghost'}">${icon('send','xic')}<span>${profile.relocate?T('Open to relocate — tap to clear'):T('I’m open to relocating')}</span></button>
-      </form>
+    </div>
+    <div class="card">
+      <div class="sec-h" style="margin-top:0">${T('What makes you stand out')}</div>
+      <p class="muted sm" style="margin-top:-4px">${T('Flip on everything that’s true — each one matches you to more jobs and ranks you higher with employers.')}</p>
+      <div class="xf-grid">${XFACTORS.map(([action,col,ic,label])=>xToggle(action, profile[col], ic, T(label), T(label), '/app/profile')).join('')}</div>
     </div>
     <div class="col2"><div class="colstack">
     <div class="card">

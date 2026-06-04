@@ -1040,3 +1040,19 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .invite-link{display:flex;gap:8px;margin-bottom:10px}
 .invite-link input{flex:1;padding:9px 11px;border:1.5px solid var(--line);border-radius:10px;font-size:13.5px;background:var(--paper);color:var(--slate)}
 .invite-share{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ===== Work Card: x-factor badges, toggle grid, strength meter ===== */
+.xf-badges{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:10px 0 4px}
+.xf-badge{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:11px;background:rgba(31,169,113,.1);color:#157a52;border:1px solid rgba(31,169,113,.25)}
+.xf-badge svg{width:13px;height:13px;stroke:#157a52}
+.xf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
+.xf-grid .xf{margin:0}
+.xf-grid .xbtn{width:100%;justify-content:flex-start}
+.wc-strength{margin:12px 0 10px;text-align:left}
+.wc-str-top{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:5px}
+.wc-str-top span{font-weight:800;color:var(--brand-d)}
+.wc-bar{height:8px;border-radius:5px;background:var(--paper);border:1px solid var(--line);overflow:hidden}
+.wc-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--steel),var(--brand));border-radius:5px;transition:width .4s}
+.wc-todo{margin-top:8px;font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.wc-todo span{background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:2px 8px;color:var(--slate);font-weight:600}
+.wc-todo.done{color:#157a52;font-weight:700}.wc-todo.done svg{width:14px;height:14px;stroke:#157a52;vertical-align:-2px}
