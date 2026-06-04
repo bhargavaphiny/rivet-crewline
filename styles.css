@@ -1128,3 +1128,10 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .paymkt.low .pm-fill{background:#E8923A;opacity:.4}
 .paymkt.low .pm-top b{color:#a85f12}.paymkt.low .pm-top svg{stroke:#c9741f}
 .paymkt.mid .pm-fill,.paymkt.mid .pm-you{border-color:#1763a6}.paymkt.mid .pm-fill{background:#1763a6;opacity:.4}
+
+/* ---------- Skill Checks: verified badges ---------- */
+.sv-row{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0 2px}
+.cand-top ~ .card .sv-row,.profile-head .sv-row{justify-content:center}
+.sv-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(31,169,113,.13);color:#157a52;border:1px solid rgba(31,169,113,.35);font-weight:800;font-size:11.5px;padding:4px 10px;border-radius:9px}
+.sv-badge svg{width:13px;height:13px;stroke:#157a52;flex:none}
+.track-card.done{border-color:rgba(31,169,113,.45);background:linear-gradient(180deg,rgba(31,169,113,.06),transparent)}

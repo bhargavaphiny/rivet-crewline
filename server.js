@@ -1051,6 +1051,24 @@ const server = http.createServer(async (req,res)=>{
         const b = await readBody(req);
         return send(res, V.layout({title:'Practice',user,active:'grow',body:V.credPrep(prepM[1], V.gradeQuiz(prepM[1], b))}));
       }
+      // ----- Hands-on Skill Checks -----
+      if(p==='/app/skillcheck' && method==='GET')
+        return send(res, V.layout({title:'Skill Checks',user,active:'grow',body:V.skillCheckIndex(V.parseSkillchecks(prof))}));
+      const skM = p.match(/^\/app\/skillcheck\/([a-z0-9_]+)$/);
+      if(skM && method==='GET'){
+        const passed = V.parseSkillchecks(prof).includes(skM[1]);
+        return send(res, V.layout({title:'Skill Check',user,active:'grow',body:V.skillCheck(skM[1], null, passed)}));
+      }
+      if(skM && method==='POST'){
+        const b = await readBody(req);
+        const result = V.gradeSkill(skM[1], b);
+        if(result && result.pass){
+          const cur = V.parseSkillchecks(prof);
+          if(!cur.includes(skM[1])){ cur.push(skM[1]);
+            try { await db.prepare('UPDATE worker_profiles SET skillchecks=? WHERE user_id=?').run(JSON.stringify(cur), user.id); } catch(e){} }
+        }
+        return send(res, V.layout({title:'Skill Check',user,active:'grow',body:V.skillCheck(skM[1], result)}));
+      }
       if(p==='/app/agent/apply' && method==='POST'){
         const matches = await rankJobsForWorker(user.id);
         const appliedIds = new Set((await db.prepare('SELECT job_id FROM applications WHERE worker_id=?').all(user.id)).map(r=>r.job_id));

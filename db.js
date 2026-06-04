@@ -1320,6 +1320,7 @@ async function migrate() {
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN has_transport INTEGER DEFAULT 0'); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN bilingual INTEGER DEFAULT 0'); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN custom_trade TEXT'); } catch (e) { /* column exists */ }
+  try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN skillchecks TEXT'); } catch (e) { /* JSON array of passed skill-check keys */ }
   try { await db.exec("ALTER TABLE jobs ADD COLUMN source TEXT DEFAULT 'Rivet'"); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE jobs ADD COLUMN apply_url TEXT'); } catch (e) { /* column exists */ }
   try { await db.exec('ALTER TABLE jobs ADD COLUMN last_seen TEXT'); } catch (e) { /* freshness: when this live posting was last seen open in its source feed */ }

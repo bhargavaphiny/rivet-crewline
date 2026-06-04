@@ -460,7 +460,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=99">
+  <link rel="stylesheet" href="/styles.css?v=100">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -819,6 +819,7 @@ function growHub({ profile, trade, reco, marketJobs = 0, avgHr = 0 }){
       <div class="track-links">
         <a class="track-link prep" href="/app/learn/interview?trade=${trade}">${icon('spark')} ${T('AI interview rep')}</a>
         <a class="track-link" href="/app/prep${PREP_FOR[trade]?'/'+PREP_FOR[trade]:''}">${icon('star')} ${T('Practice for your credential')}</a>
+        ${skillKeyFor(trade)?`<a class="track-link" href="/app/skillcheck/${skillKeyFor(trade)}">${icon('shield')} ${T('Take the Skill Check — earn a verified badge')}</a>`:''}
         ${ROLE_BLS[trade]?`<a class="track-link" href="/careers/${trade}">${icon('shield')} ${T('Full career guide')} →</a>`:''}
       </div></div>` : ''}
     ${sec&&CLIMB_TIPS[sec]?`<div class="card"><div class="sec-h" style="margin-top:0">${T('How people climb — from those who’ve done it')}</div>
@@ -948,6 +949,132 @@ function credPrep(credKey, result){
       ${quiz.qs.map((q,i)=>`<div class="card quiz-q"><div class="q-q"><b>${i+1}.</b> ${esc(q.q)}</div>
         ${q.o.map((opt,j)=>`<label class="q-opt"><input type="radio" name="q${i}" value="${j}" required> <span>${esc(opt)}</span></label>`).join('')}</div>`).join('')}
       <button class="btn full">${T('Check my answers')}</button>
+    </form>
+  </section>`;
+}
+// ---------- Hands-on Skill Checks (situational, on-the-job judgment employers screen for) ----------
+const SKILL_SCENARIOS = {
+  cna: { label:'CNA — On the floor', sector:'Healthcare', qs:[
+    { q:'You walk in and find a resident on the floor next to their bed, awake and talking. First move?', o:['Lift them back into bed quickly','Don’t move them — check for injury and call the nurse','Help them walk to the bathroom'], a:1, e:'Never move a fallen resident before assessing. Check responsiveness/injury and get the nurse — moving them can worsen a fracture.' },
+    { q:'A resident refuses their morning bath. You:', o:['Bathe them anyway — it’s on the care plan','Respect the refusal, document it, and report to the nurse','Skip it and say nothing'], a:1, e:'Residents have the right to refuse. Honor it, document, and notify the nurse so the plan can adapt.' },
+    { q:'You’re transferring a resident and feel a sharp pull in your back. You:', o:['Push through to finish','Stop, use a gait belt / get a second person, and use your legs','Bend faster next time'], a:1, e:'Stop before injury. Proper body mechanics, a gait belt, and a two-person assist protect you and the resident.' },
+    { q:'A resident’s call light has been on for a while but it’s not your assignment. You:', o:['Ignore it — not your hall','Answer it or find who can right away','Turn it off and move on'], a:1, e:'Answer or get help immediately — an unanswered light can mean a fall or emergency. Never just silence it.' },
+    { q:'Before helping a resident eat, the most important check is:', o:['That the TV is on','Their identity, positioning (upright), and any swallowing precautions','The room temperature'], a:1, e:'Verify the right resident, sit them upright, and follow any aspiration/diet orders — wrong diet or position can be life-threatening.' },
+  ]},
+  medical_assistant: { label:'Medical Assistant — In the clinic', sector:'Healthcare', qs:[
+    { q:'You’re about to room a patient. The chart says “Jane Smith” but two Jane Smiths are scheduled. You:', o:['Take the first one you see','Verify two identifiers (name + DOB) before proceeding','Ask the front desk to guess'], a:1, e:'Always confirm two patient identifiers (e.g., full name and date of birth) to prevent wrong-patient errors.' },
+    { q:'A patient’s blood pressure reads 210/120 and they have a headache. You:', o:['Record it and continue rooming','Flag the provider immediately — this may be a hypertensive emergency','Re-take it in an hour'], a:1, e:'That’s a critical value. Notify the provider right away; don’t sit on it.' },
+    { q:'You drew a tube of blood. The needle is now exposed. You:', o:['Recap it by hand','Activate the safety device and drop it straight into the sharps container','Set it on the tray for later'], a:1, e:'Never recap by hand. Engage the safety and dispose in the sharps container immediately to prevent needlesticks.' },
+    { q:'A patient asks for their lab results. The provider hasn’t reviewed them. You:', o:['Read the values to them','Explain results are released after the provider reviews, and route the request','Tell them everything looks fine'], a:1, e:'MAs don’t interpret or release un-reviewed results. Route to the provider; don’t reassure or diagnose.' },
+    { q:'Before giving an injection the provider ordered, you should confirm the:', o:['Patient’s parking spot','Five rights: right patient, drug, dose, route, time','Waiting-room count'], a:1, e:'The “five rights” of medication administration prevent the most common and dangerous errors.' },
+  ]},
+  machine_operator: { label:'Machine Operator — On the line', sector:'Manufacturing', qs:[
+    { q:'A guard on your machine is loose and rattling at start of shift. You:', o:['Run the job — quota is tight','Tag it out and report it before running','Tape it down'], a:1, e:'A defeated/loose guard is a serious hazard. Lock/tag out and report — never run an unguarded machine.' },
+    { q:'You need to clear a jam inside the machine. First step:', o:['Reach in while it idles','Lockout/Tagout — isolate and verify zero energy','Hit it with a tool'], a:1, e:'LOTO before reaching in. “Idling” machines can cycle and amputate. Verify zero energy first.' },
+    { q:'Your parts start drifting toward the edge of tolerance. You:', o:['Keep running until they fail','Stop, flag it, and check tooling/setup before more scrap','Ship them anyway'], a:1, e:'Catch drift early — stop, alert the lead, and correct the cause to avoid a batch of scrap or a recall.' },
+    { q:'You’re asked to run a job you’ve never been trained on. You:', o:['Wing it','Ask for training / sign-off before running','Refuse and walk off'], a:1, e:'Run only what you’re qualified on. Ask for proper training and sign-off — safety and quality depend on it.' },
+    { q:'Loose sleeves near rotating equipment are:', o:['Fine if you’re careful','A snag/entanglement hazard — roll them and remove gloves/jewelry as required','Required PPE'], a:1, e:'Rotating machinery and loose clothing/gloves/jewelry cause entanglement injuries. Follow the dress code.' },
+  ]},
+  maintenance_tech: { label:'Maintenance Tech — Service call', sector:'Manufacturing', qs:[
+    { q:'A line goes down and production is pushing you to “just jump the interlock.” You:', o:['Bypass it to restore the line','Refuse — interlocks are safety devices; diagnose properly','Bypass and tell no one'], a:1, e:'Never defeat a safety interlock to chase uptime. It exists to prevent injury; fix the real fault.' },
+    { q:'Before opening an electrical panel to work on it, you:', o:['Assume it’s dead','Lockout/Tagout and verify de-energized with a meter','Wear gloves and hope'], a:1, e:'LOTO and test-before-touch. Verify zero energy with a meter — assumptions kill.' },
+    { q:'You finish a repair and have one bolt left over. You:', o:['Toss it — close enough','Stop and find where it goes before releasing the machine','Leave it on the floor'], a:1, e:'A leftover fastener means an incomplete/incorrect reassembly. Resolve it before returning equipment to service.' },
+    { q:'A pressurized hydraulic line needs work. First you:', o:['Crack the fitting under pressure','Relieve/bleed the stored pressure, then service','Cut it fast'], a:1, e:'Stored hydraulic/pneumatic energy is dangerous. Relieve pressure (part of LOTO) before opening lines.' },
+    { q:'You smell something hot/electrical near a motor. You:', o:['Keep working nearby','Investigate safely and de-energize if needed; report it','Spray water on it'], a:1, e:'Burning smells signal failing insulation/bearings. Investigate, de-energize, and report before it becomes a fire.' },
+  ]},
+  welder: { label:'Welder — In the booth', sector:'Manufacturing', qs:[
+    { q:'You’re about to weld on a used drum that held unknown liquid. You:', o:['Weld it — it looks empty','Never weld a closed/used container until purged and confirmed safe','Rinse with water and weld'], a:1, e:'Sealed/used containers can explode from residual vapors. They must be properly purged/inerted and verified first.' },
+    { q:'Welding in a tight, enclosed tank. The key hazard to manage is:', o:['Boredom','Fume buildup / oxygen displacement — ventilation & a permit','Bad lighting'], a:1, e:'Confined spaces need ventilation, monitoring, and a permit. Fumes and shielding gas can displace oxygen.' },
+    { q:'After welding, a coworker walks up without a shield as you strike an arc. You:', o:['Keep going','Warn them and pause — arc flash causes eye burns','Tell them to look away fast'], a:1, e:'Protect bystanders from arc flash (“arc eye”). Warn, screen the area, and pause until they’re shielded.' },
+    { q:'Your weld shows porosity and undercut on inspection. You:', o:['Grind and hide it','Identify the cause (gas/technique), fix it, and re-weld to spec','Paint over it'], a:1, e:'Cosmetic cover-ups fail in service. Find the root cause, repair to the WPS, and re-inspect.' },
+    { q:'Hot work near combustibles requires:', o:['Nothing special','A fire watch, cleared area, and extinguisher on hand','Just speed'], a:1, e:'Hot-work permits require removing/covering combustibles, a fire watch, and extinguishing capability.' },
+  ]},
+  cleanroom_op: { label:'Cleanroom Operator — In the fab', sector:'Semiconductor', qs:[
+    { q:'You realize your glove brushed the floor before handling a wafer carrier. You:', o:['Continue — it looked clean','Change gloves — contamination ruins yield','Wipe glove on your gown'], a:1, e:'A single particle can scrap wafers. Any suspected contamination = change gloves immediately.' },
+    { q:'Proper gowning order matters because:', o:['It’s tradition','Wrong order contaminates the suit and the room','It’s faster'], a:1, e:'Gowning is sequenced (cleanest last, face/hair contained) to keep particles off you and the cleanroom.' },
+    { q:'You smell a faint chemical odor near a wet bench. You:', o:['Keep working','Stop, alert EHS/supervisor, and follow the chemical response plan','Open a window'], a:1, e:'Fab chemicals (HF, solvents) are extremely hazardous. Any odor/leak = evacuate area per protocol and report — never improvise.' },
+    { q:'Hydrofluoric acid (HF) exposure is dangerous because it:', o:['Just stings briefly','Can be painless at first but cause deep tissue/bone damage — needs calcium gluconate','Washes off easily'], a:1, e:'HF can be deceptively painless initially yet life-threatening. Know the calcium gluconate first-aid and report immediately.' },
+    { q:'You’re asked to bring a cardboard box into the cleanroom. You:', o:['Carry it in','Refuse — cardboard sheds particles; use approved cleanroom materials','Tape it shut first'], a:1, e:'Cardboard and regular paper shed particles. Only cleanroom-rated materials enter the fab.' },
+  ]},
+  equipment_tech: { label:'Equipment Tech — Tool down', sector:'Semiconductor', qs:[
+    { q:'A process tool is down and the fab is pushing for a fast restart. The tool uses toxic gas. You:', o:['Restart and skip the purge','Follow the full LOTO + gas purge/abatement procedure, no shortcuts','Vent the line to the room'], a:1, e:'Toxic/pyrophoric gases demand the full purge and LOTO. Shortcuts risk a release — production pressure never overrides it.' },
+    { q:'Before maintenance inside a tool with RF and high voltage, you:', o:['Trust the indicator light','LOTO, verify de-energized, and follow the EMO/RF lockout steps','Work fast around it'], a:1, e:'RF/HV energy is lethal. Lock out, verify with a meter, and follow the tool-specific energy-control procedure.' },
+    { q:'You finish a repair. Before releasing the tool to production you:', o:['Hand it back immediately','Run qualification/verification and document the work','Skip docs to save time'], a:1, e:'Qual the tool and record the maintenance — undocumented or unverified work causes silent yield loss and safety gaps.' },
+    { q:'You see another tech reach into a tool that isn’t locked out. You:', o:['Mind your business','Stop the work — speak up; an un-LOTO’d tool can energize','Assume they know best'], a:1, e:'Stop-work authority applies to everyone. Speaking up on an un-locked-out tool can save a life.' },
+    { q:'A pyrophoric gas line needs to be opened. The non-negotiable first step is:', o:['Open it in air','Purge/inert the line per procedure before exposure','Light a match to test'], a:1, e:'Pyrophorics ignite on contact with air. The line must be purged/inerted per the documented procedure first.' },
+  ]},
+  quality_inspector: { label:'Quality Inspector — At the gate', sector:'Manufacturing', qs:[
+    { q:'A borderline part is just outside spec but the line is behind. The lead says “ship it.” You:', o:['Ship it to help the line','Hold it — out-of-spec is a fail; escalate per the quality process','Change the measurement'], a:1, e:'Quality holds the line. Out-of-spec is a nonconformance — document, quarantine, and escalate; don’t bend the gate.' },
+    { q:'Your gauge is past its calibration-due date. You:', o:['Use it anyway','Pull it from service and use a calibrated gauge','Estimate by eye'], a:1, e:'Measurements from an out-of-cal gauge are invalid. Use only in-calibration tools and tag the bad one.' },
+    { q:'You find a defect that earlier inspection missed on shipped lots. You:', o:['Stay quiet','Trigger containment/traceability for affected lots and report','Fix only new parts'], a:1, e:'A discovered escape needs containment, traceability, and notification — possibly a recall. Silence risks customers and the company.' },
+    { q:'“First-article inspection” exists to:', o:['Slow you down','Verify a new setup makes good parts before a full run','Test the inspector'], a:1, e:'FAI confirms the process/setup is correct before committing to a full run — catching errors at part #1, not #1000.' },
+    { q:'A production worker pressures you to pass their parts. You:', o:['Pass to avoid conflict','Stay objective — judge to the spec, not the person','Reject everything to be safe'], a:1, e:'Inspection must be impartial and based on the spec and data — not social pressure in either direction.' },
+  ]},
+};
+// trade → nearest skill-check scenario set
+const SKILL_FOR = { cna:'cna', patient_care_tech:'cna', home_health_aide:'cna', caregiver:'cna', med_tech:'cna',
+  medical_assistant:'medical_assistant', surgical_tech:'medical_assistant', sterile_processing:'medical_assistant', phlebotomist:'medical_assistant', pharmacy_tech:'medical_assistant',
+  machine_operator:'machine_operator', assembler:'machine_operator', production_worker:'machine_operator', warehouse:'machine_operator', forklift_operator:'machine_operator', machinist:'machine_operator',
+  maintenance_tech:'maintenance_tech', equipment_maintenance:'maintenance_tech', millwright:'maintenance_tech', industrial_mechanic:'maintenance_tech', electrician:'maintenance_tech', hvac:'maintenance_tech',
+  welder:'welder', fabricator:'welder', boilermaker:'welder', pipefitter:'welder',
+  cleanroom_op:'cleanroom_op', wafer_fab:'cleanroom_op', process_tech:'cleanroom_op', semiconductor_tech:'cleanroom_op',
+  equipment_tech:'equipment_tech', equipment_engineer:'equipment_tech', field_service:'equipment_tech',
+  quality_inspector:'quality_inspector', qa_tech:'quality_inspector', metrology:'quality_inspector', inspector:'quality_inspector' };
+const skillKeyFor = (trade)=> SKILL_FOR[trade] || (SKILL_SCENARIOS[trade] ? trade : null);
+function parseSkillchecks(profile){ try { return JSON.parse(profile.skillchecks||'[]'); } catch(e){ return []; } }
+// Skill-verified badge row — shows on the Work Card, public profile, and to recruiters.
+function skillVerifiedRow(profile){
+  const sk = parseSkillchecks(profile).filter(k=>SKILL_SCENARIOS[k]);
+  if(!sk.length) return '';
+  return `<div class="sv-row">${sk.map(k=>`<span class="sv-badge">${icon('shield','xic')} ${esc((SKILL_SCENARIOS[k].label.split(' — ')[0]))} ${T('Skill-verified')}</span>`).join('')}</div>`;
+}
+function gradeSkill(key, body){
+  const set = SKILL_SCENARIOS[key]; if(!set) return null;
+  let score=0; const graded = set.qs.map((q,i)=>{ const chosen = Number(body['q'+i]); const correct = chosen===q.a; if(correct) score++;
+    return { q:q.q, correct, correctText:q.o[q.a], chosenText:isNaN(chosen)?'':q.o[chosen], e:q.e }; });
+  const pass = score >= Math.ceil(set.qs.length*0.8);
+  return { score, total:set.qs.length, graded, pass };
+}
+function skillCheckIndex(passed = []){
+  const ps = new Set(passed);
+  const sectors = {};
+  for(const [k,s] of Object.entries(SKILL_SCENARIOS)){ (sectors[s.sector]=sectors[s.sector]||[]).push([k,s]); }
+  return `<section class="wrap narrow">
+    <a class="back" href="/app/grow">← ${T('Grow')}</a>
+    <div class="sec-h big">${icon('shield','xic')} ${T('Skill Checks')} <span class="muted">${T('prove you can do the job')}</span></div>
+    <p class="muted sm">${T('Real on-the-job scenarios — safety, judgment, and the calls employers actually screen for. Pass one and earn a “Skill-verified” badge on your Work Card that recruiters can see.')}</p>
+    ${Object.entries(sectors).map(([sec,list])=>`<div class="sec-h" style="margin-top:14px">${esc(T(sec))}</div>
+      <div class="track-grid">${list.map(([k,s])=>`<a class="card track-card ${ps.has(k)?'done':''}" href="/app/skillcheck/${k}">
+        <div class="track-h"><span class="trend-ic">${ps.has(k)?icon('check'):icon('shield')}</span><div><b>${esc(s.label)}</b><div class="muted sm">${s.qs.length} ${T('scenarios')}${ps.has(k)?` · <b style="color:#157a52">${T('Verified ✓')}</b>`:''}</div></div></div>
+        <span class="sector-go">${ps.has(k)?T('Review'):T('Start')} →</span></a>`).join('')}</div>`).join('')}
+  </section>`;
+}
+function skillCheck(key, result, passedBefore = false){
+  const set = SKILL_SCENARIOS[key];
+  if(!set) return `<section class="wrap narrow"><div class="card muted">${T('No skill check for that trade yet.')} <a href="/app/skillcheck">${T('See all skill checks')}</a></div></section>`;
+  if(result){
+    const {score, total, graded, pass} = result; const pct = Math.round(score/total*100);
+    return `<section class="wrap narrow">
+      <a class="back" href="/app/skillcheck">← ${T('All skill checks')}</a>
+      <div class="card agent-card" style="text-align:center"><div class="agent-h" style="justify-content:center">${icon('shield','xic')} ${esc(set.label)}</div>
+        <div class="verdict-ring ${pass?'rate-strong':pct>=60?'rate-solid':'rate-weak'}" style="margin:10px auto"><b>${pct}%</b><span>${score}/${total}</span></div>
+        <p class="agent-line">${pass?T('Passed — “Skill-verified” is now on your Work Card. Employers searching your trade will see it.'):T('Not yet — review each scenario below and retake. You’ve got this.')}</p>
+        ${pass?`<a class="btn-sm" href="/app/profile">${T('See it on my Work Card →')}</a>`:''}</div>
+      ${graded.map((g,i)=>`<div class="card quiz-r ${g.correct?'ok':'no'}">
+        <div class="q-q"><b>${i+1}.</b> ${esc(g.q)}</div>
+        <div class="q-a">${g.correct?icon('check')+' '+T('Correct'):'✗ '+T('Best answer:')+' '} <b>${esc(g.correctText)}</b>${!g.correct&&g.chosenText?` · ${T('you chose:')} ${esc(g.chosenText)}`:''}</div>
+        <p class="muted sm">${esc(g.e)}</p></div>`).join('')}
+      <div class="grow-cta"><a class="btn-sm" href="/app/skillcheck/${key}">${T('Retake')}</a><a class="btn-sm ghost" href="/app/skillcheck">${T('Other skill checks')}</a></div>
+    </section>`;
+  }
+  return `<section class="wrap narrow">
+    <a class="back" href="/app/skillcheck">← ${T('All skill checks')}</a>
+    <div class="sec-h big">${icon('shield','xic')} ${esc(set.label)} ${passedBefore?`<span class="match-chip" style="background:rgba(31,169,113,.14);color:#157a52">${T('Verified ✓')}</span>`:''}</div>
+    <p class="muted sm">${T('Pick the best on-the-job call for each. Pass 4 of 5 to earn the badge. No time limit — you can retake any time.')}</p>
+    <form method="post" action="/app/skillcheck/${key}">
+      ${set.qs.map((q,i)=>`<div class="card quiz-q"><div class="q-q"><b>${i+1}.</b> ${esc(q.q)}</div>
+        ${q.o.map((opt,j)=>`<label class="q-opt"><input type="radio" name="q${i}" value="${j}" required> <span>${esc(opt)}</span></label>`).join('')}</div>`).join('')}
+      <button class="btn full">${T('Submit my answers')}</button>
     </form>
   </section>`;
 }
@@ -1521,6 +1648,7 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [],
       ${(rating.count||showUp.pct!=null)?`<div class="rating-row">${rating.count?ratingHead(rating):''} ${showUpBadge(showUp)}</div>`:''}
       <p class="muted">${esc(profile.city)} · ${profile.years_exp} yrs · floor $${profile.pay_floor}/hr · ${esc(profile.shift)} shift</p>
       ${xfactorBadges(profile)}
+      ${skillVerifiedRow(profile)}
       <div class="share-row">
         <button class="btn-sm" type="button" onclick="var u=location.origin+'/p/${user.id}';if(navigator.share){navigator.share({title:'My Rivet Work Card',url:u})}else if(navigator.clipboard){navigator.clipboard.writeText(u);this.textContent='${T('Link copied ✓')}'}">${icon('send')} ${T('Share my Work Card')}</button>
         <a class="btn-sm ghost" href="/p/${user.id}" target="_blank" rel="noopener">${T('Preview ↗')}</a>
@@ -2265,6 +2393,7 @@ function publicPortfolio({ worker, profile, creds, portfolio, work = [], rating 
       ${profile.headline?`<p class="lead">${esc(profile.headline)}</p>`:''}
       <div class="chips light">${tradeChips(profile)}</div>
       ${(rating.count||showUp.pct!=null)?`<div class="rating-row light">${rating.count?ratingHead(rating):''} ${showUpBadge(showUp)}</div>`:''}
+      ${skillVerifiedRow(profile)}
       <p class="lead">${esc(profile.city)} · ${profile.years_exp} years experience</p>
       <div class="pub-stats">
         <div><b>${profile.readiness}</b><span>Job-readiness</span></div>
@@ -2953,6 +3082,7 @@ function empCandidate({ worker, profile, creds, matches, apps, messages, meId, n
       <div class="chips">${tradeChips(profile)}</div>
       <p class="muted">${esc(profile.city)} ${esc(profile.zip||'')} · ${profile.years_exp} yrs experience · seeks $${profile.pay_floor}+/hr</p>
       <div class="rating-row">${ratingHead(rating)} ${showUpBadge(showUp)}</div>
+      ${skillVerifiedRow(profile)}
       ${profile.available?`<div class="avail-badge">${icon('dot','xic')} ${T('Available for work')}</div>`:`<div class="avail-badge off">${T('Not currently available')}</div>`}${profile.work_today?`<div class="avail-badge today">${icon('bolt','xic')} ${T('Can work today')}</div>`:''}${profile.relocate?`<div class="avail-badge relo">${icon('send','xic')} ${T('Open to relocate')}</div>`:''}${profile.veteran?`<div class="avail-badge vet">${icon('shield','xic')} ${T('Veteran')}</div>`:''}${profile.self_employed?`<div class="avail-badge sub">${icon('hammer','xic')} ${T('Owner-operator · subcontracts')}</div>`:''}
       <div class="ministats">
         <div><b>${profile.readiness}</b><span>READINESS</span></div>
@@ -3131,4 +3261,4 @@ function whyRivetBlock(){
 }
 
 module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, workerOffers, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard, earnLearn, credPrep, credPrepIndex, gradeQuiz, growHub, invitePage, shiftsBoard, sourcingAgent, empShifts, empShiftForm, voiceAgent, SHIFT_KINDS, REGISTRY };
+  jobDetail, workerProfile, workerApplications, workerOffers, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard, earnLearn, credPrep, credPrepIndex, gradeQuiz, skillCheckIndex, skillCheck, gradeSkill, skillKeyFor, parseSkillchecks, skillVerifiedRow, growHub, invitePage, shiftsBoard, sourcingAgent, empShifts, empShiftForm, voiceAgent, SHIFT_KINDS, REGISTRY };
