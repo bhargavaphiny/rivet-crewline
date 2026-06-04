@@ -420,7 +420,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   } else if ((user.mode || user.role) === 'worker') {
     const L = (h,l,k)=>`<a class="nav-link ${active===k?'on':''}" href="${h}">${l}</a>`;
     const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/app/messages">${t('nav_messages')}${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
-    nav = `${L('/app',t('nav_home'),'home')}${L('/app/jobs',t('nav_find_work'),'jobs')}${L('/app/shifts',t('nav_shifts'),'shifts')}${L('/app/agents',t('nav_agents'),'agents')}${L('/app/profile',t('nav_work_card'),'profile')}${L('/app/applications',t('nav_applications'),'apps')}${L('/app/training',t('nav_training'),'training')}${L('/pulse',t('nav_pulse'),'pulse')}${msg}
+    nav = `${L('/app',t('nav_home'),'home')}${L('/app/jobs',t('nav_find_work'),'jobs')}${L('/app/shifts',t('nav_shifts'),'shifts')}${L('/app/agents',t('nav_agents'),'agents')}${L('/app/profile',t('nav_work_card'),'profile')}${L('/app/applications',t('nav_applications'),'apps')}${L('/app/grow',T('Grow'),'grow')}${L('/pulse',t('nav_pulse'),'pulse')}${msg}
            ${modeTg('work')}
            <span class="who">${initials(user.name)}</span>
            <a class="nav-link" href="/logout">${t('nav_logout')}</a>${langTg}`;
@@ -459,7 +459,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=94">
+  <link rel="stylesheet" href="/styles.css?v=95">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -756,6 +756,72 @@ function ring(score){
     <text x="33" y="38" text-anchor="middle" fill="#fff" font-size="16" font-weight="800">${score}</text></svg>`;
 }
 
+// ---------- Career-advancement ladders (real US progressions + typical pay per rung) ----------
+// Each rung: t=title, k=trade key if it maps to a Rivet trade (current-rung detection), pay, add=what unlocks it.
+const LADDERS = {
+  cna: [{t:'CNA',k:'cna',pay:'$18–25/hr'},{t:'Patient Care Tech',k:'patient_care_tech',pay:'$18–25/hr',add:'EKG + phlebotomy skills (on-the-job)'},{t:'LPN',pay:'~$59k/yr',add:'LPN program + NCLEX-PN'},{t:'RN',pay:'~$86k/yr',add:'ADN/BSN + NCLEX-RN'}],
+  patient_care_tech: [{t:'CNA',k:'cna',pay:'$18–25/hr'},{t:'Patient Care Tech',k:'patient_care_tech',pay:'$18–25/hr'},{t:'LPN',pay:'~$59k/yr',add:'LPN program + NCLEX-PN'},{t:'RN',pay:'~$86k/yr',add:'ADN/BSN + NCLEX-RN'}],
+  medical_assistant: [{t:'Medical Assistant',k:'medical_assistant',pay:'$20–30/hr'},{t:'Lead MA',pay:'+$3–5/hr',add:'experience + leadership'},{t:'LPN / RN',pay:'$59k–86k/yr',add:'nursing program'}],
+  phlebotomist: [{t:'Phlebotomist',k:'phlebotomist',pay:'$19–27/hr'},{t:'Lab Assistant',pay:'+$2–4/hr',add:'lab experience'},{t:'Medical Lab Technician',pay:'~$57k/yr',add:'MLT associate + ASCP'}],
+  surgical_tech: [{t:'Surgical Tech',k:'surgical_tech',pay:'$25–36/hr'},{t:'Certified (CST)',pay:'+$2–4/hr',add:'CST cert (NBSTSA)'},{t:'Surgical First Assistant',pay:'~$70k+/yr',add:'CSFA program'}],
+  sterile_processing: [{t:'Sterile Processing Tech',k:'sterile_processing',pay:'$19–27/hr'},{t:'Certified (CRCST)',pay:'+$2–4/hr',add:'CRCST (HSPA)'},{t:'Lead / Supervisor',pay:'+$5–8/hr',add:'experience + leadership'}],
+  cleanroom_op: [{t:'Cleanroom Operator',k:'cleanroom_op',pay:'$21–30/hr'},{t:'Process Technician',k:'process_tech',pay:'$24–36/hr',add:'process training on the job'},{t:'Equipment Technician',k:'equipment_tech',pay:'$28–44/hr',add:'equipment-maintenance skills'},{t:'Process Engineer',pay:'$90k+/yr',add:'associate/bachelor + experience'}],
+  process_tech: [{t:'Cleanroom Operator',k:'cleanroom_op',pay:'$21–30/hr'},{t:'Process Technician',k:'process_tech',pay:'$24–36/hr'},{t:'Equipment Technician',k:'equipment_tech',pay:'$28–44/hr',add:'equipment-maintenance skills'},{t:'Process Engineer',pay:'$90k+/yr',add:'associate/bachelor + experience'}],
+  equipment_tech: [{t:'Equipment Technician',k:'equipment_tech',pay:'$28–44/hr'},{t:'Senior / Lead Tech',pay:'+$4–8/hr',add:'tenure + advanced training'},{t:'Maintenance Supervisor',pay:'$75k+/yr',add:'leadership'},{t:'Reliability / Controls Engineer',pay:'$95k+/yr',add:'degree / deep experience'}],
+  maintenance_tech: [{t:'Maintenance Tech',k:'maintenance_tech',pay:'$26–40/hr'},{t:'Lead Tech',pay:'+$4–8/hr',add:'multi-craft skills (electrical, hydraulics, PLC)'},{t:'Facilities / Reliability Engineer',pay:'$90k+/yr',add:'degree / experience'}],
+  machinist: [{t:'Machinist',k:'machinist',pay:'$26–42/hr'},{t:'CNC Programmer',pay:'+$5–10/hr',add:'CAM / G-code + NIMS'},{t:'Tool & Die Maker',pay:'$63k+/yr',add:'apprenticeship'},{t:'Shop Lead',pay:'+$8/hr',add:'leadership'}],
+  welder: [{t:'Welder',k:'welder',pay:'$26–42/hr'},{t:'Certified / 6G Welder',pay:'+$4–10/hr',add:'AWS cert + all positions'},{t:'Welding Inspector (CWI)',pay:'$70k+/yr',add:'AWS CWI'},{t:'Welding Supervisor',pay:'+$10/hr',add:'leadership'}],
+  assembler: [{t:'Assembler',k:'assembler',pay:'$20–30/hr'},{t:'Lead Assembler',pay:'+$3–5/hr',add:'tenure'},{t:'Quality Inspector',k:'quality_inspector',pay:'$22–34/hr',add:'GD&T + gauges'},{t:'Manufacturing Technician',pay:'$28–44/hr',add:'equipment / maintenance training'}],
+  machine_operator: [{t:'Machine Operator',k:'machine_operator',pay:'$20–30/hr'},{t:'Line Lead',pay:'+$3–5/hr',add:'tenure'},{t:'Maintenance Tech',k:'maintenance_tech',pay:'$26–40/hr',add:'OSHA + mechanical skills'},{t:'Maintenance Supervisor',pay:'$70k+/yr',add:'leadership'}],
+  quality_inspector: [{t:'Quality Inspector',k:'quality_inspector',pay:'$22–34/hr'},{t:'QA Technician',pay:'+$3–6/hr',add:'ASQ + SPC'},{t:'Quality Engineer',pay:'$75k+/yr',add:'degree / CQE'}],
+  electrician: [{t:'Apprentice',pay:'$18–26/hr'},{t:'Journeyman Electrician',k:'electrician',pay:'$30–46/hr',add:'apprenticeship + license'},{t:'Master Electrician',pay:'+$8–12/hr',add:'master exam + hours'},{t:'Electrical Contractor',pay:'$90k+/yr',add:'contractor license + business'}],
+  hvac: [{t:'HVAC Installer',pay:'$20–30/hr'},{t:'HVAC Service Tech',k:'hvac',pay:'$26–42/hr',add:'EPA 608 + experience'},{t:'Lead Tech',pay:'+$5–8/hr',add:'NATE + leadership'},{t:'HVAC Contractor',pay:'$85k+/yr',add:'contractor license'}],
+  automotive_tech: [{t:'Auto Technician',k:'automotive_tech',pay:'$24–40/hr'},{t:'ASE Master Tech',pay:'+$6–10/hr',add:'ASE Master certs'},{t:'Shop Foreman',pay:'+$8/hr',add:'leadership'},{t:'Service Manager',pay:'$70k+/yr',add:'management'}],
+};
+// ---------- Grow: career-advancement hub — climb the ladder, even while you're working ----------
+function growHub({ profile, trade, reco, marketJobs = 0, avgHr = 0 }){
+  if(!trade) return `<section class="wrap narrow"><div class="sec-h big">${icon('spark','xic')} ${T('Grow')}</div>
+    <div class="card muted">${T('Add your trade to your Work Card and your coach will map your path up — the next rung, the credential that gets you there, and how to train for it.')} <a href="/app/profile">${T('Set up my Work Card')}</a></div></section>`;
+  const label = TRADES[trade]||trade;
+  const ladder = LADDERS[trade];
+  const r = ROLE_BLS[trade]; const sec = r ? r.sector : '';
+  const curIdx = ladder ? ladder.findIndex(x=>x.k===trade) : -1;
+  const next = (ladder && curIdx>=0 && curIdx<ladder.length-1) ? ladder[curIdx+1] : null;
+  const cred = reco && reco.topCred;
+  return `<section class="wrap narrow">
+    <a class="back" href="/app">← ${T('Home')}</a>
+    <div class="sec-h big">${icon('spark','xic')} ${T('Grow')} <span class="muted">${esc(label)}</span></div>
+    <div class="card agent-card">
+      <div class="agent-h">${icon('bolt','xic')} ${T('Your next move')}</div>
+      ${cred ? `<p class="agent-line big">${T('Add')} <b>${esc(cred.label)}</b> — ${T('unlocks')} ${cred.jobsUnlocked} ${T('more jobs near you')}${cred.payDelta>0?` ${T('at')} +$${cred.payDelta}/hr`:''}.</p>
+        <div class="grow-cta">${cred.url?`<a class="btn-sm" href="${esc(cred.url)}" target="_blank" rel="noopener noreferrer">${T('How to earn it ↗')}</a>`:''}<a class="btn-sm ghost" href="/app/learn/interview?trade=${trade}">${T('Practice the interview')}</a></div>`
+        : next ? `<p class="agent-line big">${T('Your next rung:')} <b>${esc(next.t)}</b> (${esc(next.pay)})${next.add?` — ${T('to get there:')} ${esc(next.add)}`:''}.</p>`
+        : `<p class="agent-line big">${marketJobs?`${marketJobs} ${esc(label)} ${T('jobs are open near you')}${avgHr?` ${T('averaging')} ~$${avgHr}/hr`:''}. `:''}${T('Keep your skills sharp and climb.')}</p>`}
+    </div>
+    ${ladder ? `<div class="card"><div class="sec-h" style="margin-top:0">${T('Your career ladder')}</div>
+      <div class="ladder">${ladder.map((x,i)=>`<div class="rung ${i===curIdx?'cur':''}${i===curIdx+1?' nextr':''}">
+        <div class="rung-dot">${i<curIdx?icon('check'):(i===curIdx?'●':(i===curIdx+1?'→':'○'))}</div>
+        <div class="rung-main"><div class="rung-top">${x.k&&ROLE_BLS[x.k]?`<a class="cand-link" href="/careers/${x.k}"><b>${esc(x.t)}</b></a>`:`<b>${esc(x.t)}</b>`} <span class="rung-pay">${esc(x.pay)}</span>${i===curIdx?`<span class="chip sm green">${T('You are here')}</span>`:''}</div>
+          ${x.add&&i>curIdx?`<div class="muted sm">${T('To reach:')} ${esc(x.add)}</div>`:''}</div></div>`).join('')}</div>
+      <p class="muted sm" style="margin-top:8px">${T('Typical U.S. pay — your market and employer vary. Source: BLS + industry.')}</p></div>` : ''}
+    ${LEARN_TRACKS[trade] ? `<div class="card"><div class="sec-h" style="margin-top:0">${T('Keep getting better — 10 minutes at a time')}</div>
+      ${learnVideo(trade, LEARN_TRACKS[trade].vid)}
+      <div class="track-links">
+        <a class="track-link prep" href="/app/learn/interview?trade=${trade}">${icon('spark')} ${T('AI interview rep')}</a>
+        ${ROLE_BLS[trade]?`<a class="track-link" href="/careers/${trade}">${icon('shield')} ${T('Full career guide')} →</a>`:''}
+        <a class="track-link" href="/app/training">${icon('star')} ${T('Credentials to add')} →</a>
+      </div></div>` : ''}
+    <div class="card">
+      <div class="sec-h" style="margin-top:0">${T('Earn while you learn')}</div>
+      <p class="muted sm" style="margin-top:-4px">${T('Get paid to train up — registered apprenticeships and employer-funded programs near you.')}</p>
+      <div class="track-links">
+        <a class="track-link" href="https://www.apprenticeship.gov/apprenticeship-job-finder?keyword=${encodeURIComponent(label)}" target="_blank" rel="noopener noreferrer">${icon('star')} ${T('Find a paid apprenticeship ↗')}</a>
+        ${sec==='manufacturing'?`<a class="track-link" href="https://fame-usa.com/" target="_blank" rel="noopener noreferrer">${icon('star')} ${T('FAME earn-and-learn ↗')}</a>`:''}
+        <a class="track-link" href="https://www.careeronestop.org/Toolkit/Training/find-local-training.aspx" target="_blank" rel="noopener noreferrer">${icon('star')} ${T('Free / low-cost training near you ↗')}</a>
+      </div>
+    </div>
+  </section>`;
+}
 // ---------- worker agents ----------
 function workerCoach({ profile, reco, line }){
   const credCard = (c, primary) => `<div class="card ${primary?'agent-card':''}">
@@ -2881,4 +2947,4 @@ function whyRivetBlock(){
 }
 
 module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard, invitePage, shiftsBoard, sourcingAgent, empShifts, empShiftForm, voiceAgent, SHIFT_KINDS, REGISTRY };
+  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard, growHub, invitePage, shiftsBoard, sourcingAgent, empShifts, empShiftForm, voiceAgent, SHIFT_KINDS, REGISTRY };

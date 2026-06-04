@@ -1056,3 +1056,19 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .wc-todo{margin-top:8px;font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .wc-todo span{background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:2px 8px;color:var(--slate);font-weight:600}
 .wc-todo.done{color:#157a52;font-weight:700}.wc-todo.done svg{width:14px;height:14px;stroke:#157a52;vertical-align:-2px}
+
+/* ===== Grow: career ladder ===== */
+.grow-cta{display:flex;gap:9px;flex-wrap:wrap;margin-top:10px}
+.ladder{display:flex;flex-direction:column;gap:0;margin-top:4px}
+.rung{display:flex;gap:12px;padding:11px 0;border-left:2px solid var(--line);margin-left:11px;padding-left:16px;position:relative}
+.rung:last-child{border-left-color:transparent}
+.rung-dot{position:absolute;left:-12px;top:11px;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:#fff;border:2px solid var(--line);font-size:12px;font-weight:800;color:var(--muted)}
+.rung-dot svg{width:13px;height:13px;stroke:#fff}
+.rung.cur .rung-dot{background:var(--brand);border-color:var(--brand);color:#fff}
+.rung.nextr .rung-dot{background:rgba(31,169,113,.12);border-color:#1fa971;color:#157a52}
+.rung:has(.rung-dot svg) .rung-dot,.rung .rung-dot:has(svg){background:var(--steel);border-color:var(--steel)}
+.rung-main{flex:1;padding-top:1px}
+.rung-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rung-top b{font-size:14.5px}
+.rung-pay{font-size:12.5px;font-weight:800;color:var(--brand-d);background:var(--paper);border-radius:9px;padding:2px 8px}
+.rung.cur .rung-top b{color:var(--brand-d)}

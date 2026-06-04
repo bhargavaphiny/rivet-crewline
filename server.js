@@ -979,6 +979,11 @@ const server = http.createServer(async (req,res)=>{
         }
         return send(res, V.layout({title:'Career Coach',user,active:'home',body:V.workerCoach({profile:prof, reco, line})}));
       }
+      if(p==='/app/grow' && method==='GET'){
+        const trade = (profTrades(prof)[0])||'';
+        const reco = await coachReco(user.id);
+        return send(res, V.layout({title:'Grow',user,active:'grow',body:V.growHub({profile:prof, trade, reco, marketJobs:reco?reco.marketJobs:0, avgHr:reco?reco.avgHr:0})}));
+      }
       if(p==='/app/agent/apply' && method==='POST'){
         const matches = await rankJobsForWorker(user.id);
         const appliedIds = new Set((await db.prepare('SELECT job_id FROM applications WHERE worker_id=?').all(user.id)).map(r=>r.job_id));
