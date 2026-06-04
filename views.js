@@ -36,6 +36,16 @@ const ICONS = {
   building:{ f:0, p:'<path d="M4 21V4a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v17"/><path d="M15 9h4a1 1 0 0 1 1 1v11"/><path d="M8 7h3M8 11h3M8 15h3"/>' },
   globe:   { f:0, p:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>' },
   mic:     { f:0, p:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/>' },
+  home:    { f:0, p:'<path d="M3 11 12 3l9 8"/><path d="M5 10v10h14V10"/>' },
+  grid:    { f:0, p:'<path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/>' },
+  briefcase:{ f:0, p:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/>' },
+  inbox:   { f:0, p:'<path d="M3 13l3-9h12l3 9v6H3z"/><path d="M3 13h5l1 2h6l1-2h5"/>' },
+  chat:    { f:0, p:'<path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>' },
+  search:  { f:0, p:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/>' },
+  grad:    { f:0, p:'<path d="M12 4 2 9l10 5 10-5z"/><path d="M6 11v5c0 1 3 3 6 3s6-2 6-3v-5"/>' },
+  users:   { f:0, p:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5a3 3 0 0 1 0 6M21 20a6 6 0 0 0-5-5.9"/>' },
+  calendar:{ f:0, p:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/>' },
+  chart:   { f:0, p:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>' },
 };
 function icon(name, cls=''){
   const ic = ICONS[name] || ICONS.wrench;
@@ -423,29 +433,33 @@ function layout({ title, user, body, active = '', flash = '' }) {
       <a class="seg-opt ${LANG!=='es'?'on':''}" href="/lang/en">EN</a><a class="seg-opt ${LANG==='es'?'on':''}" href="/lang/es">ES</a></div>`;
   const modeTg = (cur)=>`<div class="seg mode" role="group" aria-label="Mode">
       <a class="seg-opt ${cur==='work'?'on':''}" href="/app">${t('mode_work')}</a><a class="seg-opt ${cur==='hire'?'on':''}" href="/console">${t('mode_hire')}</a></div>`;
+  const isEmp = user && (user.mode || user.role)==='employer';
+  // top nav for logged-OUT marketing pages
   let nav = '';
   if (!user) {
     nav = `<a class="nav-link ${active==='sectors'?'on':''}" href="/sectors">${t('nav_industries')}</a>
            <a class="nav-link ${active==='careers'?'on':''}" href="/careers">${t('nav_careers')}</a>
            <a class="nav-link" href="/login">${t('nav_login')}</a>
            <a class="btn-sm" href="/signup">${t('nav_get_started')}</a>${langTg}`;
-  } else if ((user.mode || user.role) === 'worker') {
-    const L = (h,l,k)=>`<a class="nav-link ${active===k?'on':''}" href="${h}">${l}</a>`;
-    const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/app/messages">${t('nav_messages')}${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
-    const offers = `<a class="nav-link ${active==='offers'?'on':''}" href="/app/offers">${T('Offers')}${user.offers?`<span class="ndot hot">${user.offers}</span>`:''}</a>`;
-    nav = `${L('/app',t('nav_home'),'home')}${L('/app/jobs',t('nav_find_work'),'jobs')}${offers}${L('/app/shifts',t('nav_shifts'),'shifts')}${L('/app/agents',t('nav_agents'),'agents')}${L('/app/profile',t('nav_work_card'),'profile')}${L('/app/applications',t('nav_applications'),'apps')}${L('/app/grow',T('Grow'),'grow')}${L('/pulse',t('nav_pulse'),'pulse')}${msg}
-           ${modeTg('work')}
-           <span class="who">${initials(user.name)}</span>
-           <a class="nav-link" href="/logout">${t('nav_logout')}</a>${langTg}`;
-  } else {
-    const L = (h,l,k)=>`<a class="nav-link ${active===k?'on':''}" href="${h}">${l}</a>`;
-    const msg = `<a class="nav-link ${active==='msgs'?'on':''}" href="/console/messages">${t('nav_messages')}${user.unread?`<span class="ndot">${user.unread}</span>`:''}</a>`;
-    nav = `${L('/console',t('nav_overview'),'ov')}${L('/console/search',t('nav_talent'),'search')}${L('/console/jobs',t('nav_jobs'),'jobs')}${L('/console/shifts',t('nav_shifts'),'shifts')}${L('/console/agents',t('nav_agents'),'agents')}${L('/console/analytics',t('nav_analytics'),'analytics')}${L('/pulse',t('nav_pulse'),'pulse')}${msg}
-           ${modeTg('hire')}
-           <a class="who" href="/console/company" title="Company profile">${initials(user.company||user.name)}</a>
-           <a class="nav-link" href="/logout">${t('nav_logout')}</a>${langTg}`;
   }
-  const brand = user && (user.mode || user.role)==='employer'
+  // sidebar nav for logged-IN app (worker + employer)
+  const dot = (n,hot)=> n?`<span class="ndot${hot?' hot':''}">${n}</span>`:'';
+  const S = (h,l,k,ic,badge='')=>`<a class="snav ${active===k?'on':''}" href="${h}">${icon(ic)} <span>${l}</span>${badge}</a>`;
+  let sideList = '', sideFoot = '', avatarHref = '/app/profile', avatarInit = '';
+  if (user && !isEmp) {
+    avatarHref = '/app/profile'; avatarInit = initials(user.name);
+    sideList = `${S('/app',t('nav_home'),'home','home')}${S('/app/jobs',t('nav_find_work'),'jobs','search')}${S('/app/offers',T('Offers'),'offers','bell',dot(user.offers,true))}${S('/app/applications',t('nav_applications'),'apps','inbox')}${S('/app/messages',t('nav_messages'),'msgs','chat',dot(user.unread))}
+      <div class="snav-div"></div>
+      ${S('/app/profile',t('nav_work_card'),'profile','briefcase')}${S('/app/grow',T('Grow'),'grow','grad')}${S('/app/shifts',t('nav_shifts'),'shifts','calendar')}${S('/app/agents',t('nav_agents'),'agents','spark')}${S('/pulse',t('nav_pulse'),'pulse','users')}`;
+    sideFoot = `${modeTg('work')}<div class="seg-row">${langTg}<a class="nav-link" href="/logout">${t('nav_logout')}</a></div>`;
+  } else if (user) {
+    avatarHref = '/console/company'; avatarInit = initials(user.company||user.name);
+    sideList = `${S('/console',t('nav_overview'),'ov','grid')}${S('/console/search',t('nav_talent'),'search','search')}${S('/console/jobs',t('nav_jobs'),'jobs','briefcase')}${S('/console/messages',t('nav_messages'),'msgs','chat',dot(user.unread))}
+      <div class="snav-div"></div>
+      ${S('/console/shifts',t('nav_shifts'),'shifts','calendar')}${S('/console/agents',t('nav_agents'),'agents','spark')}${S('/console/analytics',t('nav_analytics'),'analytics','chart')}${S('/console/company',T('Company'),'company','building')}${S('/pulse',t('nav_pulse'),'pulse','users')}`;
+    sideFoot = `${modeTg('hire')}<div class="seg-row">${langTg}<a class="nav-link" href="/logout">${t('nav_logout')}</a></div>`;
+  }
+  const brand = isEmp
     ? `<a class="brand" href="/console"><span class="logo c">C</span> Crewline</a>`
     : `<a class="brand" href="${user?'/app':'/'}"><span class="logo">R</span> Rivet${user?'':' <small>× Crewline</small>'}</a>`;
 
@@ -472,15 +486,35 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=104">
-  </head><body>
+  <link rel="stylesheet" href="/styles.css?v=105">
+  </head><body class="${user?'app-mode':'mkt-mode'}">
   <a class="skip" href="#main">Skip to main content</a>
+  ${user ? `
+  <input type="checkbox" id="navcb" class="nav-cb" hidden>
+  <div class="app-shell">
+    <aside class="sidenav" aria-label="Primary">
+      <div class="snav-top">${brand}<label for="navcb" class="snav-close" aria-label="Close menu">✕</label></div>
+      <nav class="snav-list">${sideList}</nav>
+      <div class="snav-foot">${sideFoot}</div>
+    </aside>
+    <label for="navcb" class="nav-scrim" aria-hidden="true"></label>
+    <div class="app-body">
+      <header class="appbar">
+        <label for="navcb" class="burger" aria-label="Open menu"><span></span><span></span><span></span></label>
+        ${brand}
+        <a class="who sm" href="${avatarHref}">${avatarInit}</a>
+      </header>
+      ${flash?`<div class="flash wrap">${esc(flash)}</div>`:''}
+      <main id="main">${body}</main>
+      <footer class="site-foot">Rivet × Crewline — blue-collar hiring platform</footer>
+    </div>
+  </div>
+  ${voiceAgent(user.mode || user.role)}`
+  : `
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
   ${flash?`<div class="flash wrap">${esc(flash)}</div>`:''}
   <main id="main">${body}</main>
-  ${user ? voiceAgent(user.mode || user.role) : ''}
-  ${user ? `<footer class="site-foot">Rivet × Crewline — blue-collar hiring platform</footer>`
-    : `<footer class="site-foot rich">
+  <footer class="site-foot rich">
     <div class="wrap foot-grid">
       <div class="foot-brand"><a class="brand" href="/"><span class="logo">R</span> Rivet <small>× Crewline</small></a>
         <p>${t('foot_tagline')}</p></div>

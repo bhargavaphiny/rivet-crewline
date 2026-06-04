@@ -1188,3 +1188,41 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .followup svg{stroke:#c9741f;flex:none;width:15px;height:15px}
 .ext-set{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:9px}
 .ext-set form{display:inline}
+
+/* ---------- App sidebar navigation (logged-in) ---------- */
+body.app-mode{margin:0}
+.app-shell{display:flex;min-height:100vh}
+.sidenav{position:fixed;top:0;left:0;bottom:0;width:232px;background:#13212B;color:#e7edf1;display:flex;flex-direction:column;padding:16px 12px;z-index:80;overflow-y:auto}
+.snav-top{display:flex;align-items:center;justify-content:space-between;padding:0 6px 12px}
+.snav-top .brand{color:#fff;font-size:18px}
+.snav-list{flex:1;display:flex;flex-direction:column;gap:3px;margin-top:4px}
+.snav{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;color:#bccad4;text-decoration:none;font-weight:600;font-size:14.5px;line-height:1}
+.snav svg{width:18px;height:18px;stroke:currentColor;fill:none;flex:none}
+.snav span{flex:1}
+.snav:hover{background:rgba(255,255,255,.07);color:#fff}
+.snav.on{background:var(--brand,#1763a6);color:#fff}
+.snav .ndot{margin-left:auto}
+.snav-div{height:1px;background:rgba(255,255,255,.1);margin:9px 8px}
+.snav-foot{border-top:1px solid rgba(255,255,255,.1);margin-top:8px;padding-top:12px;display:flex;flex-direction:column;gap:10px}
+.snav-foot .seg{width:100%}
+.snav-foot .seg .seg-opt{flex:1;text-align:center}
+.seg-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.snav-foot .nav-link{color:#bccad4;padding:0;font-size:13px}
+.snav-foot .nav-link:hover{color:#fff}
+.snav-close{display:none}
+.app-body{flex:1;margin-left:232px;min-width:0;display:flex;flex-direction:column}
+.app-body>main{flex:1}
+.appbar{display:none}
+.nav-scrim{display:none}
+.who.sm{width:34px;height:34px;font-size:13px}
+@media (max-width:880px){
+  .sidenav{transform:translateX(-100%);transition:transform .22s ease;width:272px;box-shadow:2px 0 26px rgba(0,0,0,.32)}
+  .nav-cb:checked ~ .app-shell .sidenav{transform:none}
+  .app-body{margin-left:0}
+  .appbar{display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:60;background:#13212B;color:#fff;padding:10px 14px}
+  .appbar .brand{color:#fff;flex:1;font-size:17px}
+  .snav-close{display:inline-flex;background:none;border:0;color:#bccad4;font-size:20px;cursor:pointer;padding:2px 8px;line-height:1}
+  .burger{display:inline-flex;flex-direction:column;gap:4px;cursor:pointer;padding:4px}
+  .burger span{display:block;width:22px;height:2.5px;background:#fff;border-radius:2px}
+  .nav-cb:checked ~ .app-shell .nav-scrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:75}
+}
