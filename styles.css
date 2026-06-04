@@ -1112,3 +1112,19 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .match-chip.soft{background:var(--wash,#f1f0ec);color:var(--slate)}
 .hot-ct{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;background:#E8923A;color:#fff;font-size:12px;font-weight:800;border-radius:10px;margin-left:6px;vertical-align:middle}
 .hot-ct.soft{background:var(--wash,#e7e5df);color:var(--slate)}
+
+/* ---------- Market pay percentile bar ---------- */
+.paymkt{margin:9px 0 2px;max-width:340px}
+.pm-top{display:flex;align-items:center;gap:6px;font-size:13px;flex-wrap:wrap}
+.pm-top svg{width:14px;height:14px;flex:none}
+.pm-top b{font-weight:800}
+.pm-bar{position:relative;height:7px;border-radius:5px;background:linear-gradient(90deg,#e9e6df,#d6e8dc);margin:6px 0 3px;overflow:visible}
+.pm-fill{position:absolute;left:0;top:0;height:100%;border-radius:5px;background:var(--brand-g,#1fa971);opacity:.5}
+.pm-you{position:absolute;top:50%;width:13px;height:13px;border-radius:50%;background:#fff;border:3px solid var(--brand-g,#1fa971);transform:translate(-50%,-50%);box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.pm-scale{display:flex;justify-content:space-between;font-size:11px;color:var(--slate)}
+.paymkt.top .pm-top b,.paymkt.good .pm-top b{color:#157a52}
+.paymkt.top .pm-top svg,.paymkt.good .pm-top svg{stroke:#157a52}
+.paymkt.low .pm-fill,.paymkt.low .pm-you{background:#fff;border-color:#c9741f}
+.paymkt.low .pm-fill{background:#E8923A;opacity:.4}
+.paymkt.low .pm-top b{color:#a85f12}.paymkt.low .pm-top svg{stroke:#c9741f}
+.paymkt.mid .pm-fill,.paymkt.mid .pm-you{border-color:#1763a6}.paymkt.mid .pm-fill{background:#1763a6;opacity:.4}

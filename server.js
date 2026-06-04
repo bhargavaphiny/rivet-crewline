@@ -337,6 +337,27 @@ async function inboundForWorker(wid){
   const pending = requests.filter(r=>r.status==='proposed').length;
   return { requests, interested, pending, count: pending + interested.length };
 }
+// Market pay percentile for a trade, computed from our REAL open-job corpus (no fabricated data).
+const payBandsForTrade = (trade) => cached('payband:'+trade, CACHE_TTL, async ()=>{
+  const rows = await db.prepare("SELECT pay_min, pay_max FROM jobs WHERE status='open' AND trade=? AND pay_max>0").all(trade);
+  const mids = rows.map(r=> (r.pay_min>0 ? (r.pay_min+r.pay_max)/2 : r.pay_max)).filter(v=>v>0).sort((a,b)=>a-b);
+  if(mids.length<8) return { n: mids.length };
+  const q = (pp)=> mids[Math.min(mids.length-1, Math.floor(pp*mids.length))];
+  return { n:mids.length, mids, p25:Math.round(q(.25)), p50:Math.round(q(.5)), p75:Math.round(q(.75)), p90:Math.round(q(.9)) };
+});
+async function payRankForJob(job){
+  if(!job || !job.trade || !(job.pay_max>0)) return null;
+  const b = await payBandsForTrade(job.trade);
+  if(!b || b.n<8) return null;
+  const mid = job.pay_min>0 ? (job.pay_min+job.pay_max)/2 : job.pay_max;
+  const pct = Math.round(b.mids.filter(v=>v<=mid).length / b.mids.length * 100);
+  let label='Below the local median', cls='low';
+  if(pct>=90){label='Top 10% of pay';cls='top';}
+  else if(pct>=75){label='Top 25% of pay';cls='top';}
+  else if(pct>=55){label='Above the median';cls='good';}
+  else if(pct>=45){label='Around the median';cls='mid';}
+  return { pct, label, cls, n:b.n, p25:b.p25, p50:b.p50, p75:b.p75, mid:Math.round(mid) };
+}
 // Load all credentials once, grouped by user_id — avoids an N+1 query per worker.
 async function allCredsByUser(){
   const rows = await db.prepare('SELECT * FROM credentials ORDER BY id').all();
@@ -1303,7 +1324,8 @@ const server = http.createServer(async (req,res)=>{
         const empRating = await ratingFor(job.employer_id, 'employer');
         const empPay = await payRep(job.employer_id);
         const myQuote = job.quotes_ok ? await db.prepare('SELECT * FROM quotes WHERE job_id=? AND worker_id=?').get(jid, user.id) : null;
-        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied,saved,jobMedia,distance,rules,empRating,workAuth:prof.work_auth||'',empPay,myQuote,payFloor:prof.pay_floor||0,empRehire:await rehireStat(job.employer_id),empSafety:await safetyStat(job.employer_id)})}));
+        const payMarket = await payRankForJob(job);
+        return send(res, V.layout({title:job.title,user,active:'jobs',body:V.jobDetail({job,match,applied,saved,jobMedia,distance,rules,empRating,workAuth:prof.work_auth||'',empPay,myQuote,payFloor:prof.pay_floor||0,empRehire:await rehireStat(job.employer_id),empSafety:await safetyStat(job.employer_id),payMarket})}));
       }
       if(jid && p===`/app/jobs/${jid}/quote` && method==='POST'){
         const job = await db.prepare('SELECT id,title,employer_id,quotes_ok FROM jobs WHERE id=?').get(jid);

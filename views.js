@@ -460,7 +460,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=98">
+  <link rel="stylesheet" href="/styles.css?v=99">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -1249,7 +1249,7 @@ function trustCard(v){
     <ul class="trust-list">${v.reasons.map(([k,t])=>`<li class="tr-${k}">${icon(ic[k]||'dot')} <span>${t}</span></li>`).join('')}</ul>
   </div>`;
 }
-function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance = null, rules = null, empRating = {avg:0,count:0}, workAuth = '', empPay = {}, myQuote = null, payFloor = 0, empRehire = 0, empSafety = {} }) {
+function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance = null, rules = null, empRating = {avg:0,count:0}, workAuth = '', empPay = {}, myQuote = null, payFloor = 0, empRehire = 0, empSafety = {}, payMarket = null }) {
   const _trust = trustCard(trustVerdict(job, { rating:empRating, pay:empPay, rehire:empRehire, safety:empSafety, payFloor, marketHr: ROLE_BLS[job.trade]?Math.round(ROLE_BLS[job.trade].med/2080):0 }));
   const belowMin = rules && job.pay_min && job.pay_min < rules.minWage;
   const spon = (job.sponsorship)||'authorized';
@@ -1265,6 +1265,7 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
           <div class="job-c">${job.poster_kind==='individual'?`${icon('pin')} ${T('Posted by a homeowner / small business')} · `:''}${esc(job.company||'')} · ${esc(job.city)} ${esc(job.zip)} · ${esc(T(job.shift))}${distance!=null?` · <b class="dist">${distance} ${T('mi away')}</b>`:''}</div>
           <div class="pay big">${job.quotes_ok&&!job.pay_min?T('Name your price'):`$${job.pay_min}–${job.pay_max}/hr`}</div>
           ${payFitBadge(payFloor, job, 'worker')}
+          ${marketPayBar(payMarket, job.trade)}
         </div>
         <div class="score-pill ${scoreClass(match.score)}">${match.score}<small>${T('match')}</small></div>
       </div>
@@ -2393,6 +2394,17 @@ function payFitBadge(floor, job, side = 'worker'){
     return `<span class="payfit good">${icon('dot')} ${side==='recruiter'?`${T('Asks')} $${floor}/hr · ${T('within your range')}`:`${T('Meets your')} $${floor} ${T('floor')}`}</span>`;
   const gap = floor - job.pay_max;
   return `<span class="payfit low">${icon('dot')} ${side==='recruiter'?`${T('Asks')} $${floor}/hr · $${gap} ${T('over budget')}`:`$${gap}/hr ${T('below your')} $${floor} ${T('floor')}`}</span>`;
+}
+// Market pay percentile — where this job sits vs. our real open-job pay corpus for the trade.
+function marketPayBar(pm, trade){
+  if(!pm) return '';
+  const tl = (TRADES[trade]||trade||'').toLowerCase();
+  const pos = Math.max(4, Math.min(96, pm.pct));
+  return `<div class="paymkt ${pm.cls}">
+    <div class="pm-top">${icon('chart','xic')} <b>${T(pm.label)}</b> <span class="muted sm">${T('among')} ${pm.n} ${esc(tl)} ${T('jobs on Rivet')}</span></div>
+    <div class="pm-bar"><span class="pm-fill" style="width:${pos}%"></span><i class="pm-you" style="left:${pos}%"></i></div>
+    <div class="pm-scale"><span>$${pm.p25}</span><span>${T('median')} $${pm.p50}/hr</span><span>$${pm.p75}+</span></div>
+  </div>`;
 }
 // recruiter-side interview block for a given job/worker
 function interviewEmp(iv){
