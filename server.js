@@ -1045,6 +1045,12 @@ const server = http.createServer(async (req,res)=>{
         const jobs = all.filter(j=>!tuitionIds.has(j.id) && TRAIN_RX.test(j.title||'')).slice(0,24);
         return send(res, V.layout({title:'Earn & Learn',user,active:'grow',body:V.earnLearn({trade, jobs, tuitionJobs})}));
       }
+      const credPathM = p.match(/^\/app\/cred\/([a-z0-9_]+)$/);
+      if(credPathM && method==='GET'){
+        const key = credPathM[1];
+        const hasIt = (await getCreds(user.id)).some(c=>c.kind===key);
+        return send(res, V.layout({title:'Credential path',user,active:'grow',body:V.credPath(key,{hasIt})}));
+      }
       if(p==='/app/prep' && method==='GET')
         return send(res, V.layout({title:'Credential practice',user,active:'grow',body:V.credPrepIndex()}));
       const prepM = p.match(/^\/app\/prep\/([a-z0-9_]+)$/);

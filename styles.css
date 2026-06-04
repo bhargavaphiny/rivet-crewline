@@ -1237,3 +1237,12 @@ body.app-mode{margin:0}
 .qa-copy{background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 12px;font-weight:700;font-size:13px;cursor:pointer;color:var(--ink)}
 .qa-copy:hover{border-color:#E8923A}
 .qa-pitch{background:var(--wash,#f4f2ec);border:1px solid var(--line);border-left:3px solid #E8923A;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.5;font-style:italic;color:var(--ink)}
+
+/* ---------- Credential path (guided steps) ---------- */
+.cred-path{list-style:none;padding:0;margin:14px 0 0;display:flex;flex-direction:column;gap:12px}
+.cred-path>li{display:flex;gap:13px;background:var(--card,#fff);border:1px solid var(--line);border-radius:14px;padding:14px 15px}
+.cred-path .cp-n{width:30px;height:30px;border-radius:50%;background:var(--brand,#1763a6);color:#fff;font-weight:800;display:grid;place-items:center;flex:none}
+.cred-path .cp-c{flex:1;min-width:0}
+.cred-path .cp-c>b{display:block;margin-bottom:5px;font-size:15px}
+.cred-path .cp-c p{margin:0 0 8px}
+.cred-path .cp-c .btn-sm{margin-right:6px}

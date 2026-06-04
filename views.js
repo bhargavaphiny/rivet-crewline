@@ -486,7 +486,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=106">
+  <link rel="stylesheet" href="/styles.css?v=107">
   </head><body class="${user?'app-mode':'mkt-mode'}">
   <a class="skip" href="#main">Skip to main content</a>
   ${user ? `
@@ -903,7 +903,7 @@ function growHub({ profile, trade, reco, marketJobs = 0, avgHr = 0 }){
       ${learnVideo(trade, LEARN_TRACKS[trade].vid)}
       <div class="track-links">
         <a class="track-link prep" href="/app/learn/interview?trade=${trade}">${icon('spark')} ${T('AI interview rep')}</a>
-        <a class="track-link" href="/app/prep${PREP_FOR[trade]?'/'+PREP_FOR[trade]:''}">${icon('star')} ${T('Practice for your credential')}</a>
+        <a class="track-link" href="/app/cred/${PREP_FOR[trade]||'osha10'}">${icon('star')} ${T('Practice for your credential')}</a>
         ${skillKeyFor(trade)?`<a class="track-link" href="/app/skillcheck/${skillKeyFor(trade)}">${icon('shield')} ${T('Take the Skill Check — earn a verified badge')}</a>`:''}
         ${ROLE_BLS[trade]?`<a class="track-link" href="/careers/${trade}">${icon('shield')} ${T('Full career guide')} →</a>`:''}
       </div></div>` : ''}
@@ -1016,11 +1016,30 @@ function gradeQuiz(credKey, body){
 function credPrepIndex(){
   return `<section class="wrap narrow">
     <a class="back" href="/app/grow">← ${T('Grow')}</a>
-    <div class="sec-h big">${icon('star','xic')} ${T('Credential practice')} <span class="muted">${T('free study quizzes')}</span></div>
-    <p class="muted sm">${T('Build confidence before the real exam. Quick, free, and you can retake any time.')}</p>
-    <div class="track-grid">${Object.entries(CRED_QUIZ).map(([k,q])=>`<a class="card track-card" href="/app/prep/${k}">
-      <div class="track-h"><span class="trend-ic">${icon('star')}</span><div><b>${esc(q.label)}</b><div class="muted sm">${q.qs.length} ${T('questions')}</div></div></div>
-      <span class="sector-go">${T('Start practice')} →</span></a>`).join('')}</div>
+    <div class="sec-h big">${icon('star','xic')} ${T('Credential paths')} <span class="muted">${T('earn it, step by step')}</span></div>
+    <p class="muted sm">${T('Each path walks you from “what is it” to practice to the official exam — then adds it to your Work Card. Free.')}</p>
+    <div class="track-grid">${Object.entries(CRED_QUIZ).map(([k,q])=>`<a class="card track-card" href="/app/cred/${k}">
+      <div class="track-h"><span class="trend-ic">${icon('shield')}</span><div><b>${esc(q.label)}</b><div class="muted sm">${q.qs.length} ${T('practice questions')} · ${T('full path')}</div></div></div>
+      <span class="sector-go">${T('Start the path')} →</span></a>`).join('')}</div>
+  </section>`;
+}
+// A guided path to actually EARN a credential: understand → practice → get certified → add to Work Card.
+function credPath(key, { hasIt = false } = {}){
+  const label = CRED_KINDS[key] || key;
+  const tr = TRAINING[key];
+  const quiz = CRED_QUIZ[key];
+  if(!tr && !quiz) return `<section class="wrap narrow"><a class="back" href="/app/prep">← ${T('Credential paths')}</a><div class="card muted">${T('No path for that credential yet.')}</div></section>`;
+  const steps = [];
+  if(tr) steps.push({t:T('Understand it'), b:`<p>${T(tr.how)}</p><a class="track-link" href="${esc(tr.url)}" target="_blank" rel="noopener noreferrer">${icon('shield')} ${T('Official requirements ↗')}</a>`});
+  if(quiz) steps.push({t:T('Practice — free, unlimited'), b:`<p class="muted sm">${quiz.qs.length} ${T('real practice questions — retake any time until it clicks.')}</p><a class="btn-sm" href="/app/prep/${key}">${icon('star')} ${T('Start practice')}</a>`});
+  if(tr) steps.push({t:T('Get certified for real'), b:`<p class="muted sm">${T('Enroll or sit the exam with the official provider. Many are low-cost or employer-paid.')}</p><a class="btn-sm" href="${esc(tr.url)}" target="_blank" rel="noopener noreferrer">${T('Find a course / exam ↗')}</a> <a class="btn-sm ghost" href="/app/earn">${T('Who pays for it →')}</a>`});
+  steps.push({t:T('Add it to your Work Card'), b: hasIt
+    ? `<div class="ok-card sm">${icon('check')} ${T('Already on your Work Card — employers can see it.')}</div>`
+    : `<p class="muted sm">${T('Earned it? Add it so every employer sees it on your Work Card.')}</p><form method="post" action="/app/credentials"><input type="hidden" name="kind" value="${esc(key)}"><button class="btn-sm">${T('Add to my Work Card')}</button></form>`});
+  return `<section class="wrap narrow">
+    <a class="back" href="/app/prep">← ${T('Credential paths')}</a>
+    <div class="sec-h big">${icon('shield','xic')} ${esc(label)} <span class="muted">${T('your path to earn it')}</span></div>
+    <ol class="cred-path">${steps.map((s,i)=>`<li><div class="cp-n">${i+1}</div><div class="cp-c"><b>${s.t}</b>${s.b}</div></li>`).join('')}</ol>
   </section>`;
 }
 function credPrep(credKey, result){
@@ -3613,4 +3632,4 @@ function whyRivetBlock(){
 }
 
 module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, resumeDoc, workerApplications, workerOffers, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard, earnLearn, credPrep, credPrepIndex, gradeQuiz, skillCheckIndex, skillCheck, gradeSkill, skillKeyFor, parseSkillchecks, skillVerifiedRow, growHub, invitePage, shiftsBoard, sourcingAgent, empShifts, empShiftForm, voiceAgent, SHIFT_KINDS, REGISTRY };
+  jobDetail, workerProfile, resumeDoc, workerApplications, workerOffers, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard, earnLearn, credPrep, credPrepIndex, credPath, gradeQuiz, skillCheckIndex, skillCheck, gradeSkill, skillKeyFor, parseSkillchecks, skillVerifiedRow, growHub, invitePage, shiftsBoard, sourcingAgent, empShifts, empShiftForm, voiceAgent, SHIFT_KINDS, REGISTRY };
