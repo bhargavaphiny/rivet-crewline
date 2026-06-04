@@ -305,6 +305,7 @@ const BUILTIN_ES = {
   'Construction & trades':'Construcción y oficios','Drivers & logistics':'Conductores y logística','Mechanical & repair':'Mecánica y reparación',
   'Healthcare & care':'Salud y cuidado','Food service':'Servicio de comida','Agriculture':'Agricultura',
   'Cleaning & facilities':'Limpieza e instalaciones','Security':'Seguridad','Freelance & gig':'Independiente y por encargo','Manufacturing & semiconductor':'Manufactura y semiconductores',
+  'Semiconductor':'Semiconductores','Manufacturing':'Manufactura','Healthcare':'Salud','Your other trades':'Tus otros oficios','Other trades':'Otros oficios',
   'Sourced':'Captado','Screened':'Filtrado','Interview':'Entrevista','Offer':'Oferta','Match':'Coincidencia','Pipeline':'Flujo','All jobs':'Todos los empleos',
   'matching worker with alerts on was notified about this job.':'trabajador compatible con alertas activas fue notificado sobre este empleo.',
   'matching workers with alerts on were notified about this job.':'trabajadores compatibles con alertas activas fueron notificados sobre este empleo.',
@@ -460,7 +461,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=101">
+  <link rel="stylesheet" href="/styles.css?v=102">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -612,18 +613,26 @@ function phoneVerify({ phone, demoCode='', error='' }){
 }
 
 // ---------- worker onboarding ----------
+// GTM-focused trade groups for the worker picker — Semiconductor → Manufacturing → Healthcare.
+// (CATEGORIES stays untouched for map colors, tagging, and recruiter breadth.)
+const PICKER_GROUPS = {
+  'Semiconductor': ['equipment_tech','process_tech','cleanroom_op'],
+  'Manufacturing': ['machine_operator','assembler','maintenance_tech','quality_inspector','machinist','welder','electrician','controls','millwright','sheet_metal','facilities'],
+  'Healthcare': ['cna','caregiver','medical_assistant','patient_care_tech','phlebotomist','emt','sterile_processing','surgical_tech'],
+};
 function tradeCheckboxes(selected = []) {
   const sel = new Set(selected);
   const chip = k => `<label class="tradechk"><input type="checkbox" name="trades" value="${k}" ${sel.has(k)?'checked':''}><span>${tradeEmoji(k)} ${TRADES[k]||k}</span></label>`;
   const seen = new Set();
   let html = '';
-  for(const [cat, keys] of Object.entries(CATEGORIES)){
+  for(const [cat, keys] of Object.entries(PICKER_GROUPS)){
     const ks = keys.filter(k=>TRADES[k]); ks.forEach(k=>seen.add(k));
     if(!ks.length) continue;
     html += `<div class="tradecat">${T(cat)}</div><div class="tradegrid">${ks.map(chip).join('')}</div>`;
   }
-  const rest = Object.keys(TRADES).filter(k=>!seen.has(k));
-  if(rest.length) html += `<div class="tradecat">${T('Other')}</div><div class="tradegrid">${rest.map(chip).join('')}</div>`;
+  // Never silently drop a trade a worker already picked outside the three GTM sectors.
+  const extra = [...sel].filter(k=>!seen.has(k) && TRADES[k]);
+  if(extra.length) html += `<div class="tradecat">${T('Your other trades')}</div><div class="tradegrid">${extra.map(chip).join('')}</div>`;
   return html;
 }
 function workerOnboard(error='') {
@@ -632,7 +641,7 @@ function workerOnboard(error='') {
     <p class="muted">${T('About 2 minutes. It’s what employers see — and it unlocks your real job matches near you. Free, always.')}</p>
     ${error?`<div class="err">${esc(error)}</div>`:''}
     <form method="post" action="/app/onboard">
-      <label>Headline <input name="headline" maxlength="80" placeholder="e.g. Journeyman electrician — commercial & solar"></label>
+      <label>Headline <input name="headline" maxlength="80" placeholder="e.g. Equipment maintenance tech — semiconductor fab"></label>
       <div class="fieldset">
         <div class="fs-lbl">Your trades <span class="muted">pick all you work</span></div>
         <div class="tradepick">${tradeCheckboxes([])}</div>
@@ -1291,13 +1300,14 @@ function isExternal(job){ return !!(job && job.apply_url && /^https?:\/\//i.test
 function tradeOptionsGrouped(sel=''){
   const seen = new Set();
   let html = '';
-  for(const [cat, keys] of Object.entries(CATEGORIES)){
+  // Lead with the three GTM sectors, then keep the rest available under "Other".
+  for(const [cat, keys] of Object.entries(PICKER_GROUPS)){
     const ks = keys.filter(k=>TRADES[k]); ks.forEach(k=>seen.add(k));
     if(!ks.length) continue;
     html += `<optgroup label="${esc(cat)}">${ks.map(k=>`<option value="${k}" ${sel===k?'selected':''}>${esc(TRADES[k])}</option>`).join('')}</optgroup>`;
   }
   const rest = Object.keys(TRADES).filter(k=>!seen.has(k));
-  if(rest.length) html += `<optgroup label="Other">${rest.map(k=>`<option value="${k}" ${sel===k?'selected':''}>${esc(TRADES[k])}</option>`).join('')}</optgroup>`;
+  if(rest.length) html += `<optgroup label="Other trades">${rest.map(k=>`<option value="${k}" ${sel===k?'selected':''}>${esc(TRADES[k])}</option>`).join('')}</optgroup>`;
   return html;
 }
 
@@ -1689,7 +1699,7 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [],
       <div class="sec-h" style="margin-top:0">${T('Trades, location & details')}</div>
       ${error?`<div class="err">${esc(error)}</div>`:''}
       <form method="post" action="/app/profile/details">
-        <label>${T('Headline')} <input name="headline" maxlength="80" value="${esc(profile.headline||'')}" placeholder="${T('e.g. Journeyman electrician — commercial & solar')}"></label>
+        <label>${T('Headline')} <input name="headline" maxlength="80" value="${esc(profile.headline||'')}" placeholder="${T('e.g. Equipment maintenance tech — semiconductor fab')}"></label>
         <div class="fieldset">
           <div class="fs-lbl">${T('Your trades')} <span class="muted">${T('pick all you work')}</span></div>
           <div class="tradepick">${tradeCheckboxes(trades)}</div>
