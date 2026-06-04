@@ -29,6 +29,7 @@ const SOURCES = [
   ['carbonhealth','Carbon Health','healthcare'],['devotedhealth','Devoted Health','healthcare'],
   ['includedhealth','Included Health','healthcare'],['cityblock','Cityblock Health','healthcare'],
   ['medely','Medely','healthcare'],['vivianhealth','Vivian Health','healthcare'],
+  ['bayada','BAYADA Home Health Care','healthcare'],  // ~2,600 home-health aide/caregiver/CNA roles — closes the HHA/PCA under-capture
   // ---- more advanced manufacturing / energy / aerospace / robotics (real Greenhouse boards) ----
   ['archer','Archer Aviation','manufacturing'],['jobyaviation','Joby Aviation','manufacturing'],
   ['betatechnologies','BETA Technologies','manufacturing'],['wisk','Wisk Aero','manufacturing'],
@@ -259,13 +260,13 @@ function parseLoc(name){
   return { city, st };
 }
 
-function fetchJSON(url, headers){
+function fetchJSON(url, headers, timeoutMs){
   return new Promise(resolve=>{
     const req = https.get(url, {headers:{'User-Agent':'RivetJobs/1.0 (jobs@rivet-crewline.onrender.com)','Accept':'application/json', ...(headers||{})}}, res=>{
       let d=''; res.on('data',c=>d+=c); res.on('end',()=>{ try{ resolve(JSON.parse(d)); }catch(e){ resolve(null); } });
     });
     req.on('error',()=>resolve(null));
-    req.setTimeout(15000, ()=>{ req.destroy(); resolve(null); });
+    req.setTimeout(timeoutMs||15000, ()=>{ req.destroy(); resolve(null); });  // some boards (e.g. BAYADA ~3.8MB) need longer
   });
 }
 
@@ -302,6 +303,19 @@ const WD_SOURCES = [
   ['geisinger','Geisinger','healthcare',{host:'geisinger.wd5.myworkdayjobs.com',site:'GeisingerExternal'}],
   ['houstonmethodist','Houston Methodist','healthcare',{host:'houstonmethodist.wd12.myworkdayjobs.com',site:'GTI',defaultState:'TX',defaultCity:'Houston'}],
   ['methodisthealth','Methodist Le Bonheur','healthcare',{host:'methodisthealth.wd5.myworkdayjobs.com',site:'MLH',defaultState:'TN',defaultCity:'Memphis'}],
+  // ---- Big health systems (CNA/MA/LPN/PCT volume — closes the under-capture) ----
+  // NOTE: AdventHealth, Cleveland Clinic, Intermountain, Banner, PACS, Memorial Hermann put only a
+  // facility NAME (not city) in their CXS list feed — city lives in per-job detail. Excluded until a
+  // detail-resolve pass exists; they'd add 0 geocodable rows otherwise.
+  ['aah','Advocate Health','healthcare',{host:'aah.wd5.myworkdayjobs.com',site:'External',maxOffset:500}],
+  ['bhs','Baptist Health','healthcare',{host:'bhs.wd1.myworkdayjobs.com',site:'careers',maxOffset:400}],
+  // ---- Long-term care / skilled nursing (CNA + LPN volume) ----
+  ['sanford','Good Samaritan Society (Sanford)','healthcare',{host:'sanford.wd5.myworkdayjobs.com',site:'SanfordHealth',maxOffset:500}],
+  // ---- Pharmacy technicians (closes the 0.15× pharmacy-tech under-capture) ----
+  ['cvshealth','CVS Health','healthcare',{host:'cvshealth.wd1.myworkdayjobs.com',site:'CVS_Health_Careers',searchText:'pharmacy technician',maxOffset:600}],
+  ['cardinalhealth','Cardinal Health','healthcare',{host:'cardinalhealth.wd1.myworkdayjobs.com',site:'EXT',searchText:'pharmacy technician'}],
+  ['mckesson','McKesson','healthcare',{host:'mckesson.wd3.myworkdayjobs.com',site:'External_Careers',searchText:'pharmacy technician'}],
+  ['cigna','Express Scripts (Cigna)','healthcare',{host:'cigna.wd5.myworkdayjobs.com',site:'cignacareers',searchText:'pharmacy technician'}],
 ];
 
 // KEYLESS Oracle Recruiting Cloud (Candidate Experience) feeds — the public REST API that powers
@@ -310,6 +324,11 @@ const WD_SOURCES = [
 const ORACLE_SOURCES = [
   ['TI','Texas Instruments','semiconductor',{host:'edbz.fa.us2.oraclecloud.com',site:'CX'}],
   ['onsemi','onsemi','semiconductor',{host:'hctz.fa.us2.oraclecloud.com',site:'CX_1001'}],
+  // ---- Healthcare on Oracle Recruiting CX (CNA/aide/pharmacy volume) ----
+  ['providence','Providence','healthcare',{host:'evac.fa.us2.oraclecloud.com',site:'CX_1'}],
+  ['northwell','Northwell Health','healthcare',{host:'eppr.fa.us2.oraclecloud.com',site:'CX_2'}],
+  ['brookdale','Brookdale Senior Living','healthcare',{host:'ibmwjb.fa.ocs.oraclecloud.com',site:'CX_1'}],
+  ['albertsons','Albertsons','healthcare',{host:'eofd.fa.us6.oraclecloud.com',site:'CX_1001',keyword:'pharmacy'}],
 ];
 
 // POST helper for Workday CXS endpoints.
@@ -357,14 +376,30 @@ function workdayLoc(text, defState, defCity){
 }
 const STATE_ABBR = new Set(Object.values({'alabama':'AL','alaska':'AK','arizona':'AZ','arkansas':'AR','california':'CA','colorado':'CO','connecticut':'CT','delaware':'DE','florida':'FL','georgia':'GA','hawaii':'HI','idaho':'ID','illinois':'IL','indiana':'IN','iowa':'IA','kansas':'KS','kentucky':'KY','louisiana':'LA','maine':'ME','maryland':'MD','massachusetts':'MA','michigan':'MI','minnesota':'MN','mississippi':'MS','missouri':'MO','montana':'MT','nebraska':'NE','nevada':'NV','newhampshire':'NH','newjersey':'NJ','newmexico':'NM','newyork':'NY','northcarolina':'NC','northdakota':'ND','ohio':'OH','oklahoma':'OK','oregon':'OR','pennsylvania':'PA','rhodeisland':'RI','southcarolina':'SC','southdakota':'SD','tennessee':'TN','texas':'TX','utah':'UT','vermont':'VT','virginia':'VA','washington':'WA','westvirginia':'WV','wisconsin':'WI','wyoming':'WY','dc':'DC'}));
 
+// Greenhouse location parse — handles plain "City, ST" and BAYADA-style "City, ST ZIP | lat | lon".
+function ghLoc(name){
+  name = String(name||'').trim();
+  if(!name || /remote|virtual|various|multiple|nationwide/i.test(name)) return null;
+  const parts = name.split('|').map(s=>s.trim());
+  let lat=null, lon=null;
+  if(parts.length>=3){ const la=parseFloat(parts[1]), lo=parseFloat(parts[2]); if(!isNaN(la)&&!isNaN(lo)&&Math.abs(la)<=90&&Math.abs(lo)<=180){lat=la;lon=lo;} }
+  const head = parts[0];
+  const m = head.match(/^(.+?),\s*([A-Z]{2})\b(?:\s+\d{5})?/);   // "City, ST" optionally + ZIP
+  if(m && STATE_ABBR.has(m[2])) return { city:m[1].trim(), st:m[2], lat, lon };
+  const p = parseLoc(head) || parseLocLoose(head);
+  return p ? { city:p.city, st:p.st, lat, lon } : null;
+}
+
 // Normalize one company's public board to [{title,url,city,st,lat,lon}] — US roles only.
 async function fetchProvider(provider, token, opts){
   try {
     if(provider==='workday'){
       const o = opts||{}; if(!o.host || !o.site) return [];
       const out=[];
-      for(let off=0; off<240; off+=20){
-        const j = await fetchJSONPost(o.host, `/wday/cxs/${token}/${o.site}/jobs`, {appliedFacets:{}, limit:20, offset:off, searchText:''});
+      const maxOff = o.maxOffset||240;          // deeper pull for high-volume employers (CVS, big health systems)
+      const search = o.searchText||'';          // bias results toward target roles (e.g. 'pharmacy technician')
+      for(let off=0; off<maxOff; off+=20){
+        const j = await fetchJSONPost(o.host, `/wday/cxs/${token}/${o.site}/jobs`, {appliedFacets:{}, limit:20, offset:off, searchText:search});
         const rows = j && Array.isArray(j.jobPostings) ? j.jobPostings : [];
         if(!rows.length) break;
         for(const x of rows){ const loc = workdayLoc(x.locationsText, o.defaultState, o.defaultCity); if(!loc) continue;
@@ -376,8 +411,9 @@ async function fetchProvider(provider, token, opts){
     if(provider==='oracle'){
       const o = opts||{}; if(!o.host || !o.site) return [];
       const out=[];
+      const kw = o.keyword ? `,keyword=${encodeURIComponent(o.keyword)}` : '';  // bias toward target roles (e.g. pharmacy) on broad tenants
       for(let off=0; off<1000; off+=200){
-        const url = `https://${o.host}/hcmRestApi/resources/latest/recruitingCEJobRequisitions?onlyData=true&expand=requisitionList.secondaryLocations&finder=findReqs;siteNumber=${o.site},limit=200,offset=${off},sortBy=POSTING_DATES_DESC`;
+        const url = `https://${o.host}/hcmRestApi/resources/latest/recruitingCEJobRequisitions?onlyData=true&expand=requisitionList.secondaryLocations&finder=findReqs;siteNumber=${o.site}${kw},limit=200,offset=${off},sortBy=POSTING_DATES_DESC`;
         const j = await fetchJSON(url);
         const rows = j && j.items && j.items[0] && Array.isArray(j.items[0].requisitionList) ? j.items[0].requisitionList : [];
         if(!rows.length) break;
@@ -393,9 +429,9 @@ async function fetchProvider(provider, token, opts){
       return out;
     }
     if(provider==='greenhouse'){
-      const j = await fetchJSON(`https://boards-api.greenhouse.io/v1/boards/${token}/jobs`);
+      const j = await fetchJSON(`https://boards-api.greenhouse.io/v1/boards/${token}/jobs`, null, 45000);
       if(!j || !Array.isArray(j.jobs)) return [];
-      return j.jobs.map(x=>{ const loc=parseLoc((x.location&&x.location.name)||'')||{}; return {title:(x.title||'').trim(), url:x.absolute_url, city:loc.city, st:loc.st}; });
+      return j.jobs.map(x=>{ const loc=ghLoc((x.location&&x.location.name)||'')||{}; return {title:(x.title||'').trim(), url:x.absolute_url, city:loc.city, st:loc.st, lat:loc.lat, lon:loc.lon}; });
     }
     if(provider==='lever'){
       const a = await fetchJSON(`https://api.lever.co/v0/postings/${token}?mode=json`);
