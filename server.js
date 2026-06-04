@@ -1528,18 +1528,23 @@ const server = http.createServer(async (req,res)=>{
           const r = await payRankForJob(j);
           if(r) payComp.push({ title:j.title, pay:`${j.pay_min||0}–${j.pay_max}`, p50:r.p50, pct:r.pct, label:r.label, cls:r.cls });
         }
-        // Market context for the trades this employer hires in: volume, direct-employer share, freshness.
+        // Market context: volume, direct-employer share, freshness — scoped to the employer's trades,
+        // falling back to the whole live market when those trades have little/no live volume.
         let marketCtx = null;
         const myTrades = [...new Set(jobs.map(j=>j.trade).filter(Boolean))];
-        if(myTrades.length){
-          const ph2 = myTrades.map(()=>'?').join(',');
-          const m = await db.prepare(`SELECT COUNT(*) n,
+        const marketStats = async (tradeList)=>{
+          let where = "status='open' AND apply_url IS NOT NULL", args=[];
+          if(tradeList && tradeList.length){ where += ` AND trade IN (${tradeList.map(()=>'?').join(',')})`; args=tradeList; }
+          return db.prepare(`SELECT COUNT(*) n,
               SUM(CASE WHEN hire_type='direct' OR hire_type IS NULL THEN 1 ELSE 0 END) direct,
               SUM(CASE WHEN last_seen >= datetime('now','-14 days') THEN 1 ELSE 0 END) fresh
-            FROM jobs WHERE status='open' AND apply_url IS NOT NULL AND trade IN (${ph2})`).get(...myTrades);
-          if(m && m.n>0) marketCtx = { openCount:m.n, directPct:Math.round((m.direct/m.n)*100), freshPct:Math.round((m.fresh/m.n)*100),
-            tradeLabel: myTrades.slice(0,3).map(t=>M.TRADES[t]||t).join(', ')+(myTrades.length>3?'…':'') };
-        }
+            FROM jobs WHERE ${where}`).get(...args);
+        };
+        let m = myTrades.length ? await marketStats(myTrades) : null;
+        const scoped = !!(m && m.n>=20);                    // enough volume in their trades to be meaningful
+        if(!scoped) m = await marketStats(null);            // otherwise show the overall live market
+        if(m && m.n>0) marketCtx = { openCount:m.n, directPct:Math.round((m.direct/m.n)*100), freshPct:Math.round((m.fresh/m.n)*100),
+          tradeLabel: scoped ? (myTrades.slice(0,3).map(t=>M.TRADES[t]||t).join(', ')+(myTrades.length>3?'…':'')) : 'all live trades' };
         return send(res, V.layout({title:'Analytics',user,active:'analytics',body:V.empAnalytics({user,
           kpis:{pipeline, hired, fillRate}, weekly, conv, topTrades, topJobs, avgScore, totalApps, payComp, marketCtx})}));
       }
