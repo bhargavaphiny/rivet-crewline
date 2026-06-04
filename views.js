@@ -486,7 +486,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=109">
+  <link rel="stylesheet" href="/styles.css?v=110">
   </head><body class="${user?'app-mode':'mkt-mode'}">
   <a class="skip" href="#main">Skip to main content</a>
   ${user ? `
@@ -3357,8 +3357,10 @@ function empPipeline({ job, columns, candidates, jobMedia = [], alerted = 0, sou
     <div><b>${hiredN}</b><span>${T('hired')}</span></div>
     <div><b>${Math.round(advN/allApps*100)}%</b><span>${T('advance rate')}</span></div>
   </div>` : '';
+  const quality = (a)=> (a.rating||0)*1000 + (a.score||0)*2 + (a.readiness||0) + (a.vcreds||0)*5 + skN(a)*5;
   const cols = STAGES.map(st=>`<div class="col"><div class="col-h">${T(st)} <span>${(columns[st]||[]).length}</span></div>
-    ${(columns[st]||[]).map(a=>`<div class="pcard">
+    ${(columns[st]||[]).slice().sort((a,b)=>quality(b)-quality(a)).map((a,idx)=>`<div class="pcard${idx===0&&(columns[st]||[]).length>1?' top':''}">
+        ${idx===0&&(columns[st]||[]).length>1?`<span class="pc-top">${icon('star')} ${T('Top match')}</span>`:''}
         <a class="pc-nm cand-link" href="/console/candidates/${a.worker_id}"><span class="av-t">${initials(a.name)}</span>${esc(a.name)}</a>
         <div class="muted sm">${TRADES[a.trade]||a.trade}${a.city?` · ${esc(a.city)}`:''}</div>
         ${pcSig(a)}
