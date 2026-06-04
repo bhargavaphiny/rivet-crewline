@@ -472,7 +472,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=102">
+  <link rel="stylesheet" href="/styles.css?v=104">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -899,7 +899,7 @@ function earnLearn({ trade, jobs = [], tuitionJobs = [] }){
   const credName = credKey && CRED_QUIZ[credKey] ? CRED_QUIZ[credKey].label.replace(/ —.*$/,'') : '';
   const jobCard = (j, badge)=>`<div class="card app-card"><div class="job-row"><div class="badge">${tradeEmoji(j.trade)}</div>
     <div class="job-main"><h4>${esc(T(j.title))}</h4><div class="muted">${esc(j.company||'')} · ${esc(j.city||'')} · $${j.pay_min}–${j.pay_max}/hr</div>${badge?`<span class="match-chip" style="background:rgba(31,169,113,.13);color:#157a52;margin-top:4px;display:inline-block">${badge}</span>`:''}</div></div>
-    <div class="app-act">${j.apply_url?`<a class="btn-sm" href="${esc(j.apply_url)}" target="_blank" rel="noopener noreferrer">${T('Apply')} ↗</a>`:`<a class="btn-sm" href="/app/jobs/${j.id}">${T('View')} →</a>`}</div></div>`;
+    <div class="app-act">${j.apply_url?`<a class="btn-sm" href="/app/jobs/${j.id}/apply-ext" target="_blank" rel="noopener noreferrer">${T('Apply')} ↗</a>`:`<a class="btn-sm" href="/app/jobs/${j.id}">${T('View')} →</a>`}</div></div>`;
   const askScript = `Hi — I’m excited about this role. I’m working to level up as a ${label||'skilled worker'} and earn my certifications. Do you offer tuition reimbursement, paid certification, or a registered apprenticeship? I’m committed to staying and putting it to work here.`;
   return `<section class="wrap narrow">
     <a class="back" href="/app/grow">← ${T('Grow')}</a>
@@ -1312,7 +1312,7 @@ function agentApplyResult({ applied = [], matches = [], already = 0, total = 0 }
         <div class="job-main"><h4>${esc(T(a.title))}</h4>
           <div class="muted">${esc(a.company||'')} · ${esc(a.city)} · $${a.pay_min}–${a.pay_max}/hr${a.distance!=null?` · <b class="dist">${a.distance} ${T('mi away')}</b>`:''}</div></div>
         <span class="score-tag ${scoreClass(a.score)}">${a.score}</span></div>
-      ${ext?`<div class="app-act"><a class="btn-sm" href="${esc(a.apply_url)}" target="_blank" rel="noopener noreferrer">${T('Apply')} ↗</a><form method="post" action="/app/jobs/${a.id}/save"><button class="btn-sm ghost">☆ ${T('Save')}</button></form></div>`:''}
+      ${ext?`<div class="app-act"><a class="btn-sm" href="/app/jobs/${a.id}/apply-ext" target="_blank" rel="noopener noreferrer">${T('Apply')} ↗</a><form method="post" action="/app/jobs/${a.id}/save"><button class="btn-sm ghost">☆ ${T('Save')}</button></form></div>`:''}
     </div>`;
   const headline = applied.length
     ? `${T('Done — I applied you to')} ${applied.length} ${applied.length===1?T('job'):T('jobs')}${matches.length?` ${T('and found')} ${matches.length} ${T('more great matches to apply to in one tap')}`:''}.`
@@ -1594,8 +1594,8 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
       ${_trust}
       <a class="btn full gameplan-cta" href="/app/land/${job.id}">${icon('spark')} ${T('Get your game plan to land this job')}</a>
       ${isExternal(job)
-        ? `<a class="btn full" href="${esc(job.apply_url)}" target="_blank" rel="noopener noreferrer">${T('Apply on')} ${esc(job.source)} ↗</a>
-           <p class="muted sm" style="text-align:center;margin-top:8px">${T('This opening is listed on')} ${esc(job.source)}. ${T('You’ll finish applying on their site.')}</p>`
+        ? `<a class="btn full" href="/app/jobs/${job.id}/apply-ext" target="_blank" rel="noopener noreferrer">${T('Apply on')} ${esc(job.source)} ↗</a>
+           <p class="muted sm" style="text-align:center;margin-top:8px">${T('You’ll finish on their site — and we’ll track it in')} <a href="/app/applications">${T('your applications')}</a> ${T('so you never lose it.')}</p>`
         : (job.quotes_ok
           ? (myQuote
             ? `<div class="ok-card">${T('Quote sent')}: <b>$${myQuote.amount} ${T('per '+(myQuote.unit||'job'))}</b>${myQuote.status==='accepted'?` — <b>${T('accepted! 🎉')}</b>`:myQuote.status==='declined'?` — ${T('not selected')}`:` · ${T('waiting on the poster')}`}</div>`
@@ -1671,24 +1671,58 @@ function stageTimeline(current){
   const idx = STAGES.indexOf(current);
   return `<div class="timeline">${STAGES.map((s,i)=>`<div class="tl-step ${i<idx?'done':''}${i===idx?'now':''}"><span class="tl-dot"></span><span class="tl-lbl">${stageLabelW(s)}</span></div>`).join('')}</div>`;
 }
+function daysSince(ts){ if(!ts) return 0; try { const d=new Date(String(ts).replace(' ','T')+'Z'); return Math.max(0,Math.floor((Date.now()-d.getTime())/86400000)); } catch(e){ return 0; } }
+// Worker-managed status for external applies (no recruiter on our side to advance them).
+function extStatus(a){
+  const STG = ['Applied','Interview','Offer','Hired'];
+  const cur = a.stage==='Sourced' ? 'Applied' : (a.stage||'Applied');
+  const closed = cur==='Closed';
+  const d = daysSince(a.created_at);
+  const nudge = (cur==='Applied' && d>=4) ? `<div class="followup">${icon('bell','xic')} ${T('Applied')} ${d} ${T('days ago — a quick follow-up message doubles your reply rate.')} <a href="${esc(a.apply_url)}" target="_blank" rel="noopener noreferrer">${T('Re-open posting ↗')}</a></div>` : '';
+  return `<div class="ext-track">
+    <div class="ext-steps">${STG.map(s=>`<span class="ext-step ${!closed && STG.indexOf(cur)>=STG.indexOf(s)?'on':''} ${cur===s?'cur':''}">${T(s)}</span>`).join('')}${closed?`<span class="ext-step closed cur">${T('Closed')}</span>`:''}</div>
+    ${nudge}
+    <div class="ext-set"><span class="muted sm">${T('Update status:')}</span>
+      ${['Applied','Interview','Offer','Hired','Closed'].filter(s=>s!==cur).map(s=>`<form method="post" action="/app/applications/${a.id}/status"><input type="hidden" name="stage" value="${s}"><button class="btn-xs ghost">${T(s)}</button></form>`).join('')}
+    </div>
+  </div>`;
+}
+function appCard(a, empReviews){
+  const isExt = !!a.apply_url;
+  const stageLabel = a.stage==='Sourced' && isExt ? 'Applied' : a.stage;
+  return `<div class="card app-card">
+    <div class="job-row"><div class="badge">${tradeEmoji(a.trade)}</div>
+      <div class="job-main"><h4>${esc(a.title)}</h4>
+        <div class="muted">${esc(a.company||'')} · ${esc(a.city)} · $${a.pay_min}–${a.pay_max}/hr${a.distance!=null?` · <b class="dist">${a.distance} ${T('mi away')}</b>`:''}${isExt?` · <span class="ext-src">${esc(a.source||'External')} ↗</span>`:''}</div></div>
+      ${isExt?'':`<span class="score-tag ${scoreClass(a.score)}">${a.score}</span>`}</div>
+    ${isExt ? extStatus(a) : stageTimeline(a.stage)}
+    ${stageLabel==='Hired' ? (empReviews[a.job_id]
+      ? `<div class="ok-card sm">${T('You reviewed this employer')} ${starBar(empReviews[a.job_id].stars)}</div>`
+      : (isExt ? '' : `<div class="rev-cta"><div class="muted sm">${T('You worked here — rate the employer:')}</div>${reviewForm({action:'/app/reviews', hidden:{job_id:a.job_id, employer_id:a.employer_id}, label:T('Submit review'), prompt:T('How was working here?'), safety:true})}</div>`)) : ''}
+    ${(stageLabel==='Hired' && !isExt) ? (a.pay_outcome
+      ? `<div class="ok-card sm">${T('Pay reported')}: ${T({ontime:'Paid on time',late:'Paid late',short:'Paid short',unpaid:'Not paid'}[a.pay_outcome]||a.pay_outcome)}</div>`
+      : `<div class="rev-cta"><div class="muted sm">${T('Did this employer pay you as promised?')}</div>
+        <div class="pay-btns">${[['ontime','Paid on time'],['late','Paid late'],['short','Paid short'],['unpaid','Not paid']].map(([v,l])=>`<form method="post" action="/app/applications/${a.id}/pay"><input type="hidden" name="pay_outcome" value="${v}"><button class="btn-xs${v==='ontime'?'':' ghost'}">${T(l)}</button></form>`).join('')}</div></div>`) : ''}
+  </div>`;
+}
 function workerApplications({ apps, savedJobs, interviews = [], empReviews = {} }) {
+  const norm = a => (a.stage==='Sourced' && a.apply_url) ? 'Applied' : a.stage;
+  const activeN = apps.filter(a=>!['Hired','Closed'].includes(norm(a))).length;
+  const ivN = apps.filter(a=>norm(a)==='Interview').length + interviews.filter(iv=>iv.status==='proposed').length;
+  const offerN = apps.filter(a=>['Offer','Hired'].includes(norm(a))).length;
+  const summary = apps.length ? `<div class="app-summary">
+      <div><b>${apps.length}</b><span>${T('TRACKED')}</span></div>
+      <div><b>${activeN}</b><span>${T('ACTIVE')}</span></div>
+      <div><b>${ivN}</b><span>${T('INTERVIEWS')}</span></div>
+      <div><b>${offerN}</b><span>${T('OFFERS')}</span></div>
+    </div>` : '';
   return `<section class="wrap">
+    <div class="sec-h big" style="margin-top:0">${T('Your job search')}</div>
+    <p class="muted sm" style="margin-top:-6px">${T('Every job you apply to — on Rivet or anywhere else — tracked in one place. Apply with the “Apply ↗” button on any job and it shows up here.')}</p>
+    ${summary}
     ${interviews.length ? `<div class="sec-h big">${T('Interviews')}</div>${interviews.map(interviewWorker).join('')}` : ''}
-    <div class="sec-h big">${T('Your applications')}</div>
-    ${apps.length ? apps.map(a=>`<div class="card app-card">
-      <div class="job-row"><div class="badge">${tradeEmoji(a.trade)}</div>
-        <div class="job-main"><h4>${esc(a.title)}</h4>
-          <div class="muted">${esc(a.company||'')} · ${esc(a.city)} · $${a.pay_min}–${a.pay_max}/hr${a.distance!=null?` · <b class="dist">${a.distance} ${T('mi away')}</b>`:''}</div></div>
-        <span class="score-tag ${scoreClass(a.score)}">${a.score}</span></div>
-      ${stageTimeline(a.stage)}
-      ${a.stage==='Hired' ? (empReviews[a.job_id]
-        ? `<div class="ok-card sm">${T('You reviewed this employer')} ${starBar(empReviews[a.job_id].stars)}</div>`
-        : `<div class="rev-cta"><div class="muted sm">${T('You worked here — rate the employer:')}</div>${reviewForm({action:'/app/reviews', hidden:{job_id:a.job_id, employer_id:a.employer_id}, label:T('Submit review'), prompt:T('How was working here?'), safety:true})}</div>`) : ''}
-      ${a.stage==='Hired' ? (a.pay_outcome
-        ? `<div class="ok-card sm">${T('Pay reported')}: ${T({ontime:'Paid on time',late:'Paid late',short:'Paid short',unpaid:'Not paid'}[a.pay_outcome]||a.pay_outcome)}</div>`
-        : `<div class="rev-cta"><div class="muted sm">${T('Did this employer pay you as promised?')}</div>
-          <div class="pay-btns">${[['ontime','Paid on time'],['late','Paid late'],['short','Paid short'],['unpaid','Not paid']].map(([v,l])=>`<form method="post" action="/app/applications/${a.id}/pay"><input type="hidden" name="pay_outcome" value="${v}"><button class="btn-xs${v==='ontime'?'':' ghost'}">${T(l)}</button></form>`).join('')}</div></div>`) : ''}
-    </div>`).join('') : `<div class="card muted">${T('No applications yet.')} <a href="/app/jobs">${T('Browse matches →')}</a></div>`}
+    <div class="sec-h big">${T('Applications')}</div>
+    ${apps.length ? apps.map(a=>appCard(a, empReviews)).join('') : `<div class="card muted">${T('No applications yet.')} <a href="/app/jobs">${T('Browse matches →')}</a></div>`}
     <div class="sec-h big" style="margin-top:26px">${T('Saved jobs')}</div>
     ${savedJobs.length ? savedJobs.map(j=>`<a class="jobline" href="/app/jobs/${j.id}">
         <div class="jl-left"><div class="badge">${tradeEmoji(j.trade)}</div>
@@ -1805,6 +1839,42 @@ function workCardStrength(profile, creds, work, portfolio){
     ${next.length?`<div class="wc-todo">${T('To stand out')}: ${next.map(c=>`<span>${T(c[0])}</span>`).join('')}</div>`:`<div class="wc-todo done">${icon('check')} ${T('Your card is complete — you’ll match more and rank higher.')}</div>`}
   </div>`;
 }
+// Downloadable résumé built from the worker's structured Rivet data — portable to ANY application.
+function resumeDoc({ user, profile, creds = [], work = [], showUp = {}, rating = {avg:0,count:0}, hired = 0 }){
+  const trades = tradesOf(profile);
+  const tradeNames = trades.map(t=>TRADES[t]||t);
+  const verified = creds.filter(c=>c.verified);
+  const sk = parseSkillchecks(profile).filter(k=>SKILL_SCENARIOS[k]).map(k=>SKILL_SCENARIOS[k].label.split(' — ')[0]);
+  const strengths = XFACTORS.filter(([,col])=>profile && profile[col] && col!=='alerts').map(([,,,label])=>label);
+  const summary = profile.about || `${tradeNames.join(' & ')||'Skilled tradesperson'}${profile.years_exp?` with ${profile.years_exp}+ years' experience`:''}${profile.city?`, based in ${profile.city}`:''}. Reliable, safety-focused, and ready to contribute from day one.`;
+  const contact = [user.email, user.phone, profile.city].filter(Boolean).join('  ·  ');
+  const sect = (title, body)=> body ? `<div class="rz-sec"><h2>${title}</h2>${body}</div>` : '';
+  return `<section class="wrap narrow">
+    <div class="rz-bar no-print">
+      <a class="back" href="/app/profile">← ${T('Work Card')}</a>
+      <div class="rz-actions">
+        <button class="btn-sm" type="button" onclick="window.print()">${icon('send')} ${T('Download / print PDF')}</button>
+        <a class="btn-sm ghost" href="/p/${user.id}" target="_blank" rel="noopener">${T('Share link instead ↗')}</a>
+      </div>
+    </div>
+    <p class="muted sm no-print" style="margin:0 0 12px">${T('A clean résumé built from your Work Card — use it for any application, on Rivet or off. Tap “Download / print PDF”, then choose “Save as PDF”.')}</p>
+    <article class="resume-doc">
+      <header class="rz-head">
+        <h1>${esc(user.name||'')}</h1>
+        ${profile.headline?`<div class="rz-title">${esc(profile.headline)}</div>`:(tradeNames.length?`<div class="rz-title">${esc(tradeNames.join(' · '))}</div>`:'')}
+        <div class="rz-contact">${esc(contact)}</div>
+      </header>
+      ${(showUp.pct!=null||rating.count||hired)?`<div class="rz-proof">${showUp.pct!=null?`<span><b>${showUp.pct}%</b> ${T('show-up score')}</span>`:''}${rating.count?`<span><b>${rating.avg.toFixed(1)}★</b> (${rating.count} ${T('reviews')})</span>`:''}${hired?`<span><b>${hired}</b> ${T('hires on Rivet')}</span>`:''}<span class="rz-verify">${icon('shield')} ${T('Verified on Rivet')}</span></div>`:''}
+      ${sect(T('Summary'), `<p>${esc(summary)}</p>`)}
+      ${sect(T('Trades'), tradeNames.length?`<p class="rz-tags">${tradeNames.map(t=>`<span>${esc(t)}</span>`).join('')}</p>`:'')}
+      ${sect(T('Credentials & licenses'), creds.length?`<ul class="rz-list">${creds.map(c=>`<li>${esc(CRED_KINDS[c.kind]||c.kind)}${c.detail?` — ${esc(c.detail)}`:''}${c.verified?` <b class="rz-ok">✓ ${T('verified')}</b>`:''}${c.expires?` <span class="rz-dim">(${T('exp')} ${esc(c.expires)})</span>`:''}</li>`).join('')}</ul>`:'')}
+      ${sect(T('Verified skills'), sk.length?`<p class="rz-tags">${sk.map(s=>`<span>${icon('shield')} ${esc(s)} ${T('Skill-verified')}</span>`).join('')}</p>`:'')}
+      ${sect(T('Work history'), work.length?`<div class="rz-jobs">${work.map(w=>{const yrs=w.current?`${w.start_year||''}–Present`:`${w.start_year||''}${w.end_year?('–'+w.end_year):''}`;return `<div class="rz-job"><div class="rz-job-top"><b>${esc(w.role||'')}</b><span>${esc(yrs)}</span></div><div class="rz-dim">${esc(w.employer||'')}${w.city?(' · '+esc(w.city)):''}</div>${w.description?`<p>${esc(w.description)}</p>`:''}</div>`;}).join('')}</div>`:'')}
+      ${sect(T('Strengths'), strengths.length?`<p class="rz-tags">${strengths.map(s=>`<span>${esc(T(s))}</span>`).join('')}</p>`:'')}
+      <footer class="rz-foot">${T('Verify this résumé live at')} ${(user&&user.id)?`rivet-crewline.onrender.com/p/${user.id}`:'rivet'}</footer>
+    </article>
+  </section>`;
+}
 function workerProfile({ user, profile, creds, error, portfolio = [], work = [], rating = {avg:0,count:0}, crew = [], showUp = {} }) {
   const kinds = Object.entries(CRED_KINDS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
   const trades = tradesOf(profile);
@@ -1820,9 +1890,10 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [],
       ${skillVerifiedRow(profile)}
       <div class="share-row">
         <button class="btn-sm" type="button" onclick="var u=location.origin+'/p/${user.id}';if(navigator.share){navigator.share({title:'My Rivet Work Card',url:u})}else if(navigator.clipboard){navigator.clipboard.writeText(u);this.textContent='${T('Link copied ✓')}'}">${icon('send')} ${T('Share my Work Card')}</button>
+        <a class="btn-sm ghost" href="/app/resume">${icon('star')} ${T('Download résumé')}</a>
         <a class="btn-sm ghost" href="/p/${user.id}" target="_blank" rel="noopener">${T('Preview ↗')}</a>
       </div>
-      <p class="muted sm share-hint">${T('One link with your trades, credentials, reviews & portfolio — text it to any employer.')}</p>
+      <p class="muted sm share-hint">${T('Share the live link, or download a clean résumé PDF — use it for any application, on Rivet or off.')}</p>
       <div class="ministats">
         <div><b>${profile.readiness}</b><span>${T('READINESS')}</span></div>
         <div><b>${creds.filter(c=>c.verified).length}</b><span>${T('VERIFIED')}</span></div>
@@ -2216,7 +2287,7 @@ function landJob({ job, company = '', score = 0, breakdown = {}, missing = [], r
       <a class="btn-sm" href="/app/learn/interview?job=${job.id}">${T('Start mock interview →')}</a></div>
     <div class="card agent-card row"><div><div class="agent-h">${icon('check','xic')} ${applied?T('Applied ✓'):T('Apply with your verified Work Card')}</div>
       <p class="agent-line">${T('The employer sees your checked credentials and Show-Up Score.')}</p></div>
-      ${applied?`<span class="v ok">${T('Applied')}</span>`:external?`<a class="btn-sm" href="${esc(job.apply_url)}" target="_blank" rel="noopener noreferrer">${T('Apply on')} ${esc(job.source)} ↗</a>`:`<form method="post" action="/app/jobs/${job.id}/apply"><button class="btn-sm">${T('Apply now')}</button></form>`}</div>
+      ${applied?`<span class="v ok">${T('Applied')}</span>`:external?`<a class="btn-sm" href="/app/jobs/${job.id}/apply-ext" target="_blank" rel="noopener noreferrer">${T('Apply on')} ${esc(job.source)} ↗</a>`:`<form method="post" action="/app/jobs/${job.id}/apply"><button class="btn-sm">${T('Apply now')}</button></form>`}</div>
   </section>`;
 }
 
@@ -3491,4 +3562,4 @@ function whyRivetBlock(){
 }
 
 module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, workerOffers, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard, earnLearn, credPrep, credPrepIndex, gradeQuiz, skillCheckIndex, skillCheck, gradeSkill, skillKeyFor, parseSkillchecks, skillVerifiedRow, growHub, invitePage, shiftsBoard, sourcingAgent, empShifts, empShiftForm, voiceAgent, SHIFT_KINDS, REGISTRY };
+  jobDetail, workerProfile, resumeDoc, workerApplications, workerOffers, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard, earnLearn, credPrep, credPrepIndex, gradeQuiz, skillCheckIndex, skillCheck, gradeSkill, skillKeyFor, parseSkillchecks, skillVerifiedRow, growHub, invitePage, shiftsBoard, sourcingAgent, empShifts, empShiftForm, voiceAgent, SHIFT_KINDS, REGISTRY };

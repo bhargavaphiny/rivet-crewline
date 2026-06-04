@@ -1134,6 +1134,35 @@ const server = http.createServer(async (req,res)=>{
         const work = await getWorkHistory(user.id);
         return send(res, V.layout({title:'Work Card',user,active:'profile',body:V.workerProfile({user,profile:prof,creds:await getCreds(user.id),portfolio,work,rating:await ratingFor(user.id,'worker'),crew:await crewOf(user.id),showUp:await showUp(user.id)})}));
       }
+      // Downloadable resume — the worker's Rivet identity, portable to any application (print → PDF).
+      if(p==='/app/resume' && method==='GET'){
+        const work = await getWorkHistory(user.id);
+        const creds = await getCreds(user.id);
+        const su = await showUp(user.id);
+        const rating = await ratingFor(user.id,'worker');
+        const hired = (await db.prepare("SELECT COUNT(*) c FROM applications WHERE worker_id=? AND stage='Hired'").get(user.id)).c;
+        return send(res, V.layout({title:'My Résumé',user,active:'profile',body:V.resumeDoc({user,profile:prof,creds,work,showUp:su,rating,hired})}));
+      }
+      // Own the funnel: track an external apply, then open the employer's site. (New tab → records, then redirects.)
+      const applyExt = p.match(/^\/app\/jobs\/(\d+)\/apply-ext$/);
+      if(applyExt && method==='GET'){
+        const xid = Number(applyExt[1]);
+        const job = await db.prepare('SELECT id, apply_url FROM jobs WHERE id=?').get(xid);
+        if(!job || !job.apply_url || !/^https?:\/\//i.test(job.apply_url)) return redirect(res, '/app/jobs');
+        try { await db.prepare("INSERT INTO applications(job_id,worker_id,stage,score) VALUES(?,?,'Applied',0) ON CONFLICT(job_id,worker_id) DO UPDATE SET stage=CASE WHEN applications.stage='Sourced' THEN 'Applied' ELSE applications.stage END").run(xid, user.id); } catch(e){}
+        return redirect(res, job.apply_url);
+      }
+      // Worker advances the status of an external application they're tracking.
+      const appStatus = p.match(/^\/app\/applications\/(\d+)\/status$/);
+      if(appStatus && method==='POST'){
+        const aid = Number(appStatus[1]); const b = await readBody(req);
+        const allowed = ['Applied','Interview','Offer','Hired','Closed'];
+        const stage = allowed.includes(b.stage) ? b.stage : null;
+        // only the worker's own application, and only for external (self-managed) jobs
+        const own = await db.prepare('SELECT a.id FROM applications a JOIN jobs j ON j.id=a.job_id WHERE a.id=? AND a.worker_id=? AND j.apply_url IS NOT NULL').get(aid, user.id);
+        if(own && stage){ try { await db.prepare('UPDATE applications SET stage=? WHERE id=?').run(stage, aid); } catch(e){} }
+        return redirect(res, '/app/applications');
+      }
       if(p==='/app/profile/details' && method==='POST'){
         const b = await readBody(req);
         const trades = normTrades(b.trades);
@@ -1274,7 +1303,7 @@ const server = http.createServer(async (req,res)=>{
         return send(res, V.layout({title:'AI mock interview',user,active:'training',body:V.mockInterview({...base, history, qi, done, verdict: done?interviewVerdict(history):null})}));
       }
       if(p==='/app/applications' && method==='GET'){
-        const apps = await db.prepare(`SELECT a.*, j.title,j.trade,j.pay_min,j.pay_max,j.city,j.zip,u.company,u.id employer_id
+        const apps = await db.prepare(`SELECT a.*, j.title,j.trade,j.pay_min,j.pay_max,j.city,j.zip,j.apply_url,j.source,u.company,u.id employer_id
           FROM applications a JOIN jobs j ON j.id=a.job_id JOIN users u ON u.id=j.employer_id
           WHERE a.worker_id=? ORDER BY a.created_at DESC`).all(user.id);
         const savedJobs = await db.prepare(`SELECT j.*, u.company FROM saved_jobs s
