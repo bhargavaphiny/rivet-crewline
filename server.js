@@ -712,7 +712,7 @@ const server = http.createServer(async (req,res)=>{
         datePosted: String(job.created_at||'').replace(' ','T'),
         employmentType: ETMAP[job.employment_type]||'FULL_TIME',
         hiringOrganization: { '@type':'Organization', name: job.company||'Employer' },
-        jobLocation: { '@type':'Place', address: { '@type':'PostalAddress', addressLocality: job.city||'', addressRegion: (rules&&rules.state)||'', postalCode: job.zip||'', addressCountry:'US' } },
+        jobLocation: { '@type':'Place', address: { '@type':'PostalAddress', addressLocality: job.city||'', addressRegion: (rules&&rules.state)||'', postalCode: /^\d{5}(-\d{4})?$/.test(String(job.zip||'').trim())?job.zip:'', addressCountry:'US' } },
         baseSalary: { '@type':'MonetaryAmount', currency:'USD', value: { '@type':'QuantitativeValue', minValue: job.pay_min||0, maxValue: job.pay_max||0, unitText:'HOUR' } },
       };
       const jsonld = JSON.stringify(ld).replace(/</g,'\\u003c');
@@ -1964,22 +1964,34 @@ async function retagSemiconductor(){
 }
 // One-time: re-run the (now finer) trade rules over existing live jobs so the new
 // semiconductor/manufacturing/healthcare sub-disciplines populate without re-ingesting.
-// Trade label only — never touches sector, so GTM counts are unaffected. Flag-guarded.
-const RETAG_VERSION = '1';
+// Trade label refresh + correction of rare cross-sector ingest mistags. Flag-guarded.
+const RETAG_VERSION = '2';
+const HEALTH_ONLY = new Set(['cna','caregiver','medical_assistant','patient_care_tech','sterile_processing','surgical_tech','lpn','pharmacy_tech','radiology_tech','med_lab_tech','dental_assistant','monitor_tech','behavioral_tech','pt_aide','dietary_aide','phlebotomist','emt']);
+const SEMI_ONLY = new Set(['photolith_tech','etch_tech','deposition_tech','cmp_tech','implant_tech','diffusion_tech','wafer_fab_op']);
 async function retagTrades(){
   try {
     const done = ((await db.prepare("SELECT v FROM meta WHERE k='retag_ver'").get())||{}).v;
     if(done === RETAG_VERSION) return;
-    const rows = await db.prepare("SELECT id,title,trade FROM jobs WHERE apply_url IS NOT NULL").all();
-    const byTrade = {};
-    for(const r of rows){ const t = tradeFor(r.title || ''); if(t && t!==r.trade){ (byTrade[t]=byTrade[t]||[]).push(r.id); } }
-    let changed = 0;
+    const rows = await db.prepare("SELECT id,title,trade,sector FROM jobs WHERE apply_url IS NOT NULL").all();
+    const byTrade = {}, sectorFix = { healthcare:[], semiconductor:[] };
+    for(const r of rows){
+      const t = tradeFor(r.title || '') || r.trade;
+      if(t && t!==r.trade){ (byTrade[t]=byTrade[t]||[]).push(r.id); }
+      // a pharmacy tech should never show under Semiconductor, etc. — fix unambiguous mistags
+      if(HEALTH_ONLY.has(t) && r.sector!=='healthcare') sectorFix.healthcare.push(r.id);
+      else if(SEMI_ONLY.has(t) && r.sector!=='semiconductor') sectorFix.semiconductor.push(r.id);
+    }
+    let changed = 0, secFixed = 0;
     for(const [t,ids] of Object.entries(byTrade)){
       for(let i=0;i<ids.length;i+=200){ const c=ids.slice(i,i+200); const ph=c.map(()=>'?').join(',');
         try { await db.prepare(`UPDATE jobs SET trade=? WHERE id IN (${ph})`).run(t,...c); changed+=c.length; } catch(e){} }
     }
+    for(const [sec,ids] of Object.entries(sectorFix)){
+      for(let i=0;i<ids.length;i+=200){ const c=ids.slice(i,i+200); const ph=c.map(()=>'?').join(',');
+        try { await db.prepare(`UPDATE jobs SET sector=? WHERE id IN (${ph})`).run(sec,...c); secFixed+=c.length; } catch(e){} }
+    }
     await db.prepare("INSERT INTO meta(k,v) VALUES('retag_ver',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").run(RETAG_VERSION);
-    console.log(`[retag] refined trade labels on ${changed} jobs (v${RETAG_VERSION})`);
+    console.log(`[retag] refined ${changed} trade labels, corrected ${secFixed} cross-sector mistags (v${RETAG_VERSION})`);
   } catch(e){ console.error('[retag] skipped (non-fatal):', e.message); }
 }
 // Real-job count = anything with a real external apply link, excluding the old USAJOBS search-link seeds.
