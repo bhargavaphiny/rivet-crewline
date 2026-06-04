@@ -486,7 +486,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=110">
+  <link rel="stylesheet" href="/styles.css?v=111">
   </head><body class="${user?'app-mode':'mkt-mode'}">
   <a class="skip" href="#main">Skip to main content</a>
   ${user ? `
@@ -1480,6 +1480,7 @@ function jobCard(m, bare = false){
       ${cadenceBadge(j.pay_cadence)}
       <span class="js-shift">${esc(T(j.shift))}</span>
       ${isExternal(j)?`<span class="ext-badge">${esc(j.source)} ↗</span>`:''}
+      ${hireBadge(j)}
       ${sponsorBadge(j)}
       ${j.crew_ok?`<span class="crew-badge">${icon('truck')} ${T('Crews ok')}</span>`:''}
       ${j.fair_chance?`<span class="incl-badge fair">${T('Fair-chance')}</span>`:''}
@@ -1536,7 +1537,7 @@ function workerJobs({ matches, total = null, filters = {}, jobsGeo = null, needZ
   const shifts = ['Day','Night','4x10','Any'];
   const shiftOpts = `<option value="">${T('Any shift')}</option>`+shifts.map(s=>`<option value="${s}" ${filters.shift===s?'selected':''}>${esc(T(s))}</option>`).join('');
   const typeOpts = `<option value="">${T('Any type')}</option>`+JOB_TYPES.map(t=>`<option value="${t}" ${filters.jtype===t?'selected':''}>${esc(T(t))}</option>`).join('');
-  const active = (filters.q||filters.trade||filters.city||filters.minpay||filters.shift||filters.jtype);
+  const active = (filters.q||filters.trade||filters.city||filters.minpay||filters.shift||filters.jtype||filters.direct);
   return `<section class="wrap">
     <div class="sec-h big">${T('Find work')} <span class="muted">${total} ${total===1?T('job'):T('jobs')}${active?' · '+T('filtered'):' · '+T('ranked by fit')}${total>matches.length?' · '+T('showing top')+' '+matches.length:''}</span></div>
     <div class="card agent-card row">
@@ -1553,6 +1554,7 @@ function workerJobs({ matches, total = null, filters = {}, jobsGeo = null, needZ
       <select name="shift" aria-label="Shift">${shiftOpts}</select>
       <select name="jtype" aria-label="Employment type">${typeOpts}</select>
       <label class="chk"><input type="checkbox" name="sort" value="distance" ${filters.sort==='distance'?'checked':''}> ${T('Nearest first')}</label>
+      <label class="chk"><input type="checkbox" name="direct" value="1" ${filters.direct?'checked':''}> ${T('Direct employers only')}</label>
       <button class="btn-sm">${T('Search')}</button>
       ${active?`<a class="nav-link" style="color:var(--brand-d)" href="/app/jobs">${T('Clear')}</a>`:''}
     </form>
@@ -3159,7 +3161,7 @@ function empOverview({ user, kpis, funnel, recent, hot, alerts, fillRate, geo = 
 }
 function kpi(l,v){return `<div class="kpi"><div class="kl">${l}</div><b>${v}</b></div>`;}
 
-function empAnalytics({ user, kpis, weekly = [], conv = [], topTrades = [], topJobs = [], avgScore = 0, totalApps = 0, avgDaysToHire = null }){
+function empAnalytics({ user, kpis, weekly = [], conv = [], topTrades = [], topJobs = [], avgScore = 0, totalApps = 0, avgDaysToHire = null, payComp = [], marketCtx = null }){
   const maxW = Math.max(1, ...weekly.map(w=>w.n));
   const weekBars = weekly.map(w=>`<div class="vbar-col">
       <div class="vbar-track"><i class="vbar" style="height:${Math.max(w.n?6:0,Math.round((w.n/maxW)*100))}%"></i></div>
@@ -3214,6 +3216,24 @@ function empAnalytics({ user, kpis, weekly = [], conv = [], topTrades = [], topJ
         ${jobRows}
       </div>
     </div>`}
+    ${(payComp.length || marketCtx) ? `<div class="grid2">
+      <div class="card">
+        <div class="sec-h" style="margin-top:0">${T('Your pay vs the live market')} <span class="muted">${T('from real openings')}</span></div>
+        ${payComp.length ? `<table class="tbl"><tr><th>${T('Your job')}</th><th>${T('Your pay')}</th><th>${T('Market median')}</th><th>${T('Where it sits')}</th></tr>
+          ${payComp.map(p=>`<tr><td>${esc(p.title)}</td><td>$${p.pay}</td><td>$${p.p50}/hr</td><td><span class="pctl ${p.cls}">${p.pct}${T('th')} · ${esc(p.label)}</span></td></tr>`).join('')}</table>
+          <p class="muted sm" style="margin-top:8px">${T('Roles posted at or above the market median tend to fill about twice as fast.')}</p>`
+          : `<p class="muted">${T('Add a pay range to your open roles to see where they sit against live-market pay for that trade.')}</p>`}
+      </div>
+      ${marketCtx ? `<div class="card">
+        <div class="sec-h" style="margin-top:0">${T('Your market at a glance')}${marketCtx.tradeLabel?` <span class="muted">${esc(marketCtx.tradeLabel)}</span>`:''}</div>
+        <div class="mkt-stats">
+          <div class="mkt-stat"><b>${marketCtx.openCount.toLocaleString()}</b><span>${T('live openings in your trades')}</span></div>
+          <div class="mkt-stat"><b>${marketCtx.directPct}%</b><span>${T('from direct employers')}</span></div>
+          <div class="mkt-stat"><b>${marketCtx.freshPct}%</b><span>${T('refreshed in the last 2 weeks')}</span></div>
+        </div>
+        <p class="muted sm" style="margin-top:8px">${T('Workers favor direct employers and freshly-posted roles — both lift your response rate.')}</p>
+      </div>` : ''}
+    </div>` : ''}
   </section>`;
 }
 
@@ -3282,6 +3302,13 @@ function sponsorBadge(job, profile){
   const label = s==='h2a' ? T('Sponsors H-2A visa') : T('Sponsors H-2B visa');
   const match = profile && ((s==='h2a'&&profile.work_auth==='need_h2a')||(s==='h2b'&&profile.work_auth==='need_h2b'));
   return `<span class="sponsor-badge${match?' match':''}" title="${T('Informational only — not legal advice')}">${icon('globe')} ${label}${match?` · ${T('matches you')}`:''}</span>`;
+}
+// Direct-employer vs staffing-agency badge. Workers strongly prefer applying to the company that
+// actually hires (no middle-man). Only badges live/external postings where we know the source.
+function hireBadge(job){
+  if(!job || !isExternal(job)) return '';
+  if(job.hire_type==='agency') return `<span class="hire-badge agency" title="${T('Posted by a staffing/temp agency — you apply through a recruiter')}">${T('Staffing agency')}</span>`;
+  return `<span class="hire-badge direct" title="${T('Apply directly to the company that hires — no middle-man')}">${icon('check')} ${T('Direct employer')}</span>`;
 }
 function empJobForm(error='', job=null) {
   const editing = !!job;

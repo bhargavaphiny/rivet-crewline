@@ -487,6 +487,18 @@ async function fetchProvider(provider, token, opts){
   return [];
 }
 
+// Staffing / temp / travel agencies — a posting from these means the worker reaches a recruiter,
+// not the company that does the hiring. Used to tag jobs 'agency' vs 'direct' (workers prefer direct).
+const STAFFING = /\b(aerotek|randstad|adecco|kelly services|kforce|robert half|manpower\w*|express employment|trueblue|peopleready|labor ?finders|integrity staffing|staffmark|spherion|insight global|teksystems|allegis|hire ?dynamics|tradesmen international|gpac|cybercoders|jobot|judge group|prologistix|surestaff|elwood staffing|onin staffing|employbridge|nextaff|trillium staffing|\bvolt\b|snelling|medix|cross country|aya healthcare|favorite healthcare|host healthcare|amn healthcare|supplemental health|trustaff|maxim healthcare|staffing|staffing services|personnel services|temp(?:orary)? (?:agency|staffing)|travel nurse|travel nursing|recruit(?:ing|ment) (?:agency|services|firm)|talent solutions)\b/i;
+function classifyHire(text){ return STAFFING.test(String(text||'')) ? 'agency' : 'direct'; }
+// Normalized dedup key — company + trade + city + a title stripped of shift/level/number noise.
+function jobDedupKey(company, trade, city, title){
+  const t = String(title||'').toLowerCase()
+    .replace(/\b(1st|2nd|3rd|first|second|third|day|night|evening|weekend|prn|per ?diem|full|part|time|shift|sign[- ]?on|bonus|hiring|now|immediately|urgent|new|i{1,3}|iv|sr|jr|senior|junior|lead|level\s*\d+|\$[\d,]+)\b/g,'')
+    .replace(/[^a-z]+/g,' ').replace(/\s+/g,' ').trim();
+  return `${String(company||'').toLowerCase().trim()}|${trade}|${String(city||'').toLowerCase().trim()}|${t}`;
+}
+
 // Filter to a real blue-collar US role, geocode, ensure employer, insert. Returns 1 if added.
 async function processJob(ctx, empKey, company, sector, item){
   let { title, url, city, st, lat, lon } = item;
@@ -512,7 +524,8 @@ async function processJob(ctx, empKey, company, sector, item){
   try { await ctx.insZip.run(zipKey, lat, lon, city); } catch(e){}
   const band = PAY[trade] || [18,30];
   const descr = `${title} at ${company} — ${city}${st?', '+st:''}. Live opening; apply on ${company}'s official careers site.`;
-  try { await ctx.insJob.run(eid, title, trade, band[0], band[1], city, zipKey, 'Day', CRED[trade]||'', descr, 'Full-time', company, url, sector, 'biweekly', 'Ongoing', 'authorized'); return 1; } catch(e){ return 0; }
+  const hire = classifyHire(company);   // live ATS feeds are the direct employer unless the name is a staffing agency
+  try { await ctx.insJob.run(eid, title, trade, band[0], band[1], city, zipKey, 'Day', CRED[trade]||'', descr, 'Full-time', company, url, sector, 'biweekly', 'Ongoing', 'authorized', hire); return 1; } catch(e){ return 0; }
 }
 
 // Main: fetch every keyless source, keep blue-collar US roles, insert deduped by apply_url.
@@ -523,7 +536,7 @@ async function ingestLiveJobs(db){
     db, DENY, seen: new Set(seenRows.map(r=>r.apply_url)), touched: [], empCache: {}, pw: '$rivet$live',
     insZip: db.prepare('INSERT OR IGNORE INTO zip_geo(zip,lat,lon,city) VALUES(?,?,?,?)'),
     insEmp: db.prepare('INSERT INTO users(email,pass,role,name,company,company_city,company_size,company_about) VALUES(?,?,?,?,?,?,?,?)'),
-    insJob: db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type,source,apply_url,sector,pay_cadence,duration,sponsorship) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`),
+    insJob: db.prepare(`INSERT INTO jobs(employer_id,title,trade,pay_min,pay_max,city,zip,shift,req_creds,descr,employment_type,source,apply_url,sector,pay_cadence,duration,sponsorship,hire_type) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`),
   };
   const all = SOURCES.map(([t,c,s])=>['greenhouse',t,c,s,null])
     .concat(EXTRA_SOURCES.map(([p,t,c,s])=>[p,t,c,s,null]))
@@ -546,4 +559,4 @@ async function normalizeTitles(db){
   return n;
 }
 
-module.exports = { ingestLiveJobs, normalizeTitles, normalizePay, SOURCES, EXTRA_SOURCES, WD_SOURCES, ORACLE_SOURCES, fetchProvider, tradeFor, cleanTitle, parseLoc, parseLocLoose, workdayLoc, geocode, PAY, CRED, DENY, TRADE_RULES, fetchJSON };
+module.exports = { ingestLiveJobs, normalizeTitles, normalizePay, classifyHire, jobDedupKey, SOURCES, EXTRA_SOURCES, WD_SOURCES, ORACLE_SOURCES, fetchProvider, tradeFor, cleanTitle, parseLoc, parseLocLoose, workdayLoc, geocode, PAY, CRED, DENY, TRADE_RULES, fetchJSON };

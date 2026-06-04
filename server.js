@@ -1119,9 +1119,11 @@ const server = http.createServer(async (req,res)=>{
           jtype:url.searchParams.get('jtype')||'',
           maxmi:Number(url.searchParams.get('maxmi'))||0,
           sort:url.searchParams.get('sort')||'',
+          direct:url.searchParams.get('direct')==='1',
         };
         let matches = await rankJobsForWorker(user.id);
         const needZip = matches.length ? !!matches[0].needZip : false;
+        if(f.direct) matches=matches.filter(m=>m.job.hire_type!=='agency');  // worker wants direct employers, no staffing middle-men
         if(f.q){ const q=f.q.toLowerCase(); matches=matches.filter(m=>(m.job.title||'').toLowerCase().includes(q)||(m.job.company||'').toLowerCase().includes(q)); }
         if(f.trade) matches=matches.filter(m=>m.job.trade===f.trade);
         if(f.city){ const c=f.city.toLowerCase(); matches=matches.filter(m=>(m.job.city||'').toLowerCase().includes(c)); }
@@ -1520,8 +1522,26 @@ const server = http.createServer(async (req,res)=>{
         const topTrades = Object.entries(tmap).map(([trade,n])=>({trade,n})).sort((a,b)=>b.n-a.n).slice(0,6);
         const jmap={}; for(const a of apps){ const k=a.job_id; (jmap[k]=jmap[k]||{id:a.job_id,title:a.title,n:0,hired:0}); jmap[k].n++; if(a.stage==='Hired') jmap[k].hired++; }
         const topJobs = Object.values(jmap).sort((a,b)=>b.n-a.n).slice(0,6);
+        // Pay competitiveness: where each of the recruiter's open roles sits vs the live market for its trade.
+        const payComp = [];
+        for(const j of jobs.filter(j=>j.status==='open' && j.pay_max>0).slice(0,8)){
+          const r = await payRankForJob(j);
+          if(r) payComp.push({ title:j.title, pay:`${j.pay_min||0}–${j.pay_max}`, p50:r.p50, pct:r.pct, label:r.label, cls:r.cls });
+        }
+        // Market context for the trades this employer hires in: volume, direct-employer share, freshness.
+        let marketCtx = null;
+        const myTrades = [...new Set(jobs.map(j=>j.trade).filter(Boolean))];
+        if(myTrades.length){
+          const ph2 = myTrades.map(()=>'?').join(',');
+          const m = await db.prepare(`SELECT COUNT(*) n,
+              SUM(CASE WHEN hire_type='direct' OR hire_type IS NULL THEN 1 ELSE 0 END) direct,
+              SUM(CASE WHEN last_seen >= datetime('now','-14 days') THEN 1 ELSE 0 END) fresh
+            FROM jobs WHERE status='open' AND apply_url IS NOT NULL AND trade IN (${ph2})`).get(...myTrades);
+          if(m && m.n>0) marketCtx = { openCount:m.n, directPct:Math.round((m.direct/m.n)*100), freshPct:Math.round((m.fresh/m.n)*100),
+            tradeLabel: myTrades.slice(0,3).map(t=>M.TRADES[t]||t).join(', ')+(myTrades.length>3?'…':'') };
+        }
         return send(res, V.layout({title:'Analytics',user,active:'analytics',body:V.empAnalytics({user,
-          kpis:{pipeline, hired, fillRate}, weekly, conv, topTrades, topJobs, avgScore, totalApps})}));
+          kpis:{pipeline, hired, fillRate}, weekly, conv, topTrades, topJobs, avgScore, totalApps, payComp, marketCtx})}));
       }
       if(p==='/console/company' && method==='GET')
         return send(res, V.layout({title:'Company profile',user,active:'',body:V.empCompany({user, saved:url.searchParams.get('saved')==='1', welcome:url.searchParams.get('welcome')==='1', rating:await ratingFor(user.id,'employer'), reviews:await reviewsFor(user.id,'employer'), payRep:await payRep(user.id), rehire:await rehireStat(user.id), safety:await safetyStat(user.id)})}));
@@ -1995,7 +2015,7 @@ const server = http.createServer(async (req,res)=>{
 
 // Live job ingestion from companies' public job boards (Greenhouse). Runs in the
 // background after boot, at most every 6h, so prod stays full of real current postings.
-const { ingestLiveJobs, normalizeTitles, tradeFor, normalizePay } = require('./jobs_live');
+const { ingestLiveJobs, normalizeTitles, tradeFor, normalizePay, classifyHire, jobDedupKey } = require('./jobs_live');
 const { ingestAggregators, aggregatorsConfigured, isFabTitle } = require('./jobs_aggregators');
 // Keep the semiconductor sector accurate: aggregator jobs tagged semiconductor must have a real fab
 // signal in the title (employer-sourced fab jobs from Workday are exempt). Demote the rest to mfg.
@@ -2055,6 +2075,48 @@ async function normalizePayPass(){
     await db.prepare("INSERT INTO meta(k,v) VALUES('paynorm_ver',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").run(PAYNORM_VERSION);
     console.log(`[paynorm] normalized pay on ${fixed} jobs (v${PAYNORM_VERSION})`);
   } catch(e){ console.error('[paynorm] skipped (non-fatal):', e.message); }
+}
+// Tag every live posting direct vs agency (staffing/temp firm) from its source/company name.
+// Re-runs whenever the rule version bumps. Workers can then filter to direct employers only.
+const HIRE_VERSION = '1';
+async function tagHirePass(){
+  try {
+    const done = ((await db.prepare("SELECT v FROM meta WHERE k='hire_ver'").get())||{}).v;
+    if(done === HIRE_VERSION) return;
+    const rows = await db.prepare("SELECT j.id, j.source, j.title, u.company FROM jobs j JOIN users u ON u.id=j.employer_id WHERE j.apply_url IS NOT NULL").all();
+    let n=0;
+    for(const r of rows){
+      const ht = classifyHire(`${r.source||''} ${r.company||''} ${r.title||''}`);
+      try { await db.prepare('UPDATE jobs SET hire_type=? WHERE id=?').run(ht, r.id); if(ht==='agency') n++; } catch(e){}
+    }
+    await db.prepare("INSERT INTO meta(k,v) VALUES('hire_ver',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").run(HIRE_VERSION);
+    console.log(`[hire] tagged ${rows.length} live jobs (${n} agency) (v${HIRE_VERSION})`);
+  } catch(e){ console.error('[hire] skipped (non-fatal):', e.message); }
+}
+// Cross-source de-dup: when the SAME role (company+trade+city+title) is reachable both directly and
+// via an aggregator mirror (Adzuna/Jooble/USAJOBS), hide the aggregator copy and keep the direct one.
+// Only ever hides aggregator mirrors — never collapses multiple genuine direct openings. Runs each refresh.
+const AGG_RE = /adzuna|jooble|usajobs/i;
+async function dedupeLivePass(){
+  try {
+    const rows = await db.prepare("SELECT id, source, trade, city, title, apply_url, last_seen, created_at FROM jobs WHERE status='open' AND apply_url IS NOT NULL").all();
+    const groups = new Map();
+    for(const r of rows){ const k = jobDedupKey(r.source, r.trade, r.city, r.title); if(!groups.has(k)) groups.set(k, []); groups.get(k).push(r); }
+    let hidden=0;
+    for(const g of groups.values()){
+      if(g.length<2) continue;
+      const direct = g.filter(r=>!AGG_RE.test(r.apply_url||''));
+      const aggr   = g.filter(r=> AGG_RE.test(r.apply_url||''));
+      if(direct.length && aggr.length){                          // a direct copy exists → hide the aggregator mirrors
+        const keeper = direct[0].id;
+        for(const a of aggr){ try { await db.prepare("UPDATE jobs SET status='dupe', dupe_of=? WHERE id=?").run(keeper, a.id); hidden++; } catch(e){} }
+      } else if(aggr.length>1){                                  // multiple aggregator copies of the same role → keep freshest
+        aggr.sort((a,b)=> (Date.parse((b.last_seen||b.created_at||'').replace(' ','T'))||0) - (Date.parse((a.last_seen||a.created_at||'').replace(' ','T'))||0) || a.id-b.id);
+        for(let i=1;i<aggr.length;i++){ try { await db.prepare("UPDATE jobs SET status='dupe', dupe_of=? WHERE id=?").run(aggr[0].id, aggr[i].id); hidden++; } catch(e){} }
+      }
+    }
+    if(hidden) console.log(`[dedupe] hid ${hidden} cross-source mirror postings`);
+  } catch(e){ console.error('[dedupe] skipped (non-fatal):', e.message); }
 }
 // Real-job count = anything with a real external apply link, excluding the old USAJOBS search-link seeds.
 async function realJobCount(){
@@ -2129,7 +2191,7 @@ async function refreshLiveJobs(){
     const stale = age >= 6*3600*1000;
     const ver = (await db.prepare("SELECT v FROM meta WHERE k='ingest_ver'").get()||{}).v;
     const forced = ver !== INGEST_VERSION; // code changed how/what we ingest → refresh once regardless of freshness
-    if(!forced && !stale && liveCount >= 800){ try { await retagTrades(); } catch(e){} try { await normalizePayPass(); } catch(e){} await purgeSeeds(); clearJobCache(); await prewarmJobCache(); return; } // well-stocked; still keep fakes out
+    if(!forced && !stale && liveCount >= 800){ try { await retagTrades(); } catch(e){} try { await normalizePayPass(); } catch(e){} try { await tagHirePass(); } catch(e){} try { await dedupeLivePass(); } catch(e){} await purgeSeeds(); clearJobCache(); await prewarmJobCache(); return; } // well-stocked; still keep fakes out
     const r = await ingestLiveJobs(db);
     let agg = { added:0, scanned:0 };
     if(aggregatorsConfigured()) agg = await ingestAggregators(db);
@@ -2141,6 +2203,8 @@ async function refreshLiveJobs(){
     try { await retagSemiconductor(); } catch(e){}
     try { await retagTrades(); } catch(e){}
     try { await normalizePayPass(); } catch(e){}
+    try { await tagHirePass(); } catch(e){}
+    try { await dedupeLivePass(); } catch(e){}
     await purgeSeeds();
     await pruneNonGTM();
     clearJobCache(); await prewarmJobCache(); // fresh data → drop + immediately re-warm so pages stay fast

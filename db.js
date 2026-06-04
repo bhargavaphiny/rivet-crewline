@@ -1352,6 +1352,8 @@ async function migrate() {
   try { await db.exec('ALTER TABLE jobs ADD COLUMN subcontract_ok INTEGER DEFAULT 0'); } catch (e) { /* employer open to subcontractors */ }
   try { await db.exec('ALTER TABLE jobs ADD COLUMN sector TEXT'); } catch (e) { /* semiconductor|manufacturing|healthcare (GTM verticals) */ }
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN open_to_extra INTEGER DEFAULT 0'); } catch (e) { /* wants to stack multiple jobs/shifts */ }
+  try { await db.exec("ALTER TABLE jobs ADD COLUMN hire_type TEXT DEFAULT 'direct'"); } catch (e) { /* direct (employer hires) | agency (staffing/temp firm) */ }
+  try { await db.exec("ALTER TABLE jobs ADD COLUMN dupe_of INTEGER"); } catch (e) { /* set when this posting is a cross-source mirror of another (hidden from the board) */ }
 }
 
 async function seedZips() {
