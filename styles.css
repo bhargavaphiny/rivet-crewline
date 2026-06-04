@@ -1246,3 +1246,19 @@ body.app-mode{margin:0}
 .cred-path .cp-c>b{display:block;margin-bottom:5px;font-size:15px}
 .cred-path .cp-c p{margin:0 0 8px}
 .cred-path .cp-c .btn-sm{margin-right:6px}
+
+/* ---------- ATS depth: pipeline quality signals + scorecard + health ---------- */
+.pipe-health{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0 14px}
+.pipe-health>div{background:var(--card,#fff);border:1px solid var(--line);border-radius:12px;padding:9px 6px;text-align:center}
+.pipe-health b{display:block;font-size:20px;font-weight:800;color:var(--ink)}
+.pipe-health span{font-size:10px;letter-spacing:.05em;color:var(--slate)}
+.pc-sig{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px;font-size:11.5px;color:var(--slate);font-weight:700}
+.pc-sig span{display:inline-flex;align-items:center;gap:3px}
+.pc-sig svg{width:12px;height:12px;stroke:currentColor}
+.pc-sig .sv{color:#157a52}.pc-sig .sv svg{stroke:#157a52}
+.pc-sig .pc-days{margin-left:auto;color:#9aa6ad;font-weight:600}
+.pc-rate{display:flex;gap:1px;margin:2px 0 6px}
+.pc-rate form{display:inline;line-height:1}
+.pc-rate .star{background:none;border:0;cursor:pointer;font-size:15px;color:#d8d2c6;padding:0 1px;line-height:1}
+.pc-rate .star.on{color:#E8923A}
+.pc-rate .star:hover{color:#E8923A}

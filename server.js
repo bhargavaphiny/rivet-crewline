@@ -1633,6 +1633,14 @@ const server = http.createServer(async (req,res)=>{
           await db.prepare('UPDATE applications SET outcome=? WHERE id=?').run(b.outcome, appId);
         return redirect(res, `/console/jobs/${app?app.job_id:''}`);
       }
+      const rateMatch = p.match(/^\/console\/applications\/(\d+)\/rate$/);
+      if(rateMatch && method==='POST'){
+        const b = await readBody(req); const appId = Number(rateMatch[1]);
+        const r = Math.max(0, Math.min(5, Number(b.rating)||0));
+        const app = await db.prepare(`SELECT a.job_id FROM applications a JOIN jobs j ON j.id=a.job_id WHERE a.id=? AND j.employer_id=?`).get(appId, user.id);
+        if(app){ try { await db.prepare('UPDATE applications SET rating=? WHERE id=?').run(r||null, appId); } catch(e){} }
+        return redirect(res, `/console/jobs/${app?app.job_id:''}`);
+      }
       const addMatch = p.match(/^\/console\/jobs\/(\d+)\/add$/);
       if(addMatch && method==='POST'){
         const b = await readBody(req); const jobId=Number(addMatch[1]);
@@ -1700,7 +1708,9 @@ const server = http.createServer(async (req,res)=>{
       if(jid && p===`/console/jobs/${jid}` && method==='GET'){
         const job = await db.prepare('SELECT * FROM jobs WHERE id=? AND employer_id=?').get(jid,user.id);
         if(!job) return send(res, V.layout({title:'Not found',user,body:'<section class="wrap"><div class="card">Job not found.</div></section>'}),404);
-        const apps = await db.prepare(`SELECT a.id app_id,a.stage,a.score,a.outcome,u.id worker_id,u.name,p.trade FROM applications a
+        const apps = await db.prepare(`SELECT a.id app_id,a.stage,a.score,a.outcome,a.rating,a.created_at,u.id worker_id,u.name,p.trade,p.readiness,p.skillchecks,p.city,
+          (SELECT COUNT(*) FROM credentials c WHERE c.user_id=a.worker_id AND c.verified=1) vcreds
+          FROM applications a
           JOIN users u ON u.id=a.worker_id JOIN worker_profiles p ON p.user_id=a.worker_id WHERE a.job_id=?`).all(jid);
         const columns = {}; for(const st of V.STAGES) columns[st]=[];
         const inPipe = new Set(); for(const a of apps){ (columns[a.stage]=columns[a.stage]||[]).push(a); inPipe.add(a.name); }

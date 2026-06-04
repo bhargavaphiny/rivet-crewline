@@ -486,7 +486,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=107">
+  <link rel="stylesheet" href="/styles.css?v=108">
   </head><body class="${user?'app-mode':'mkt-mode'}">
   <a class="skip" href="#main">Skip to main content</a>
   ${user ? `
@@ -3330,10 +3330,24 @@ function empPipeline({ job, columns, candidates, jobMedia = [], alerted = 0, sou
       <div class="quote-act">${q.status==='accepted'?`<span class="v ok">${T('Accepted')}</span>`:q.status==='declined'?`<span class="v pending">${T('Not selected')}</span>`:`<form method="post" action="/console/jobs/${job.id}/quotes/${q.id}/accept"><button class="btn-xs">${T('Accept quote')}</button></form>`}</div>
     </div>`).join('') : `<p class="muted sm">${T('No quotes yet — they’ll appear here as workers bid.')}</p>`}
   </div>` : '';
+  const skN = (a)=>{ try { return JSON.parse(a.skillchecks||'[]').filter(k=>SKILL_SCENARIOS[k]).length; } catch(e){ return 0; } };
+  const pcSig = (a)=>`<div class="pc-sig">${a.readiness?`<span title="${T('Job-readiness')}">${icon('check')} ${a.readiness}</span>`:''}${a.vcreds?`<span title="${T('Verified credentials')}">${icon('shield')} ${a.vcreds}</span>`:''}${skN(a)?`<span class="sv" title="${T('Skill-verified')}">${icon('shield')} ${skN(a)}</span>`:''}${a.created_at?`<span class="pc-days" title="${T('Time in stage')}">${daysSince(a.created_at)}d</span>`:''}</div>`;
+  const scoreCard = (a)=>`<div class="pc-rate" title="${T('Your rating')}">${[1,2,3,4,5].map(n=>`<form method="post" action="/console/applications/${a.app_id}/rate"><input type="hidden" name="rating" value="${a.rating===n?0:n}"><button class="star ${a.rating>=n?'on':''}" aria-label="${n}">★</button></form>`).join('')}</div>`;
+  const allApps = STAGES.reduce((n,s)=>n+(columns[s]||[]).length,0);
+  const advN = (columns.Interview||[]).length+(columns.Offer||[]).length+(columns.Hired||[]).length;
+  const hiredN = (columns.Hired||[]).length;
+  const health = allApps ? `<div class="pipe-health">
+    <div><b>${allApps}</b><span>${T('in pipeline')}</span></div>
+    <div><b>${advN}</b><span>${T('advancing')}</span></div>
+    <div><b>${hiredN}</b><span>${T('hired')}</span></div>
+    <div><b>${Math.round(advN/allApps*100)}%</b><span>${T('advance rate')}</span></div>
+  </div>` : '';
   const cols = STAGES.map(st=>`<div class="col"><div class="col-h">${T(st)} <span>${(columns[st]||[]).length}</span></div>
     ${(columns[st]||[]).map(a=>`<div class="pcard">
         <a class="pc-nm cand-link" href="/console/candidates/${a.worker_id}"><span class="av-t">${initials(a.name)}</span>${esc(a.name)}</a>
-        <div class="muted sm">${TRADES[a.trade]||a.trade}</div>
+        <div class="muted sm">${TRADES[a.trade]||a.trade}${a.city?` · ${esc(a.city)}`:''}</div>
+        ${pcSig(a)}
+        ${scoreCard(a)}
         <div class="pc-ft"><span class="score-tag ${scoreClass(a.score)}">${a.score}</span>
           <form method="post" action="/console/applications/${a.app_id}/stage" class="stageform">
             <select name="stage" onchange="this.form.submit()">${STAGES.map(s=>`<option value="${s}" ${s===st?'selected':''}>${T(s)}</option>`).join('')}</select>
@@ -3349,6 +3363,7 @@ function empPipeline({ job, columns, candidates, jobMedia = [], alerted = 0, sou
       <p class="muted">$${job.pay_min}–${job.pay_max}/hr · ${esc(job.city)}</p>
       <a class="btn-sm ghost right" href="/console/jobs/${job.id}/edit">${T('Edit')}</a>
       <form method="post" action="/console/jobs/${job.id}/${job.status==='closed'?'reopen':'close'}"><button class="btn-sm ${job.status==='closed'?'':'ghost'}">${job.status==='closed'?T('Reopen job'):T('Close job')}</button></form></div>
+    ${health}
     ${marketCard}
     ${job.status==='closed'?`<div class="card warn-card">${T('This job is closed — it’s hidden from worker search and the map. Reopen it to keep matching.')}</div>`:''}
     ${alerted>0?`<div class="ok-card">${icon('bell','xic')} ${alerted} ${alerted===1?T('matching worker with alerts on was notified about this job.'):T('matching workers with alerts on were notified about this job.')}</div>`:''}
