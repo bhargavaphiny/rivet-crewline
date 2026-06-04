@@ -1084,3 +1084,8 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .quiz-r.no{border-left-color:#e2453b;background:rgba(226,69,59,.04)}
 .q-a{font-size:13px;font-weight:700;margin:4px 0 4px}
 .q-a svg{width:14px;height:14px;stroke:#157a52;vertical-align:-2px}
+
+/* ===== Grow: climb tips ===== */
+.climb-tips{list-style:none;padding:0;margin:6px 0 0;display:flex;flex-direction:column;gap:8px}
+.climb-tips li{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;line-height:1.5;color:var(--slate)}
+.climb-tips li svg{width:15px;height:15px;stroke:#157a52;flex:none;margin-top:2px}

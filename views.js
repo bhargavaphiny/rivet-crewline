@@ -459,7 +459,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=96">
+  <link rel="stylesheet" href="/styles.css?v=97">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -778,6 +778,12 @@ const LADDERS = {
   hvac: [{t:'HVAC Installer',pay:'$20–30/hr'},{t:'HVAC Service Tech',k:'hvac',pay:'$26–42/hr',add:'EPA 608 + experience'},{t:'Lead Tech',pay:'+$5–8/hr',add:'NATE + leadership'},{t:'HVAC Contractor',pay:'$85k+/yr',add:'contractor license'}],
   automotive_tech: [{t:'Auto Technician',k:'automotive_tech',pay:'$24–40/hr'},{t:'ASE Master Tech',pay:'+$6–10/hr',add:'ASE Master certs'},{t:'Shop Foreman',pay:'+$8/hr',add:'leadership'},{t:'Service Manager',pay:'$70k+/yr',add:'management'}],
 };
+// Real "how people actually climb" advice per sector (Rivet guidance — not fake user posts).
+const CLIMB_TIPS = {
+  healthcare: ['Ask your employer about tuition reimbursement — many hospitals pay for CNA→LPN→RN school if you stay.','Pick up float/per-diem shifts in new units (ER, OR, ICU) to build the skills that get you promoted.','Get BLS and any unit certs early — they’re fast, cheap, and bump your pay and options.'],
+  semiconductor: ['Volunteer for cross-training on new tools — equipment techs out-earn operators and it’s learned on the job.','Keep spotless SPC/recipe documentation and zero contamination — that’s what gets you moved into process roles.','Ask about the fab’s tuition or apprenticeship program — many pay for an associate degree toward engineering.'],
+  manufacturing: ['Learn to read blueprints/GD&T and run the measuring tools — the fastest jump from operator to tech or quality.','Add a safety + trade cert (OSHA 30, NIMS, AWS) — multi-skilled techs get the maintenance and lead roles.','Say yes to PM and troubleshooting tasks — that’s how operators become maintenance techs (+$8–15/hr).'],
+};
 // ---------- Grow: career-advancement hub — climb the ladder, even while you're working ----------
 function growHub({ profile, trade, reco, marketJobs = 0, avgHr = 0 }){
   if(!trade) return `<section class="wrap narrow"><div class="sec-h big">${icon('spark','xic')} ${T('Grow')}</div>
@@ -811,6 +817,12 @@ function growHub({ profile, trade, reco, marketJobs = 0, avgHr = 0 }){
         <a class="track-link" href="/app/prep${PREP_FOR[trade]?'/'+PREP_FOR[trade]:''}">${icon('star')} ${T('Practice for your credential')}</a>
         ${ROLE_BLS[trade]?`<a class="track-link" href="/careers/${trade}">${icon('shield')} ${T('Full career guide')} →</a>`:''}
       </div></div>` : ''}
+    ${sec&&CLIMB_TIPS[sec]?`<div class="card"><div class="sec-h" style="margin-top:0">${T('How people climb — from those who’ve done it')}</div>
+      <ul class="climb-tips">${CLIMB_TIPS[sec].map(tip=>`<li>${icon('check')} ${T(tip)}</li>`).join('')}</ul>
+      <div class="track-links" style="margin-top:6px">
+        <a class="track-link" href="/pulse">${icon('spark')} ${T('Ask your trade community')} →</a>
+        <a class="track-link" href="/app/invite">${icon('send')} ${T('Invite your crew — grow together')} →</a>
+      </div></div>`:''}
     <div class="card">
       <div class="sec-h" style="margin-top:0">${T('Earn while you learn')}</div>
       <p class="muted sm" style="margin-top:-4px">${T('Get paid to train up — registered apprenticeships and employer-funded programs near you.')}</p>
