@@ -984,6 +984,15 @@ const server = http.createServer(async (req,res)=>{
         const reco = await coachReco(user.id);
         return send(res, V.layout({title:'Grow',user,active:'grow',body:V.growHub({profile:prof, trade, reco, marketJobs:reco?reco.marketJobs:0, avgHr:reco?reco.avgHr:0})}));
       }
+      if(p==='/app/earn' && method==='GET'){
+        const trade = (profTrades(prof)[0])||'';
+        const trades = profTrades(prof); const broad = new Set(trades); for(const t of trades) for(const a of (M.ADJACENT[t]||[])) broad.add(a);
+        const TRAIN_RX = /apprentice|trainee|entry.?level|no experience|will train|paid training|earn while|\bhelper\b/i;
+        let jobs = (await openJobs()).filter(j=>j.apply_url || j.employer_id);
+        if(broad.size) jobs = jobs.filter(j=>broad.has(j.trade));
+        jobs = jobs.filter(j=>TRAIN_RX.test(j.title||'')).slice(0,30);
+        return send(res, V.layout({title:'Earn & Learn',user,active:'grow',body:V.earnLearn({trade, jobs})}));
+      }
       if(p==='/app/prep' && method==='GET')
         return send(res, V.layout({title:'Credential practice',user,active:'grow',body:V.credPrepIndex()}));
       const prepM = p.match(/^\/app\/prep\/([a-z0-9_]+)$/);

@@ -823,7 +823,8 @@ function growHub({ profile, trade, reco, marketJobs = 0, avgHr = 0 }){
         <a class="track-link" href="/pulse">${icon('spark')} ${T('Ask your trade community')} →</a>
         <a class="track-link" href="/app/invite">${icon('send')} ${T('Invite your crew — grow together')} →</a>
       </div></div>`:''}
-    <div class="card">
+    <a class="invite-cta" href="/app/earn">${icon('star','xic')} <span><b>${T('Earn while you learn')}</b> — ${T('real employers near you who train you on the job, plus paid programs')}</span> <span class="invite-go">${T('Open')} →</span></a>
+    <div class="card" style="display:none">
       <div class="sec-h" style="margin-top:0">${T('Earn while you learn')}</div>
       <p class="muted sm" style="margin-top:-4px">${T('Get paid to train up — registered apprenticeships and employer-funded programs near you.')}</p>
       <div class="track-links">
@@ -831,6 +832,30 @@ function growHub({ profile, trade, reco, marketJobs = 0, avgHr = 0 }){
         ${sec==='manufacturing'?`<a class="track-link" href="https://fame-usa.com/" target="_blank" rel="noopener noreferrer">${icon('star')} ${T('FAME earn-and-learn ↗')}</a>`:''}
         <a class="track-link" href="https://www.careeronestop.org/Toolkit/Training/find-local-training.aspx" target="_blank" rel="noopener noreferrer">${icon('star')} ${T('Free / low-cost training near you ↗')}</a>
       </div>
+    </div>
+  </section>`;
+}
+// ---------- Earn while you learn: real "will-train" jobs from the live board + official paid programs ----------
+function earnLearn({ trade, jobs = [] }){
+  const label = TRADES[trade]||trade;
+  const sec = ROLE_BLS[trade] ? ROLE_BLS[trade].sector : '';
+  return `<section class="wrap narrow">
+    <a class="back" href="/app/grow">← ${T('Grow')}</a>
+    <div class="sec-h big">${icon('star','xic')} ${T('Earn while you learn')}${trade?` <span class="muted">${esc(label)}</span>`:''}</div>
+    <p class="muted">${T('Get paid to skill up. These real employers will train you on the job — plus the official programs that pay you to learn a trade, no debt.')}</p>
+    ${jobs.length?`<div class="sec-h">${jobs.length} ${T('“will-train” / entry openings near you')}</div>
+      ${jobs.map(j=>`<div class="card app-card"><div class="job-row"><div class="badge">${tradeEmoji(j.trade)}</div>
+        <div class="job-main"><h4>${esc(T(j.title))}</h4><div class="muted">${esc(j.company||'')} · ${esc(j.city||'')} · $${j.pay_min}–${j.pay_max}/hr</div></div></div>
+        <div class="app-act">${j.apply_url?`<a class="btn-sm" href="${esc(j.apply_url)}" target="_blank" rel="noopener noreferrer">${T('Apply')} ↗</a>`:`<a class="btn-sm" href="/app/jobs/${j.id}">${T('View')} →</a>`}</div></div>`).join('')}`
+      : `<div class="card muted">${T('No “will-train” postings in your trade right now — the official programs below pay you to learn.')}</div>`}
+    <div class="card"><div class="sec-h" style="margin-top:0">${T('Official paid-training programs')}</div>
+      <div class="track-links">
+        <a class="track-link" href="https://www.apprenticeship.gov/apprenticeship-job-finder?keyword=${encodeURIComponent(label||'')}" target="_blank" rel="noopener noreferrer">${icon('star')} ${T('Registered apprenticeships (apprenticeship.gov) ↗')}</a>
+        ${sec==='manufacturing'?`<a class="track-link" href="https://fame-usa.com/" target="_blank" rel="noopener noreferrer">${icon('star')} ${T('FAME earn-and-learn (manufacturing) ↗')}</a>`:''}
+        ${sec==='healthcare'?`<a class="track-link" href="https://www.careeronestop.org/Toolkit/Training/find-scholarships.aspx" target="_blank" rel="noopener noreferrer">${icon('star')} ${T('Healthcare scholarships & tuition help ↗')}</a>`:''}
+        <a class="track-link" href="https://www.careeronestop.org/Toolkit/Training/find-local-training.aspx" target="_blank" rel="noopener noreferrer">${icon('star')} ${T('Free / WIOA-funded local training ↗')}</a>
+      </div>
+      <p class="muted sm" style="margin-top:8px">${T('Tip: in any interview, ask if the employer pays for training or tuition — many do, and it’s how people climb without debt.')}</p>
     </div>
   </section>`;
 }
@@ -3047,4 +3072,4 @@ function whyRivetBlock(){
 }
 
 module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard, credPrep, credPrepIndex, gradeQuiz, growHub, invitePage, shiftsBoard, sourcingAgent, empShifts, empShiftForm, voiceAgent, SHIFT_KINDS, REGISTRY };
+  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard, earnLearn, credPrep, credPrepIndex, gradeQuiz, growHub, invitePage, shiftsBoard, sourcingAgent, empShifts, empShiftForm, voiceAgent, SHIFT_KINDS, REGISTRY };
