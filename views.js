@@ -93,7 +93,7 @@ let LANG = 'en';
 function setLang(l){ LANG = (l === 'es') ? 'es' : 'en'; }
 const I18N = {
   en: {
-    nav_login:'Log in', nav_get_started:'Get started', nav_home:'Home', nav_find_work:'Jobs', nav_industries:'Industries', nav_careers:'Careers', nav_shifts:'Shifts',
+    nav_login:'Log in', nav_get_started:'Get started', nav_home:'Home', nav_find_work:'Jobs', nav_why:'Why Rivet', nav_industries:'Industries', nav_careers:'Careers', nav_shifts:'Shifts',
     nav_work_card:'Work Card', nav_applications:'Applications', nav_training:'Learn', nav_pulse:'Pulse', nav_messages:'Messages',
     nav_hiring:'Hiring →', nav_working:'Working →', nav_logout:'Log out', mode_work:'Work', mode_hire:'Hire',
     nav_overview:'Overview', nav_talent:'Talent', nav_jobs:'Jobs', nav_analytics:'Analytics', nav_agents:'Agents',
@@ -140,7 +140,7 @@ const I18N = {
     x_bilingual_on:'Bilingual (EN/ES)', x_bilingual_off:'Tap: Bilingual',
   },
   es: {
-    nav_login:'Entrar', nav_get_started:'Empezar', nav_home:'Inicio', nav_find_work:'Empleos', nav_industries:'Industrias', nav_careers:'Carreras', nav_shifts:'Turnos',
+    nav_login:'Entrar', nav_get_started:'Empezar', nav_home:'Inicio', nav_find_work:'Empleos', nav_why:'Por qué Rivet', nav_industries:'Industrias', nav_careers:'Carreras', nav_shifts:'Turnos',
     nav_work_card:'Mi perfil', nav_applications:'Solicitudes', nav_training:'Aprender', nav_pulse:'Pulso', nav_messages:'Mensajes',
     nav_hiring:'Contratar →', nav_working:'Trabajar →', nav_logout:'Salir', mode_work:'Trabajo', mode_hire:'Contratar',
     nav_overview:'Resumen', nav_talent:'Talento', nav_jobs:'Empleos', nav_analytics:'Analíticas', nav_agents:'Agentes',
@@ -437,7 +437,8 @@ function layout({ title, user, body, active = '', flash = '' }) {
   // top nav for logged-OUT marketing pages
   let nav = '';
   if (!user) {
-    nav = `<a class="nav-link ${active==='sectors'?'on':''}" href="/sectors">${t('nav_industries')}</a>
+    nav = `<a class="nav-link ${active==='why'?'on':''}" href="/why">${t('nav_why')}</a>
+           <a class="nav-link ${active==='sectors'?'on':''}" href="/sectors">${t('nav_industries')}</a>
            <a class="nav-link ${active==='careers'?'on':''}" href="/careers">${t('nav_careers')}</a>
            <a class="nav-link" href="/login">${t('nav_login')}</a>
            <a class="btn-sm" href="/signup">${t('nav_get_started')}</a>${langTg}`;
@@ -486,7 +487,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=111">
+  <link rel="stylesheet" href="/styles.css?v=112">
   </head><body class="${user?'app-mode':'mkt-mode'}">
   <a class="skip" href="#main">Skip to main content</a>
   ${user ? `
@@ -3677,6 +3678,48 @@ function sectorPage({ key, count, metros, payLo, payHi, employers = [], roles = 
       <a class="btn" href="/signup?role=worker">${T('Get started')}</a></div>
   </section>`;
 }
+// Dedicated differentiation page — the moat, in plain language, for both sides + the GTM pitch.
+function whyPage(){
+  const wins = [
+    ['shield', T('Real jobs from real employers'), T('Every live opening is pulled straight from a company’s own careers system — Intel, TI, onsemi, CVS, Tyson, Cleveland Clinic, BAYADA and hundreds more. No scraped spam, no dead listings.')],
+    ['dollar', T('Verified pay on every job'), T('We show where each role’s pay sits against the live market for that trade — top 10%, above median, or below. No “competitive pay” mystery.')],
+    ['check', T('Direct employers, no middle-men'), T('We tag staffing agencies vs the company that actually hires — and let you filter to direct employers only, so you apply straight to the source.')],
+    ['spark', T('Matched, not searched'), T('We score every job on your trade, pay floor, location and credentials and surface the best fits. Or just talk — the voice agent runs the whole app hands-free.')],
+    ['badge', T('Get hired AND upskilled'), T('A verified Work Card (OSHA, CDL, EPA, licenses), hands-on Skill Checks with badges, AI mock interviews, and real BLS-backed career ladders for every role.')],
+    ['pin', T('Free, bilingual, mobile-first'), T('Always free for workers. Full English/Spanish. Built for a phone in a work glove — not a desktop HR portal.')],
+  ];
+  const sectors = [
+    ['🔬', T('Semiconductor'), T('Equipment, process, fab & probe technicians at every major US fab — Intel, Micron, GlobalFoundries, Samsung, NXP, TI, onsemi, Applied Materials, KLA and more.')],
+    ['🏭', T('Manufacturing'), T('Welders, machinists, CNC & production operators, industrial maintenance — Caterpillar, Magna, Cummins, Tyson, Trane, Johnson Controls and dozens more.')],
+    ['⚕️', T('Healthcare support'), T('CNAs, home-health & personal-care aides, LPNs, pharmacy & sterile-processing techs — BAYADA, Providence, CVS, Brookdale, Sanford and major hospital systems.')],
+  ];
+  const emp = [
+    [T('Verified, job-ready crews'), T('Every candidate carries a checked Work Card, Show-Up Score and skill badges — you see readiness before you ever message.')],
+    [T('Price to win'), T('Your analytics show exactly where your pay sits vs the live market for each trade, so you post roles that fill — not roles that sit.')],
+    [T('A real pipeline'), T('Source from a public-registry agent, score and stage candidates, schedule interviews, and track quality — without a heavyweight ATS.')],
+  ];
+  return `<section class="wrap">
+    <div class="why-hero">
+      <span class="pill">${T('Why Rivet × Crewline')}</span>
+      <h1>${T('The platform that helps you land the job — and get good at it.')}</h1>
+      <p class="lead">${T('Most job boards stop at a listing. Rivet pulls real openings from real employers, shows you honest pay, gets you credentialed, and walks you all the way to hired — across the sectors actually building America.')}</p>
+      <div class="why-cta">
+        <a class="btn-primary" href="/signup?role=worker">${T('Find work')}</a>
+        <a class="btn-ghost" href="/signup?role=employer">${T('Hire a crew')}</a>
+      </div>
+    </div>
+    <div class="sec-h">${T('What makes it different')}</div>
+    <div class="why-grid wide">${wins.map(([ic,h,b])=>`<div class="why-item card"><span class="why-ic">${icon(ic)}</span><div><b>${h}</b><p class="muted sm">${b}</p></div></div>`).join('')}</div>
+    <div class="sec-h">${T('Deep in the sectors that are hiring')}</div>
+    <div class="why-grid wide">${sectors.map(([e,h,b])=>`<div class="why-item card"><span class="why-emo">${e}</span><div><b>${h}</b><p class="muted sm">${b}</p></div></div>`).join('')}</div>
+    <div class="sec-h">${T('For employers — this is Crewline')}</div>
+    <div class="why-grid">${emp.map(([h,b])=>`<div class="why-item card"><span class="why-ic">${icon('check')}</span><div><b>${h}</b><p class="muted sm">${b}</p></div></div>`).join('')}</div>
+    <div class="card why-foot">
+      <h3>${T('Built for semiconductor, manufacturing and healthcare — the work that can’t be outsourced.')}</h3>
+      <div class="why-cta"><a class="btn-primary" href="/signup?role=worker">${T('Get started — it’s free')}</a><a class="btn-ghost" href="/sectors">${T('Browse live openings')}</a></div>
+    </div>
+  </section>`;
+}
 function whyRivetBlock(){
   const rows = [
     ['shield', T('Verified Work Card'), T('Credentials checked — OSHA, CDL, EPA, licenses. Not an anonymous listing.')],
@@ -3691,4 +3734,4 @@ function whyRivetBlock(){
 }
 
 module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, resumeDoc, workerApplications, workerOffers, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard, earnLearn, credPrep, credPrepIndex, credPath, gradeQuiz, skillCheckIndex, skillCheck, gradeSkill, skillKeyFor, parseSkillchecks, skillVerifiedRow, growHub, invitePage, shiftsBoard, sourcingAgent, empShifts, empShiftForm, voiceAgent, SHIFT_KINDS, REGISTRY };
+  jobDetail, workerProfile, resumeDoc, workerApplications, workerOffers, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard, earnLearn, credPrep, credPrepIndex, credPath, gradeQuiz, skillCheckIndex, skillCheck, gradeSkill, skillKeyFor, parseSkillchecks, skillVerifiedRow, growHub, invitePage, shiftsBoard, sourcingAgent, empShifts, empShiftForm, voiceAgent, whyPage, SHIFT_KINDS, REGISTRY };

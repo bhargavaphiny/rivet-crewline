@@ -724,6 +724,8 @@ const server = http.createServer(async (req,res)=>{
       return send(res, V.layout({title:'Work in the U.S.',user,active:'',body:V.workHub()}));
 
     // ---- GTM sector hubs (public): Manufacturing / Healthcare / Semiconductor ----
+    if(p==='/why' && method==='GET')
+      return send(res, V.layout({title:'Why Rivet', user, active:'why', body:V.whyPage()}));
     if(p==='/sectors' && method==='GET'){
       const keys = ['semiconductor','manufacturing','healthcare'];
       const cards = [];

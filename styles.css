@@ -506,7 +506,23 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .cta-band{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;background:var(--steel);color:#fff}
 .cta-band b{font-size:17px}
 .cta-band .muted{color:#c3cfd6!important}
-@media(max-width:560px){.role-grid,.why-grid{grid-template-columns:1fr}}
+@media(max-width:560px){.role-grid,.why-grid,.why-grid.wide{grid-template-columns:1fr}}
+/* ---- Why Rivet page ---- */
+.why-hero{text-align:center;max-width:760px;margin:8px auto 26px;padding:8px}
+.why-hero h1{font-size:34px;line-height:1.12;margin:14px 0 12px;letter-spacing:-.5px}
+.why-hero .lead{font-size:16px;color:var(--slate);max-width:620px;margin:0 auto}
+.why-hero .pill{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--brand-d,#7a3b22);background:rgba(31,111,181,.10);padding:5px 12px;border-radius:999px}
+.why-cta{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px}
+.btn-primary{display:inline-block;background:var(--brand);color:#fff;font-weight:800;padding:11px 20px;border-radius:11px;border:1px solid var(--brand)}
+.btn-ghost{display:inline-block;background:#fff;color:var(--steel);font-weight:800;padding:11px 20px;border-radius:11px;border:1px solid var(--line)}
+.btn-primary:hover{filter:brightness(1.06)}.btn-ghost:hover{border-color:var(--brand);color:var(--brand-d,#7a3b22)}
+.why-grid.wide{grid-template-columns:1fr 1fr 1fr}
+.why-grid .why-item.card{padding:16px;align-items:flex-start}
+.why-item b{display:block;margin-bottom:3px}
+.why-emo{flex:none;width:32px;height:32px;font-size:21px;display:grid;place-items:center;line-height:1}
+.why-foot{text-align:center;background:linear-gradient(180deg,var(--wash),var(--card));margin-top:22px}
+.why-foot h3{font-size:20px;max-width:620px;margin:6px auto 4px;line-height:1.25}
+@media(max-width:760px){.why-grid.wide{grid-template-columns:1fr}.why-hero h1{font-size:27px}}
 /* ---- Learn: career tracks + mock interview ---- */
 .track-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .track-card{margin:0}
