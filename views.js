@@ -459,7 +459,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=92">
+  <link rel="stylesheet" href="/styles.css?v=93">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -533,15 +533,16 @@ function landing(demandGeo = []) {
 }
 
 // ---------- auth ----------
-function authForm(kind, { role = 'worker', error = '', google = false } = {}) {
+function authForm(kind, { role = 'worker', error = '', google = false, ref = '', refName = '' } = {}) {
   const isSignup = kind === 'signup';
+  const refQ = ref ? '&ref='+encodeURIComponent(ref) : '';
   const googleBtn = google ? `
       <a class="gbtn full" id="gbtn" href="/auth/google?role=${esc(role)}">
         <svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
         ${t('auth_google')}
       </a>` : '';
   const phoneBtn = `
-      <a class="gbtn full" id="phonebtn" href="/phone?role=${esc(role)}">
+      <a class="gbtn full" id="phonebtn" href="/phone?role=${esc(role)}${refQ}">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="#13212B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
         ${t('auth_phone')}
       </a>`;
@@ -549,9 +550,11 @@ function authForm(kind, { role = 'worker', error = '', google = false } = {}) {
   return `<section class="wrap narrow">
     <div class="card auth">
       <h2>${isSignup?t('auth_create'):t('auth_welcome')}</h2>
+      ${ref&&refName&&isSignup?`<div class="crew-invite">${icon('spark','xic')} ${T('You’re joining')} <b>${esc(refName)}</b>${T('’s crew on Rivet — free for workers, always.')}</div>`:''}
       ${error?`<div class="err">${esc(error)}</div>`:''}
       ${googleBlock}
       <form method="post" action="/${kind}">
+        ${ref?`<input type="hidden" name="ref" value="${esc(ref)}">`:''}
         ${isSignup?`
           <label>${t('auth_iam')}
             <select name="role">
@@ -624,8 +627,8 @@ function tradeCheckboxes(selected = []) {
 }
 function workerOnboard(error='') {
   return `<section class="wrap narrow"><div class="card">
-    <h2>Set up your Work Card</h2>
-    <p class="muted">This is what employers see. It drives your matches and readiness score.</p>
+    <h2>${T('Set up your Work Card')}</h2>
+    <p class="muted">${T('About 2 minutes. It’s what employers see — and it unlocks your real job matches near you. Free, always.')}</p>
     ${error?`<div class="err">${esc(error)}</div>`:''}
     <form method="post" action="/app/onboard">
       <label>Headline <input name="headline" maxlength="80" placeholder="e.g. Journeyman electrician — commercial & solar"></label>
@@ -685,6 +688,7 @@ function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 
       ${xToggle('/app/extra', profile.open_to_extra, 'bolt', T('Open to extra work ✓'), T('I want extra / multiple jobs'), '/app')}
     </div>
     ${welcome}
+    <a class="invite-cta" href="/app/invite">${icon('spark','xic')} <span><b>${T('Invite your crew')}</b> — ${T('bring the people you work with; get hired as a team')}</span> <span class="invite-go">${T('Invite')} →</span></a>
     ${jobsGeo && jobsGeo.points.length ? usMap(jobsGeo.points, {title:isNew?T('Where the work is'):t('home_top'), noun:T('job'), cta:T('Apply'), home:jobsGeo.home,
         legend:isNew?null:`<span class="lg"><i class="d-direct"></i> ${T('Your trades')}</span><span class="lg"><i class="d-related"></i> ${T('Related trades')}</span>`,
         emptyMsg:T('No mapped openings yet.')}) : ''}
@@ -784,6 +788,34 @@ function workerCoach({ profile, reco, line }){
   </section>`;
 }
 
+function invitePage({ user, link, joined = 0, sent = false }){
+  const msg = encodeURIComponent('Join me on Rivet — real blue-collar jobs near you, free for workers. '+link);
+  return `<section class="wrap narrow">
+    <a class="back" href="/app">← ${T('Home')}</a>
+    <div class="card agent-card">
+      <div class="agent-h">${icon('spark','xic')} ${T('Invite your crew')}</div>
+      <p class="agent-line">${T('The fastest way to better work is to bring the people you already work with. Invite your crew — when they join, employers can hire you as a team.')}</p>
+      ${joined?`<p class="muted sm">${joined} ${joined===1?T('teammate has joined'):T('teammates have joined')} ${T('from your invites')} 🎉</p>`:''}
+    </div>
+    ${sent?`<div class="ok-card">${T('Invite sent ✓')}</div>`:''}
+    <div class="card">
+      <div class="sec-h" style="margin-top:0">${T('Your invite link')}</div>
+      <div class="invite-link"><input id="invlink" readonly value="${esc(link)}"><button class="btn-sm" type="button" onclick="try{navigator.clipboard.writeText(document.getElementById('invlink').value);this.textContent='${T('Copied ✓')}'}catch(e){}">${T('Copy')}</button></div>
+      <div class="invite-share">
+        <a class="track-link" href="sms:?&body=${msg}">${icon('bell')} ${T('Text it')}</a>
+        <a class="track-link" href="https://wa.me/?text=${msg}" target="_blank" rel="noopener noreferrer">${T('WhatsApp')}</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="sec-h" style="margin-top:0">${T('Or send a text invite')}</div>
+      <form method="post" action="/app/invite/sms" class="crew-form">
+        <input name="phone" inputmode="tel" placeholder="${T('Teammate’s phone number')}" required>
+        <button class="btn-sm">${T('Send invite')}</button>
+      </form>
+      <p class="muted sm">${T('We’ll text them your link — one invite, no spam.')}</p>
+    </div>
+  </section>`;
+}
 function agentApplyResult({ applied = [], matches = [], already = 0, total = 0 }){
   const card = (a, ext) => `<div class="card app-card">
       <div class="job-row"><div class="badge">${tradeEmoji(a.trade)}</div>
@@ -2567,8 +2599,9 @@ function empPipeline({ job, columns, candidates, jobMedia = [], alerted = 0, sou
 function empSearch({ rows, filters }) {
   const tradeOpts = `<option value="">${T('All trades')}</option>`+Object.entries(TRADES).map(([k,v])=>`<option value="${k}" ${filters.trade===k?'selected':''}>${esc(T(v))}</option>`).join('');
   return `<section class="wrap">
-    <div class="page-h"><h2>${T('Talent Search')}</h2><p class="muted">${rows.length} ${T('verified candidates')}</p>
+    <div class="page-h"><h2>${T('Talent Search')}</h2><p class="muted">${rows.length} ${T('candidates')}</p>
       <a class="btn-sm right ghost" href="/console/shortlist">★ Shortlist</a></div>
+    <div class="card disclaimer" style="margin-bottom:14px">${icon('spark','xic')} ${T('Rivet is brand-new — our verified worker pool is growing every day. Post a job to attract candidates, or use the Sourcing Agent to find and verify talent from public registries while the pool fills out.')}</div>
     <form class="filters" method="get" action="/console/search">
       <select name="trade" onchange="this.form.submit()">${tradeOpts}</select>
       <label class="chk"><input type="checkbox" name="verified" value="1" ${filters.verified?'checked':''} onchange="this.form.submit()"> ${T('Verified only')}</label>
@@ -2810,4 +2843,4 @@ function whyRivetBlock(){
 }
 
 module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard, shiftsBoard, sourcingAgent, empShifts, empShiftForm, voiceAgent, SHIFT_KINDS, REGISTRY };
+  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard, invitePage, shiftsBoard, sourcingAgent, empShifts, empShiftForm, voiceAgent, SHIFT_KINDS, REGISTRY };

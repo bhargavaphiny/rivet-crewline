@@ -750,8 +750,14 @@ const server = http.createServer(async (req,res)=>{
       // Show every metro (real counts) — clustering keeps it clean, and the total stays honest.
       return send(res, V.layout({title:'Hire & get hired in the trades', user:null, body:V.landing(demandGeo)}));
     }
-    if(p==='/signup' && method==='GET')
-      return send(res, V.layout({title:'Sign up', user:null, body:V.authForm('signup',{role:url.searchParams.get('role')||'worker', google:googleEnabled})}));
+    if(p==='/signup' && method==='GET'){
+      const ref = url.searchParams.get('ref')||'';
+      let refName=''; if(ref){ const r=await db.prepare('SELECT name,role FROM users WHERE id=?').get(Number(ref)); if(r && r.role==='worker') refName = r.name; }
+      return send(res, V.layout({title:'Sign up', user:null, body:V.authForm('signup',{role:url.searchParams.get('role')||'worker', google:googleEnabled, ref:refName?ref:'', refName})}));
+    }
+    // crew referral link → worker signup pre-tagged with the inviter
+    const rmatch = p.match(/^\/r\/(\d+)$/);
+    if(rmatch && method==='GET') return redirect(res, `/signup?role=worker&ref=${rmatch[1]}`);
     if(p==='/login' && method==='GET')
       return send(res, V.layout({title:'Log in', user:null, body:V.authForm('login',{google:googleEnabled})}));
 
@@ -812,8 +818,9 @@ const server = http.createServer(async (req,res)=>{
       const role = b.role==='employer'?'employer':'worker';
       if(!b.email||!b.pass||!b.name) return send(res, V.layout({title:'Sign up',user:null,body:V.authForm('signup',{role,google:googleEnabled,error:'All fields are required.'})}));
       try{
-        const info = await db.prepare('INSERT INTO users(email,pass,role,name,company) VALUES(?,?,?,?,?)')
-          .run(b.email.toLowerCase().trim(), hashPassword(b.pass), role, b.name.trim(), role==='employer'?(b.company||'').trim():null);
+        const refId = (role==='worker' && Number(b.ref)) ? Number(b.ref) : null;
+        const info = await db.prepare('INSERT INTO users(email,pass,role,name,company,referred_by) VALUES(?,?,?,?,?,?)')
+          .run(b.email.toLowerCase().trim(), hashPassword(b.pass), role, b.name.trim(), role==='employer'?(b.company||'').trim():null, refId);
         setSession(req, res, info.lastInsertRowid);
         // new employers set up their company first so worker-facing job pages aren't empty
         return redirect(res, role==='employer'?'/console/company?welcome=1':'/app/onboard');
@@ -947,6 +954,17 @@ const server = http.createServer(async (req,res)=>{
       }
       if(p==='/app/agents' && method==='GET')
         return send(res, V.layout({title:'Agents',user,active:'agents',body:V.agentsHub({mode:'worker'})}));
+      if(p==='/app/invite' && method==='GET'){
+        const link = `https://${req.headers.host||'rivet-crewline.onrender.com'}/r/${user.id}`;
+        const joined = (await db.prepare('SELECT COUNT(*) c FROM users WHERE referred_by=?').get(user.id)).c;
+        return send(res, V.layout({title:'Invite your crew',user,active:'home',body:V.invitePage({user, link, joined, sent:url.searchParams.get('sent')==='1'})}));
+      }
+      if(p==='/app/invite/sms' && method==='POST'){
+        const b = await readBody(req); const ph = normPhone(b.phone);
+        if(validPhone(ph)){ const link=`https://${req.headers.host||'rivet-crewline.onrender.com'}/r/${user.id}`;
+          try { await sendSms(ph, `${user.name} invited you to Rivet — real blue-collar jobs near you, free for workers. ${link}`); } catch(e){} }
+        return redirect(res, '/app/invite?sent=1');
+      }
       if(p==='/app/coach' && method==='GET'){
         const reco = await coachReco(user.id);
         let line = '';
