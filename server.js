@@ -984,6 +984,15 @@ const server = http.createServer(async (req,res)=>{
         const reco = await coachReco(user.id);
         return send(res, V.layout({title:'Grow',user,active:'grow',body:V.growHub({profile:prof, trade, reco, marketJobs:reco?reco.marketJobs:0, avgHr:reco?reco.avgHr:0})}));
       }
+      if(p==='/app/prep' && method==='GET')
+        return send(res, V.layout({title:'Credential practice',user,active:'grow',body:V.credPrepIndex()}));
+      const prepM = p.match(/^\/app\/prep\/([a-z0-9_]+)$/);
+      if(prepM && method==='GET')
+        return send(res, V.layout({title:'Practice',user,active:'grow',body:V.credPrep(prepM[1], null)}));
+      if(prepM && method==='POST'){
+        const b = await readBody(req);
+        return send(res, V.layout({title:'Practice',user,active:'grow',body:V.credPrep(prepM[1], V.gradeQuiz(prepM[1], b))}));
+      }
       if(p==='/app/agent/apply' && method==='POST'){
         const matches = await rankJobsForWorker(user.id);
         const appliedIds = new Set((await db.prepare('SELECT job_id FROM applications WHERE worker_id=?').all(user.id)).map(r=>r.job_id));

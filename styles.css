@@ -1072,3 +1072,15 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .rung-top b{font-size:14.5px}
 .rung-pay{font-size:12.5px;font-weight:800;color:var(--brand-d);background:var(--paper);border-radius:9px;padding:2px 8px}
 .rung.cur .rung-top b{color:var(--brand-d)}
+
+/* ===== Credential practice quiz ===== */
+.quiz-q{padding:13px 15px}
+.q-q{font-size:14.5px;margin-bottom:9px;line-height:1.45}
+.q-opt{display:flex;align-items:center;gap:9px;padding:9px 11px;border:1.5px solid var(--line);border-radius:10px;margin-bottom:7px;cursor:pointer;font-size:13.5px;transition:.12s}
+.q-opt:hover{border-color:var(--brand)}
+.q-opt input{accent-color:var(--brand);width:16px;height:16px;flex:none}
+.quiz-r{padding:12px 15px;border-left:3px solid var(--line)}
+.quiz-r.ok{border-left-color:#1fa971;background:rgba(31,169,113,.04)}
+.quiz-r.no{border-left-color:#e2453b;background:rgba(226,69,59,.04)}
+.q-a{font-size:13px;font-weight:700;margin:4px 0 4px}
+.q-a svg{width:14px;height:14px;stroke:#157a52;vertical-align:-2px}

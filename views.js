@@ -459,7 +459,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=95">
+  <link rel="stylesheet" href="/styles.css?v=96">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -808,8 +808,8 @@ function growHub({ profile, trade, reco, marketJobs = 0, avgHr = 0 }){
       ${learnVideo(trade, LEARN_TRACKS[trade].vid)}
       <div class="track-links">
         <a class="track-link prep" href="/app/learn/interview?trade=${trade}">${icon('spark')} ${T('AI interview rep')}</a>
+        <a class="track-link" href="/app/prep${PREP_FOR[trade]?'/'+PREP_FOR[trade]:''}">${icon('star')} ${T('Practice for your credential')}</a>
         ${ROLE_BLS[trade]?`<a class="track-link" href="/careers/${trade}">${icon('shield')} ${T('Full career guide')} →</a>`:''}
-        <a class="track-link" href="/app/training">${icon('star')} ${T('Credentials to add')} →</a>
       </div></div>` : ''}
     <div class="card">
       <div class="sec-h" style="margin-top:0">${T('Earn while you learn')}</div>
@@ -820,6 +820,94 @@ function growHub({ profile, trade, reco, marketJobs = 0, avgHr = 0 }){
         <a class="track-link" href="https://www.careeronestop.org/Toolkit/Training/find-local-training.aspx" target="_blank" rel="noopener noreferrer">${icon('star')} ${T('Free / low-cost training near you ↗')}</a>
       </div>
     </div>
+  </section>`;
+}
+// ---------- In-app credential practice quizzes (study practice, clearly not the official exam) ----------
+const CRED_QUIZ = {
+  osha10: { label:'OSHA 10 — Safety', qs:[
+    { q:'What does PPE stand for?', o:['Personal Protective Equipment','Public Protection Enforcement','Plant Production Efficiency'], a:0, e:'PPE = Personal Protective Equipment — hard hat, eye/ear protection, gloves, etc.' },
+    { q:'The #1 cause of construction deaths (“Fatal Four”) is:', o:['Loud noise','Falls','Paperwork'], a:1, e:'Falls lead OSHA’s Fatal Four, then struck-by, caught-in/between, and electrocution.' },
+    { q:'Lockout/Tagout (LOTO) is used to:', o:['Lock the breakroom','Control hazardous energy during service','Track overtime'], a:1, e:'LOTO isolates and locks out energy so a machine can’t start while you service it.' },
+    { q:'A Safety Data Sheet (SDS) tells you:', o:['The lunch menu','A chemical’s hazards and safe handling','Your pay rate'], a:1, e:'An SDS lists hazards, safe handling, required PPE, and first aid for a chemical.' },
+    { q:'If you’re unsure a task is safe, you should:', o:['Do it fast','Stop and ask your supervisor','Skip your PPE'], a:1, e:'Stop-work authority: when in doubt, stop and ask. No job is worth an injury.' },
+  ]},
+  cna_cert: { label:'CNA Basics', qs:[
+    { q:'The single most important infection-control step is:', o:['Wearing cologne','Hand hygiene','Charting fast'], a:1, e:'Hand hygiene is the #1 way to stop the spread of infection.' },
+    { q:'“ADLs” stands for:', o:['Advanced Drug Lists','Activities of Daily Living','Automated Data Logs'], a:1, e:'ADLs = bathing, dressing, eating, toileting, mobility — the daily care CNAs assist with.' },
+    { q:'Before any procedure with a resident you should:', o:['Start right away','Identify them and explain what you’ll do','Close the blinds'], a:1, e:'Always verify identity and explain — it protects safety and dignity.' },
+    { q:'To prevent pressure injuries you should:', o:['Keep one position','Reposition regularly, keep skin clean & dry','Limit water'], a:1, e:'Scheduled repositioning plus clean, dry skin prevents bed sores.' },
+    { q:'A confused resident becomes combative. First you:', o:['Restrain them','Stay calm, keep everyone safe, get help','Argue back'], a:1, e:'Stay calm, ensure safety, de-escalate, and call for help — never restrain improperly.' },
+  ]},
+  bls: { label:'BLS / CPR', qs:[
+    { q:'Adult CPR compression rate is:', o:['60–80/min','100–120/min','200+/min'], a:1, e:'Push 100–120/min, ~2 inches deep, letting the chest fully recoil.' },
+    { q:'The CPR sequence is:', o:['A-B-C','C-A-B (Compressions, Airway, Breathing)','Breaths only'], a:1, e:'Start compressions first — C-A-B.' },
+    { q:'When an AED arrives you should:', o:['Wait for a doctor','Turn it on and follow the prompts','Ignore it'], a:1, e:'Power it on and follow the voice prompts — AEDs are built for lay rescuers.' },
+    { q:'Minimize pauses in compressions because:', o:['It saves battery','Blood flow to the brain stops when you pause','It looks better'], a:1, e:'Keep interruptions under 10 seconds — every pause stops circulation.' },
+  ]},
+  forklift: { label:'Forklift Safety', qs:[
+    { q:'Before each shift you must:', o:['Honk twice','Do a pre-operation inspection','Wash it'], a:1, e:'OSHA requires a daily pre-op check: brakes, horn, forks, leaks, tires.' },
+    { q:'When traveling with a load, forks should be:', o:['Raised high','Low and tilted back','Pointed up'], a:1, e:'Carry low and tilted back for stability and visibility.' },
+    { q:'A pedestrian steps into your path. You:', o:['Speed up','Stop and sound the horn','Raise the forks'], a:1, e:'Pedestrians have the right of way — stop, horn, proceed only when clear.' },
+    { q:'The “stability triangle” helps prevent:', o:['Speeding tickets','Tip-overs','Flat tires'], a:1, e:'Keeping the center of gravity inside the stability triangle prevents tip-overs.' },
+  ]},
+  aws_welding: { label:'Welding Fundamentals', qs:[
+    { q:'TIG welding is also called:', o:['GMAW','GTAW','SMAW'], a:1, e:'TIG = GTAW. MIG = GMAW, Stick = SMAW.' },
+    { q:'The main eye hazard when welding is:', o:['Dust','Arc flash / UV radiation','Cold air'], a:1, e:'The arc emits intense UV — use the correct shade lens to prevent “arc eye.”' },
+    { q:'A 6G pipe weld is performed at:', o:['Flat','45° fixed pipe (the hardest)','Horizontal'], a:1, e:'6G is a 45° fixed pipe — passing it qualifies you for most other positions.' },
+    { q:'Porosity in a weld is caused by:', o:['Good shielding','Gas trapped in the weld','Slow pay'], a:1, e:'Porosity = trapped gas, often from poor shielding gas or contamination.' },
+  ]},
+  epa608: { label:'EPA 608 — Refrigerant', qs:[
+    { q:'EPA 608 is required to:', o:['Drive a van','Handle refrigerants','Read a thermostat'], a:1, e:'Section 608 certification is legally required to service refrigerant-containing equipment.' },
+    { q:'Venting most refrigerants to the air is:', o:['Encouraged','Illegal','Required'], a:1, e:'Knowingly venting is illegal — refrigerant must be recovered.' },
+    { q:'Measuring superheat/subcooling helps you:', o:['Calculate overtime','Charge & diagnose a system','Weld pipe'], a:1, e:'It tells you if a system is correctly charged and helps diagnose faults.' },
+  ]},
+};
+// trade → the credential quiz most relevant to it
+const PREP_FOR = { cna:'cna_cert', patient_care_tech:'bls', surgical_tech:'bls', sterile_processing:'bls', medical_assistant:'bls',
+  welder:'aws_welding', hvac:'epa608', warehouse:'forklift', machine_operator:'forklift',
+  equipment_tech:'osha10', maintenance_tech:'osha10', electrician:'osha10', machinist:'osha10', assembler:'osha10', quality_inspector:'osha10', process_tech:'osha10', cleanroom_op:'osha10' };
+function gradeQuiz(credKey, body){
+  const quiz = CRED_QUIZ[credKey]; if(!quiz) return null;
+  let score=0; const graded = quiz.qs.map((q,i)=>{ const chosen = Number(body['q'+i]); const correct = chosen===q.a; if(correct) score++;
+    return { q:q.q, correct, correctText:q.o[q.a], chosenText:isNaN(chosen)?'':q.o[chosen], e:q.e }; });
+  return { score, total:quiz.qs.length, graded };
+}
+function credPrepIndex(){
+  return `<section class="wrap narrow">
+    <a class="back" href="/app/grow">← ${T('Grow')}</a>
+    <div class="sec-h big">${icon('star','xic')} ${T('Credential practice')} <span class="muted">${T('free study quizzes')}</span></div>
+    <p class="muted sm">${T('Build confidence before the real exam. Quick, free, and you can retake any time.')}</p>
+    <div class="track-grid">${Object.entries(CRED_QUIZ).map(([k,q])=>`<a class="card track-card" href="/app/prep/${k}">
+      <div class="track-h"><span class="trend-ic">${icon('star')}</span><div><b>${esc(q.label)}</b><div class="muted sm">${q.qs.length} ${T('questions')}</div></div></div>
+      <span class="sector-go">${T('Start practice')} →</span></a>`).join('')}</div>
+  </section>`;
+}
+function credPrep(credKey, result){
+  const quiz = CRED_QUIZ[credKey];
+  if(!quiz) return `<section class="wrap narrow"><div class="card muted">${T('No practice quiz for that yet.')} <a href="/app/prep">${T('See all quizzes')}</a></div></section>`;
+  if(result){
+    const {score, total, graded} = result; const pct = Math.round(score/total*100);
+    return `<section class="wrap narrow">
+      <a class="back" href="/app/prep">← ${T('All quizzes')}</a>
+      <div class="card agent-card" style="text-align:center"><div class="agent-h" style="justify-content:center">${icon('star','xic')} ${esc(quiz.label)}</div>
+        <div class="verdict-ring ${pct>=80?'rate-strong':pct>=60?'rate-solid':'rate-weak'}" style="margin:10px auto"><b>${pct}%</b><span>${score}/${total}</span></div>
+        <p class="agent-line">${pct>=80?T('Strong — you’re ready to sit the real exam.'):pct>=60?T('Close — review your misses and try again.'):T('Keep practicing — read each explanation below.')}</p></div>
+      ${graded.map((g,i)=>`<div class="card quiz-r ${g.correct?'ok':'no'}">
+        <div class="q-q"><b>${i+1}.</b> ${esc(g.q)}</div>
+        <div class="q-a">${g.correct?icon('check')+' '+T('Correct'):'✗ '+T('Correct answer:')+' '} <b>${esc(g.correctText)}</b>${!g.correct&&g.chosenText?` · ${T('you chose:')} ${esc(g.chosenText)}`:''}</div>
+        <p class="muted sm">${esc(g.e)}</p></div>`).join('')}
+      <div class="grow-cta"><a class="btn-sm" href="/app/prep/${credKey}">${T('Try again')}</a><a class="btn-sm ghost" href="/app/training">${T('How to earn it for real ↗')}</a></div>
+    </section>`;
+  }
+  return `<section class="wrap narrow">
+    <a class="back" href="/app/prep">← ${T('All quizzes')}</a>
+    <div class="sec-h big">${icon('star','xic')} ${esc(quiz.label)} <span class="muted">${T('practice quiz')}</span></div>
+    <p class="muted sm">${T('Study practice to build confidence — not the official exam.')}</p>
+    <form method="post" action="/app/prep/${credKey}">
+      ${quiz.qs.map((q,i)=>`<div class="card quiz-q"><div class="q-q"><b>${i+1}.</b> ${esc(q.q)}</div>
+        ${q.o.map((opt,j)=>`<label class="q-opt"><input type="radio" name="q${i}" value="${j}" required> <span>${esc(opt)}</span></label>`).join('')}</div>`).join('')}
+      <button class="btn full">${T('Check my answers')}</button>
+    </form>
   </section>`;
 }
 // ---------- worker agents ----------
@@ -2947,4 +3035,4 @@ function whyRivetBlock(){
 }
 
 module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, workerOnboard, workerHome, workerJobs,
-  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard, growHub, invitePage, shiftsBoard, sourcingAgent, empShifts, empShiftForm, voiceAgent, SHIFT_KINDS, REGISTRY };
+  jobDetail, workerProfile, workerApplications, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard, credPrep, credPrepIndex, gradeQuiz, growHub, invitePage, shiftsBoard, sourcingAgent, empShifts, empShiftForm, voiceAgent, SHIFT_KINDS, REGISTRY };
