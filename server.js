@@ -242,8 +242,8 @@ async function _jobGeoAllRaw(sector){
     if(b.items.length<12) b.items.push({ label:`${r.title} · $${r.pay_min}–${r.pay_max}/hr`, sub:`${r.company||''} · ${M.TRADES[r.trade]||r.trade}`, href:`/jobs/${r.id}` });
   }
   return Object.values(byZip).map(b=>{
-    const n = metroDemand(b.city, b.real);
-    const cats = Object.entries(b.catReal).map(([k,rc])=>({k, n:Math.max(1,Math.round(n*rc/b.real))})).sort((a,b)=>b.n-a.n);
+    const n = b.real; // REAL open jobs on Rivet in this metro — no inflation
+    const cats = Object.entries(b.catReal).map(([k,rc])=>({k, n:rc})).sort((a,b)=>b.n-a.n);
     return {...b, n, cats};
   }).sort((a,b)=>b.n-a.n);
 }
