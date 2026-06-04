@@ -50,15 +50,23 @@ const SOURCES = [
 // Title → trade. Order matters (first match wins). Drives the "is this blue-collar?" gate too.
 // Covers every blue-collar sector so aggregator feeds (Adzuna/USAJOBS/Jooble) classify correctly.
 const TRADE_RULES = [
-  // ---- healthcare support ----
+  // ---- healthcare support (specific roles first so they win over generic ones) ----
   [/sterile process|\bspd\b tech|central (service|sterile)/i,'sterile_processing'],
   [/surgical tech|surg tech|\bor\b tech|operating room tech/i,'surgical_tech'],
+  [/licensed practical nurse|licensed vocational nurse|\blpn\b|\blvn\b/i,'lpn'],
+  [/radiolog|rad tech|x.?ray tech|\bct tech|\bmri tech|mammograph|sonograph|ultrasound tech|imaging tech/i,'radiology_tech'],
+  [/medical (lab|laboratory)|laboratory tech|clinical lab|\bmlt\b|histolog|cytolog/i,'med_lab_tech'],
+  [/dental (assistant|hygien)|\brda\b/i,'dental_assistant'],
+  [/telemetry|monitor tech|\bekg\b tech|cardiac monitor/i,'monitor_tech'],
+  [/behavioral health (tech|aide|associate)|psych(iatric)? tech|mental health (tech|aide|associate)|\bbht\b/i,'behavioral_tech'],
+  [/physical therap(y|ist) (aide|assistant)|\bpta\b|rehab (aide|tech)|occupational therapy (aide|assistant)/i,'pt_aide'],
+  [/dietary (aide|assistant|technician)|nutrition (aide|services|assistant)/i,'dietary_aide'],
+  [/pharmacy tech|\bcpht\b/i,'pharmacy_tech'],
   [/phlebotom/i,'phlebotomist'],
-  [/patient care tech|\bpct\b/i,'patient_care_tech'],
+  [/patient care tech|\bpct\b|nurse extern|care partner/i,'patient_care_tech'],
   [/nurse(s)? aide|nursing assistant|\bcna\b|certified nurse|geriatric aide/i,'cna'],
   [/home health|caregiver|care giver|personal care (aide|assistant)|\bpca\b|direct support|\bdsp\b|resident (aide|assistant)|companion care/i,'caregiver'],
   [/medical assistant|clinical assistant|\bcma\b/i,'medical_assistant'],
-  [/pharmacy tech/i,'medical_assistant'],
   [/\bemt\b|paramedic|emergency medical/i,'emt'],
   // ---- skilled trades ----
   [/welder|welding|fabricat(or|ion)/i,'welder'],
@@ -84,15 +92,35 @@ const TRADE_RULES = [
   [/carpenter|framer|framing carpenter|finish carpenter/i,'carpenter'],
   [/painter|painting|coatings applicator/i,'painter'],
   [/solar (install|tech|pv|panel)|photovoltaic|\bpv\b install/i,'solar'],
-  // ---- machining / manufacturing ----
-  [/machinist|\bcnc\b|lathe|mill operator|\d-?axis|tool ?maker|\bgrinder\b/i,'machinist'],
+  // ---- semiconductor fab disciplines (specific — must precede generic process/equipment rules) ----
+  [/photolithograph|\blitho\b|lithography|photo (bay|tech|process)|track (operator|tech)|stepper|scanner tech/i,'photolith_tech'],
+  [/\betch\b|etcher|plasma etch|dry etch|wet etch/i,'etch_tech'],
+  [/deposition|\bcvd\b|\bpvd\b|\bald\b|thin film|\bepi\b technician|sputter/i,'deposition_tech'],
+  [/\bcmp\b|chemical mechanical|planariz/i,'cmp_tech'],
+  [/ion implant|implanter|\bimplant\b (tech|technician|operator)/i,'implant_tech'],
+  [/diffusion|\bfurnace\b (tech|operator)|oxidation|anneal/i,'diffusion_tech'],
+  [/metrolog|defect (review|inspection)|\bsem\b (tech|operator)|\bcd-?sem|inspection technician|optical inspection|wafer inspect/i,'metrology_tech'],
+  [/wafer (test|sort|probe)|\bprobe\b (tech|operator|station)|\bate\b (tech|technician|operator)|final test|test (technician|operator)|burn.?in/i,'test_tech'],
+  [/die (attach|prep|bond)|wire bond|\bbond(ing)? (tech|operator)|assembly (and|&) (test|packaging)|packaging (technician|operator)|back ?end (operator|tech)/i,'packaging_tech'],
+  [/calibration|metrology calibration|calibrat/i,'cal_tech'],
+  [/wafer (fab )?(operator|associate)|fab (operator|production)|cleanroom (operator|associate|technician)|manufacturing (operator|specialist).*(semiconductor|wafer|fab)/i,'wafer_fab_op'],
   [/cleanroom/i,'cleanroom_op'],
   [/chemical operator|process (technician|operator|tech)|fab (technician|operator)|wafer/i,'process_tech'],
-  [/equipment (technician|maintenance|specialist)|field service tech|tool (tech|install)/i,'equipment_tech'],
+  [/equipment (technician|maintenance|specialist|engineer)|field service tech|tool (tech|install)|sub.?fab (tech|technician)/i,'equipment_tech'],
+  [/fab facilit|facilities (technician|engineer).*(fab|semiconductor|gas|chemical)|gas (and|&)? chemical|\bgas\b delivery|abatement (tech|technician)/i,'fab_facilities'],
+  // ---- machining / manufacturing ----
+  [/tool (and|&) die|tool ?and ?die|die maker|toolmaker/i,'tool_die'],
+  [/injection mold|molding (technician|operator|process)|blow mold|mold setter|process (technician|tech).*mold/i,'injection_molding'],
+  [/press (operator|tech)|stamping (operator|press|tech)|punch press|brake press operator/i,'press_operator'],
+  [/material handler|\bpicker\b.*(plant|factory)|line (feeder|stocker)|production material/i,'material_handler'],
+  [/robot(ic)?s? (tech|technician|programmer)|automation (technician|tech|engineer)|\bplc\b (tech|technician)/i,'robotics_tech'],
+  [/quality (lab|laboratory)|materials (lab|test)|test lab tech|metallurg|\bqc\b (lab|analyst)/i,'lab_tech'],
+  [/machinist|\bcnc\b|lathe|mill operator|\d-?axis|tool ?maker|\bgrinder\b/i,'machinist'],
+  [/fabricat(or|ion)|metal fabricat|structural fabricat/i,'fabricator'],
   [/maintenance (technician|mechanic|tech|worker|associate)|facilities (technician|maintenance|mechanic)|building (engineer|maintenance)|general maintenance|maintenance person/i,'maintenance_tech'],
   [/quality (inspector|technician|control|assurance tech)|\bqc\b inspector|\binspector\b/i,'quality_inspector'],
   [/assembler|assembly (technician|operator|associate|worker)|electro.?mechanical assembler/i,'assembler'],
-  [/(production|manufacturing) (associate|operator|technician|worker|specialist)|machine operator|press operator|line (lead|operator|worker)|extrusion|injection mold|packaging operator|mixer operator|blow mold/i,'machine_operator'],
+  [/(production|manufacturing) (associate|operator|technician|worker|specialist)|machine operator|line (lead|operator|worker)|extrusion|packaging operator|mixer operator/i,'machine_operator'],
   // ---- automotive / heavy equipment ----
   [/diesel|heavy (equipment|mobile|duty) (mechanic|tech)/i,'diesel_mechanic'],
   [/automotive|auto (tech|mechanic)|vehicle (technician|mechanic|tech)|service technician|lube tech|tire tech|\bmechanic\b/i,'automotive_tech'],
@@ -137,6 +165,16 @@ const PAY = {
   cook:[16,24],prep_cook:[15,21],server:[12,22],dishwasher:[14,18],janitor:[15,22],housekeeper:[15,21],
   security_guard:[16,24],caregiver:[15,22],emt:[17,28],landscaper:[16,24],pest_control:[18,28],
   locksmith:[20,32],appliance_repair:[22,36],facilities:[20,32],
+  // semiconductor depth
+  wafer_fab_op:[20,32],photolith_tech:[26,40],etch_tech:[26,40],deposition_tech:[26,40],cmp_tech:[25,38],
+  implant_tech:[26,40],diffusion_tech:[25,38],metrology_tech:[24,38],test_tech:[24,38],packaging_tech:[20,32],
+  fab_facilities:[26,42],cal_tech:[26,40],
+  // manufacturing depth
+  tool_die:[28,44],injection_molding:[20,32],press_operator:[19,29],material_handler:[17,25],
+  robotics_tech:[28,44],fabricator:[22,36],lab_tech:[22,34],
+  // healthcare depth
+  lpn:[24,34],pharmacy_tech:[18,27],radiology_tech:[28,44],med_lab_tech:[24,38],dental_assistant:[20,30],
+  monitor_tech:[18,26],behavioral_tech:[18,27],pt_aide:[16,24],dietary_aide:[15,21],
 };
 const CRED = { welder:'aws_welding',electrician:'osha10',equipment_tech:'osha10',maintenance_tech:'osha10',
   diesel_mechanic:'ase',automotive_tech:'ase',warehouse:'forklift',cna:'cna_cert',surgical_tech:'bls',

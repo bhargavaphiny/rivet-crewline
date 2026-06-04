@@ -1950,7 +1950,7 @@ const server = http.createServer(async (req,res)=>{
 
 // Live job ingestion from companies' public job boards (Greenhouse). Runs in the
 // background after boot, at most every 6h, so prod stays full of real current postings.
-const { ingestLiveJobs, normalizeTitles } = require('./jobs_live');
+const { ingestLiveJobs, normalizeTitles, tradeFor } = require('./jobs_live');
 const { ingestAggregators, aggregatorsConfigured, isFabTitle } = require('./jobs_aggregators');
 // Keep the semiconductor sector accurate: aggregator jobs tagged semiconductor must have a real fab
 // signal in the title (employer-sourced fab jobs from Workday are exempt). Demote the rest to mfg.
@@ -1961,6 +1961,26 @@ async function retagSemiconductor(){
     for(let i=0;i<bad.length;i+=200){ const c=bad.slice(i,i+200); const ph=c.map(()=>'?').join(','); try { await db.prepare(`UPDATE jobs SET sector='manufacturing' WHERE id IN (${ph})`).run(...c); } catch(e){} }
     if(bad.length) console.log(`[gtm] re-tagged ${bad.length} non-fab jobs: semiconductor → manufacturing`);
   } catch(e){ console.error('[gtm] retag skipped:', e.message); }
+}
+// One-time: re-run the (now finer) trade rules over existing live jobs so the new
+// semiconductor/manufacturing/healthcare sub-disciplines populate without re-ingesting.
+// Trade label only — never touches sector, so GTM counts are unaffected. Flag-guarded.
+const RETAG_VERSION = '1';
+async function retagTrades(){
+  try {
+    const done = ((await db.prepare("SELECT v FROM meta WHERE k='retag_ver'").get())||{}).v;
+    if(done === RETAG_VERSION) return;
+    const rows = await db.prepare("SELECT id,title,trade FROM jobs WHERE apply_url IS NOT NULL").all();
+    const byTrade = {};
+    for(const r of rows){ const t = tradeFor(r.title || ''); if(t && t!==r.trade){ (byTrade[t]=byTrade[t]||[]).push(r.id); } }
+    let changed = 0;
+    for(const [t,ids] of Object.entries(byTrade)){
+      for(let i=0;i<ids.length;i+=200){ const c=ids.slice(i,i+200); const ph=c.map(()=>'?').join(',');
+        try { await db.prepare(`UPDATE jobs SET trade=? WHERE id IN (${ph})`).run(t,...c); changed+=c.length; } catch(e){} }
+    }
+    await db.prepare("INSERT INTO meta(k,v) VALUES('retag_ver',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").run(RETAG_VERSION);
+    console.log(`[retag] refined trade labels on ${changed} jobs (v${RETAG_VERSION})`);
+  } catch(e){ console.error('[retag] skipped (non-fatal):', e.message); }
 }
 // Real-job count = anything with a real external apply link, excluding the old USAJOBS search-link seeds.
 async function realJobCount(){
@@ -1991,7 +2011,7 @@ async function purgeSeeds(){
     console.log(`[purge] removed ${ids.length} seeded jobs + seeded shifts — site is now 100% real (${real} real jobs)`);
   } catch(e){ console.error('[purge] skipped (non-fatal):', e.message); }
 }
-const INGEST_VERSION = '7'; // bump to force a one-time re-ingest on the next deploy (e.g. after source/sector changes)
+const INGEST_VERSION = '8'; // bump to force a one-time re-ingest on the next deploy (e.g. after source/sector changes)
 const GTM_SECTORS = ['semiconductor','manufacturing','healthcare']; // sector-wise GTM focus order: semi → mfg → health
 // Keep the board focused on the GTM sectors: drop live (aggregated) jobs in other sectors so
 // plumbing/energy/logistics don't crowd out semiconductor/manufacturing/healthcare. Employer-
@@ -2035,7 +2055,7 @@ async function refreshLiveJobs(){
     const stale = age >= 6*3600*1000;
     const ver = (await db.prepare("SELECT v FROM meta WHERE k='ingest_ver'").get()||{}).v;
     const forced = ver !== INGEST_VERSION; // code changed how/what we ingest → refresh once regardless of freshness
-    if(!forced && !stale && liveCount >= 800){ await purgeSeeds(); return; } // well-stocked; still keep fakes out
+    if(!forced && !stale && liveCount >= 800){ try { await retagTrades(); } catch(e){} await purgeSeeds(); return; } // well-stocked; still keep fakes out
     const r = await ingestLiveJobs(db);
     let agg = { added:0, scanned:0 };
     if(aggregatorsConfigured()) agg = await ingestAggregators(db);
@@ -2045,6 +2065,7 @@ async function refreshLiveJobs(){
     try { const nt = await normalizeTitles(db); if(nt) console.log(`[live] tidied ${nt} job titles`); } catch(e){}
     try { await refreshFreshness([...(r.touched||[]), ...(agg.touched||[])]); } catch(e){ console.error('[fresh] skipped:', e.message); }
     try { await retagSemiconductor(); } catch(e){}
+    try { await retagTrades(); } catch(e){}
     await purgeSeeds();
     await pruneNonGTM();
     clearJobCache(); await prewarmJobCache(); // fresh data → drop + immediately re-warm so pages stay fast

@@ -616,9 +616,9 @@ function phoneVerify({ phone, demoCode='', error='' }){
 // GTM-focused trade groups for the worker picker — Semiconductor → Manufacturing → Healthcare.
 // (CATEGORIES stays untouched for map colors, tagging, and recruiter breadth.)
 const PICKER_GROUPS = {
-  'Semiconductor': ['equipment_tech','process_tech','cleanroom_op'],
-  'Manufacturing': ['machine_operator','assembler','maintenance_tech','quality_inspector','machinist','welder','electrician','controls','millwright','sheet_metal','facilities'],
-  'Healthcare': ['cna','caregiver','medical_assistant','patient_care_tech','phlebotomist','emt','sterile_processing','surgical_tech'],
+  'Semiconductor': ['equipment_tech','process_tech','cleanroom_op','wafer_fab_op','photolith_tech','etch_tech','deposition_tech','cmp_tech','implant_tech','diffusion_tech','metrology_tech','test_tech','packaging_tech','fab_facilities','cal_tech'],
+  'Manufacturing': ['machine_operator','assembler','maintenance_tech','quality_inspector','machinist','welder','fabricator','electrician','controls','robotics_tech','millwright','tool_die','injection_molding','press_operator','material_handler','sheet_metal','lab_tech','facilities'],
+  'Healthcare': ['cna','caregiver','patient_care_tech','medical_assistant','lpn','phlebotomist','emt','monitor_tech','pharmacy_tech','radiology_tech','med_lab_tech','dental_assistant','sterile_processing','surgical_tech','behavioral_tech','pt_aide','dietary_aide'],
 };
 function tradeCheckboxes(selected = []) {
   const sel = new Set(selected);
@@ -1036,13 +1036,17 @@ const SKILL_SCENARIOS = {
 };
 // trade → nearest skill-check scenario set
 const SKILL_FOR = { cna:'cna', patient_care_tech:'cna', home_health_aide:'cna', caregiver:'cna', med_tech:'cna',
+  lpn:'cna', monitor_tech:'cna', behavioral_tech:'cna', pt_aide:'cna', dietary_aide:'cna',
   medical_assistant:'medical_assistant', surgical_tech:'medical_assistant', sterile_processing:'medical_assistant', phlebotomist:'medical_assistant', pharmacy_tech:'medical_assistant',
+  radiology_tech:'medical_assistant', med_lab_tech:'medical_assistant', dental_assistant:'medical_assistant',
   machine_operator:'machine_operator', assembler:'machine_operator', production_worker:'machine_operator', warehouse:'machine_operator', forklift_operator:'machine_operator', machinist:'machine_operator',
+  tool_die:'machine_operator', injection_molding:'machine_operator', press_operator:'machine_operator', material_handler:'machine_operator', robotics_tech:'machine_operator',
   maintenance_tech:'maintenance_tech', equipment_maintenance:'maintenance_tech', millwright:'maintenance_tech', industrial_mechanic:'maintenance_tech', electrician:'maintenance_tech', hvac:'maintenance_tech',
   welder:'welder', fabricator:'welder', boilermaker:'welder', pipefitter:'welder',
-  cleanroom_op:'cleanroom_op', wafer_fab:'cleanroom_op', process_tech:'cleanroom_op', semiconductor_tech:'cleanroom_op',
-  equipment_tech:'equipment_tech', equipment_engineer:'equipment_tech', field_service:'equipment_tech',
-  quality_inspector:'quality_inspector', qa_tech:'quality_inspector', metrology:'quality_inspector', inspector:'quality_inspector' };
+  cleanroom_op:'cleanroom_op', wafer_fab:'cleanroom_op', wafer_fab_op:'cleanroom_op', process_tech:'cleanroom_op', semiconductor_tech:'cleanroom_op',
+  photolith_tech:'cleanroom_op', etch_tech:'cleanroom_op', deposition_tech:'cleanroom_op', cmp_tech:'cleanroom_op', implant_tech:'cleanroom_op', diffusion_tech:'cleanroom_op', packaging_tech:'cleanroom_op',
+  equipment_tech:'equipment_tech', equipment_engineer:'equipment_tech', field_service:'equipment_tech', fab_facilities:'equipment_tech', cal_tech:'equipment_tech',
+  quality_inspector:'quality_inspector', qa_tech:'quality_inspector', metrology:'quality_inspector', metrology_tech:'quality_inspector', test_tech:'quality_inspector', lab_tech:'quality_inspector', inspector:'quality_inspector' };
 const skillKeyFor = (trade)=> SKILL_FOR[trade] || (SKILL_SCENARIOS[trade] ? trade : null);
 function parseSkillchecks(profile){ try { return JSON.parse(profile.skillchecks||'[]'); } catch(e){ return []; } }
 // Skill-verified badge row — shows on the Work Card, public profile, and to recruiters.
