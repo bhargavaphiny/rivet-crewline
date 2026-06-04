@@ -2533,26 +2533,41 @@ function voiceAgent(mode){
   const isEmp = mode==='employer';
   // intent table the browser uses to map a spoken phrase → an action with no clicks
   const intents = isEmp ? [
-    {re:'post (a )?(job|position|role)', url:'/console/jobs/new', say:'Opening Post a job'},
+    {re:'post (a )?(job|position|role)|new job|hire for', url:'/console/jobs/new', say:'Opening Post a job'},
     {re:'post (a )?shift|new shift|add (a )?shift', url:'/console/shifts/new', say:'Opening Post a shift'},
     {re:'shift|per ?diem|contract|claim', url:'/console/shifts', say:'Opening your shifts'},
-    {re:'sourc|find (me )?(candidates|talent|workers)|who can i hire', url:'/console/source', say:'Opening the Sourcing Agent'},
+    {re:'sourc|find (me )?(candidates|talent|workers)|who can i hire|auto.?source', url:'/console/source', say:'Opening the Sourcing Agent'},
+    {re:'pipeline|scorecard|applicant|review candidate|rate', url:'/console/jobs', say:'Opening your jobs and pipelines'},
     {re:'talent|candidate|search|pool', url:'/console/search', say:'Opening Talent Search'},
-    {re:'job|posting|listing', url:'/console/jobs', say:'Opening your jobs'},
-    {re:'analytic|report|funnel|metric', url:'/console/analytics', say:'Opening analytics'},
-    {re:'message|inbox|chat', url:'/console/messages', say:'Opening messages'},
+    {re:'analytic|report|funnel|metric|fill rate|how am i doing', url:'/console/analytics', say:'Opening analytics'},
+    {re:'compan|business profile|edit company', url:'/console/company', say:'Opening your company profile'},
+    {re:'message|inbox|chat|reply', url:'/console/messages', say:'Opening messages'},
     {re:'agent', url:'/console/agents', say:'Opening agents'},
+    {re:'pulse|community|forum', url:'/pulse', say:'Opening the community'},
+    {re:'job|posting|listing', url:'/console/jobs', say:'Opening your jobs'},
     {re:'home|overview|dashboard', url:'/console', say:'Going to your overview'},
   ] : [
-    {re:'shift|gig|per ?diem|extra work|this weekend|tonight', url:'/app/shifts', say:'Opening open shifts near you'},
-    {re:'job|work near|find work|hiring', url:'/app/jobs', say:'Opening jobs near you'},
+    {re:'available|go available|looking for work|open to work', url:'/app/available', post:true, say:'Updating your availability'},
+    {re:'work today|can work today|free today', url:'/app/work-today', post:true, say:'Toggling work-today'},
+    {re:'alert|notify me|text me jobs', url:'/app/alerts', post:true, say:'Toggling job alerts'},
     {re:'apply for me|auto.?apply|apply me|match me', url:'/app/agent/apply', post:true, say:'Finding and applying you to your best matches'},
+    {re:'offer|who wants me|employers? want|interview request|reach.?out', url:'/app/offers', say:'Opening employers who want you'},
+    {re:'resume|résumé|\\bcv\\b|download', url:'/app/resume', say:'Opening your résumé'},
+    {re:'earn and learn|earn while|free training|who pays|paid training|tuition|apprentic', url:'/app/earn', say:'Opening earn and learn'},
+    {re:'skill check|prove (my )?skills|get verified|verified badge', url:'/app/skillcheck', say:'Opening skill checks'},
+    {re:'credential|license|certificat|\\bosha\\b|\\bepa\\b|\\bcpr\\b|\\bbls\\b', url:'/app/prep', say:'Opening credential paths'},
+    {re:'grow|career ladder|move up|upskill|raise|promotion|next step', url:'/app/grow', say:'Opening your growth plan'},
     {re:'coach|what should i learn|which (cert|credential)|earn more', url:'/app/coach', say:'Opening your Career Coach'},
     {re:'interview|practice|mock', url:'/app/learn/interview', say:'Opening the mock interview'},
-    {re:'train|certif|class|course', url:'/app/training', say:'Opening training'},
-    {re:'work card|profile|my card|resume', url:'/app/profile', say:'Opening your Work Card'},
-    {re:'applicat|status|where am i', url:'/app/applications', say:'Opening your applications'},
-    {re:'message|inbox|chat', url:'/app/messages', say:'Opening messages'},
+    {re:'train|class|course', url:'/app/training', say:'Opening training'},
+    {re:'shift|gig|per ?diem|extra work|this weekend|tonight', url:'/app/shifts', say:'Opening open shifts near you'},
+    {re:'invite|my crew|bring my|refer', url:'/app/invite', say:'Opening crew invite'},
+    {re:'work card|profile|my card', url:'/app/profile', say:'Opening your Work Card'},
+    {re:'applicat|status|where am i|my jobs|tracking|command center', url:'/app/applications', say:'Opening your applications'},
+    {re:'message|inbox|chat|reply', url:'/app/messages', say:'Opening messages'},
+    {re:'pulse|community|forum', url:'/pulse', say:'Opening the community'},
+    {re:'agent', url:'/app/agents', say:'Opening agents'},
+    {re:'job|work near|find work|hiring', url:'/app/jobs', say:'Opening jobs near you'},
     {re:'home|main', url:'/app', say:'Going home'},
   ];
   // role keyword search (worker only): "find welder jobs", "cna shifts"
@@ -2567,7 +2582,7 @@ function voiceAgent(mode){
       <button id="va-mic" class="va-mic">${icon('mic')} <span>${T('Hold to talk')}</span></button>
     </div>
     <form id="va-form" class="va-typed"><input id="va-text" placeholder="${T('…or type a command')}" autocomplete="off"><button class="btn-xs">${T('Go')}</button></form>
-    <div class="va-tips muted sm">${(isEmp?['post a shift','source CNAs','talent search','analytics']:['open shifts','find electrician jobs','practice interview','career coach']).map(x=>`<button class="va-chip" data-cmd="${esc(x)}">${esc(x)}</button>`).join('')}</div>
+    <div class="va-tips muted sm">${(isEmp?['post a job','source CNAs','open pipelines','analytics']:['I’m available','find welder jobs','show my offers','apply for me','open my résumé']).map(x=>`<button class="va-chip" data-cmd="${esc(x)}">${esc(x)}</button>`).join('')}</div>
   </div>
   <script>(function(){
     var INTENTS=${JSON.stringify(intents)}, ROLES=${JSON.stringify(roleHints)}, WORKER=${isEmp?'false':'true'};
