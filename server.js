@@ -1037,10 +1037,13 @@ const server = http.createServer(async (req,res)=>{
         const trade = (profTrades(prof)[0])||'';
         const trades = profTrades(prof); const broad = new Set(trades); for(const t of trades) for(const a of (M.ADJACENT[t]||[])) broad.add(a);
         const TRAIN_RX = /apprentice|trainee|entry.?level|no experience|will train|paid training|earn while|\bhelper\b/i;
-        let jobs = (await openJobs()).filter(j=>j.apply_url || j.employer_id);
-        if(broad.size) jobs = jobs.filter(j=>broad.has(j.trade));
-        jobs = jobs.filter(j=>TRAIN_RX.test(j.title||'')).slice(0,30);
-        return send(res, V.layout({title:'Earn & Learn',user,active:'grow',body:V.earnLearn({trade, jobs})}));
+        const TUITION_RX = /tuition|reimburs|we pay (for|your)|paid certification|paid cert\b|education (assistance|benefit)|earn your (degree|certification)|sponsor(ed|s)? (training|certification|your)|loan (repayment|forgiveness)|cover the cost|pay for school/i;
+        let all = (await openJobs()).filter(j=>j.apply_url || j.employer_id);
+        if(broad.size) all = all.filter(j=>broad.has(j.trade));
+        const tuitionJobs = all.filter(j=>TUITION_RX.test((j.title||'')+' '+(j.descr||''))).slice(0,12);
+        const tuitionIds = new Set(tuitionJobs.map(j=>j.id));
+        const jobs = all.filter(j=>!tuitionIds.has(j.id) && TRAIN_RX.test(j.title||'')).slice(0,24);
+        return send(res, V.layout({title:'Earn & Learn',user,active:'grow',body:V.earnLearn({trade, jobs, tuitionJobs})}));
       }
       if(p==='/app/prep' && method==='GET')
         return send(res, V.layout({title:'Credential practice',user,active:'grow',body:V.credPrepIndex()}));

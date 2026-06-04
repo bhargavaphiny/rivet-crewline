@@ -1135,3 +1135,6 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .sv-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(31,169,113,.13);color:#157a52;border:1px solid rgba(31,169,113,.35);font-weight:800;font-size:11.5px;padding:4px 10px;border-radius:9px}
 .sv-badge svg{width:13px;height:13px;stroke:#157a52;flex:none}
 .track-card.done{border-color:rgba(31,169,113,.45);background:linear-gradient(180deg,rgba(31,169,113,.06),transparent)}
+
+/* ---------- Earn-and-learn: ask-your-employer script ---------- */
+.ask-script{background:var(--wash,#f4f2ec);border:1px solid var(--line);border-left:3px solid var(--brand-g,#1fa971);border-radius:10px;padding:11px 13px;margin:8px 0 10px;font-size:13.5px;line-height:1.55;color:var(--ink);font-style:italic}

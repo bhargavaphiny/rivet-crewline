@@ -460,7 +460,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=100">
+  <link rel="stylesheet" href="/styles.css?v=101">
   </head><body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar"><div class="bar wrap">${brand}<nav aria-label="Primary">${nav}</nav></div></header>
@@ -841,19 +841,33 @@ function growHub({ profile, trade, reco, marketJobs = 0, avgHr = 0 }){
   </section>`;
 }
 // ---------- Earn while you learn: real "will-train" jobs from the live board + official paid programs ----------
-function earnLearn({ trade, jobs = [] }){
+function earnLearn({ trade, jobs = [], tuitionJobs = [] }){
   const label = TRADES[trade]||trade;
   const sec = ROLE_BLS[trade] ? ROLE_BLS[trade].sector : '';
+  const credKey = PREP_FOR[trade];
+  const credName = credKey && CRED_QUIZ[credKey] ? CRED_QUIZ[credKey].label.replace(/ —.*$/,'') : '';
+  const jobCard = (j, badge)=>`<div class="card app-card"><div class="job-row"><div class="badge">${tradeEmoji(j.trade)}</div>
+    <div class="job-main"><h4>${esc(T(j.title))}</h4><div class="muted">${esc(j.company||'')} · ${esc(j.city||'')} · $${j.pay_min}–${j.pay_max}/hr</div>${badge?`<span class="match-chip" style="background:rgba(31,169,113,.13);color:#157a52;margin-top:4px;display:inline-block">${badge}</span>`:''}</div></div>
+    <div class="app-act">${j.apply_url?`<a class="btn-sm" href="${esc(j.apply_url)}" target="_blank" rel="noopener noreferrer">${T('Apply')} ↗</a>`:`<a class="btn-sm" href="/app/jobs/${j.id}">${T('View')} →</a>`}</div></div>`;
+  const askScript = `Hi — I’m excited about this role. I’m working to level up as a ${label||'skilled worker'} and earn my certifications. Do you offer tuition reimbursement, paid certification, or a registered apprenticeship? I’m committed to staying and putting it to work here.`;
   return `<section class="wrap narrow">
     <a class="back" href="/app/grow">← ${T('Grow')}</a>
-    <div class="sec-h big">${icon('star','xic')} ${T('Earn while you learn')}${trade?` <span class="muted">${esc(label)}</span>`:''}</div>
-    <p class="muted">${T('Get paid to skill up. These real employers will train you on the job — plus the official programs that pay you to learn a trade, no debt.')}</p>
+    <div class="sec-h big">${icon('star','xic')} ${T('Get your training paid for')}${trade?` <span class="muted">${esc(label)}</span>`:''}</div>
+    <p class="muted">${T('Three real ways to skill up without debt — employers who fund it, official earn-and-learn programs, and the public funding most workers never claim.')}</p>
+    ${tuitionJobs.length?`<div class="sec-h">${icon('star','xic')} ${tuitionJobs.length} ${T('employers near you who’ll pay for your training')}</div>
+      <p class="muted sm" style="margin-top:-6px">${T('These openings mention tuition help, paid certification, or sponsored training.')}</p>
+      ${tuitionJobs.map(j=>jobCard(j, T('Pays for training'))).join('')}`:''}
     ${jobs.length?`<div class="sec-h">${jobs.length} ${T('“will-train” / entry openings near you')}</div>
-      ${jobs.map(j=>`<div class="card app-card"><div class="job-row"><div class="badge">${tradeEmoji(j.trade)}</div>
-        <div class="job-main"><h4>${esc(T(j.title))}</h4><div class="muted">${esc(j.company||'')} · ${esc(j.city||'')} · $${j.pay_min}–${j.pay_max}/hr</div></div></div>
-        <div class="app-act">${j.apply_url?`<a class="btn-sm" href="${esc(j.apply_url)}" target="_blank" rel="noopener noreferrer">${T('Apply')} ↗</a>`:`<a class="btn-sm" href="/app/jobs/${j.id}">${T('View')} →</a>`}</div></div>`).join('')}`
-      : `<div class="card muted">${T('No “will-train” postings in your trade right now — the official programs below pay you to learn.')}</div>`}
-    <div class="card"><div class="sec-h" style="margin-top:0">${T('Official paid-training programs')}</div>
+      <p class="muted sm" style="margin-top:-6px">${T('Get hired first — these employers train you on the job, no experience needed.')}</p>
+      ${jobs.map(j=>jobCard(j, null)).join('')}`
+      : (tuitionJobs.length?'':`<div class="card muted">${T('No “will-train” postings in your trade right now — the official programs below pay you to learn.')}</div>`)}
+    <div class="card"><div class="sec-h" style="margin-top:0">${icon('send','xic')} ${T('Ask any employer — most say yes if you ask')}</div>
+      <p class="muted sm" style="margin-top:-2px">${T('Tuition help is common but you usually have to ask. Copy this and send it in your application or interview:')}</p>
+      <div class="ask-script" id="askScript">${esc(askScript)}</div>
+      <button class="btn-sm" type="button" onclick="var t=document.getElementById('askScript').innerText;if(navigator.clipboard){navigator.clipboard.writeText(t);this.textContent='${T('Copied ✓')}'}">${icon('send')} ${T('Copy the script')}</button>
+      ${credKey?`<a class="btn-sm ghost" href="/app/prep/${credKey}" style="margin-left:6px">${T('Practice for your')} ${esc(credName)} →</a>`:''}
+    </div>
+    <div class="card"><div class="sec-h" style="margin-top:0">${T('Official programs that pay you to learn')}</div>
       <div class="track-links">
         <a class="track-link" href="https://www.apprenticeship.gov/apprenticeship-job-finder?keyword=${encodeURIComponent(label||'')}" target="_blank" rel="noopener noreferrer">${icon('star')} ${T('Registered apprenticeships (apprenticeship.gov) ↗')}</a>
         ${sec==='manufacturing'?`<a class="track-link" href="https://fame-usa.com/" target="_blank" rel="noopener noreferrer">${icon('star')} ${T('FAME earn-and-learn (manufacturing) ↗')}</a>`:''}
