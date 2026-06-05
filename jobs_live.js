@@ -542,12 +542,23 @@ async function ingestLiveJobs(db){
     .concat(EXTRA_SOURCES.map(([p,t,c,s])=>[p,t,c,s,null]))
     .concat(WD_SOURCES.map(([t,c,s,o])=>['workday',t,c,s,o]))
     .concat(ORACLE_SOURCES.map(([t,c,s,o])=>['oracle',t,c,s,o]));
-  for(const [provider, token, company, sector, opts] of all){
-    const items = await fetchProvider(provider, token, opts);
-    scanned += items.length;
-    const empKey = provider==='greenhouse' ? token : `${provider}-${token}`;
-    for(const it of items){ added += await processJob(ctx, empKey, company, sector, it); }
+  // Fetch employers concurrently (bounded pool) and process each as it lands. The old loop was strictly
+  // serial — ~80 employers' paginated fetches summed end-to-end — so most of the wall-clock was just
+  // waiting on the network. Each source is one employer pulled by exactly one worker (atomic idx++),
+  // so there are no empCache races and only ~CONCURRENCY feeds are ever in flight (bounded memory).
+  const CONCURRENCY = 6;
+  let idx = 0;
+  async function worker(){
+    while(idx < all.length){
+      const [provider, token, company, sector, opts] = all[idx++];   // synchronous grab → no two workers share an index
+      let items = [];
+      try { items = await fetchProvider(provider, token, opts); } catch(e){ items = []; }
+      scanned += items.length;
+      const empKey = provider==='greenhouse' ? token : `${provider}-${token}`;
+      for(const it of items){ const n = await processJob(ctx, empKey, company, sector, it); added += n; }  // resolve first, then += (atomic)
+    }
   }
+  await Promise.all(Array.from({length: Math.min(CONCURRENCY, all.length)}, ()=>worker()));
   return { added, scanned, touched: ctx.touched };
 }
 
