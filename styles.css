@@ -961,6 +961,11 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .hire-badge svg{width:11px;height:11px}
 .hire-badge.direct{background:rgba(31,169,113,.14);color:#157a52}
 .hire-badge.agency{background:rgba(154,75,46,.10);color:var(--brand-d,#7a3b22)}
+.fresh-chip{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px}
+.fresh-chip svg{width:11px;height:11px}
+.fresh-chip.fresh{background:rgba(31,169,113,.15);color:#157a52}
+.fresh-chip.evergreen{background:rgba(120,128,134,.12);color:#5b656c}
+.stale-tag{font-size:10px;font-weight:800;color:#9a5a1f;background:rgba(224,136,58,.15);padding:1px 7px;border-radius:9px;white-space:nowrap}
 .pctl{display:inline-block;font-size:11px;font-weight:800;padding:2px 8px;border-radius:10px;background:rgba(43,51,56,.08);color:#2B3338}
 .pctl.top{background:rgba(31,169,113,.16);color:#157a52}
 .pctl.good{background:rgba(31,169,113,.10);color:#1d8a5e}

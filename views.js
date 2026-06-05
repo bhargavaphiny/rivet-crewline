@@ -487,7 +487,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=112">
+  <link rel="stylesheet" href="/styles.css?v=113">
   </head><body class="${user?'app-mode':'mkt-mode'}">
   <a class="skip" href="#main">Skip to main content</a>
   ${user ? `
@@ -1482,6 +1482,7 @@ function jobCard(m, bare = false){
       <span class="js-shift">${esc(T(j.shift))}</span>
       ${isExternal(j)?`<span class="ext-badge">${esc(j.source)} ↗</span>`:''}
       ${hireBadge(j)}
+      ${freshChip(j)}
       ${sponsorBadge(j)}
       ${j.crew_ok?`<span class="crew-badge">${icon('truck')} ${T('Crews ok')}</span>`:''}
       ${j.fair_chance?`<span class="incl-badge fair">${T('Fair-chance')}</span>`:''}
@@ -1630,7 +1631,7 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
         <div class="badge big">${tradeEmoji(job.trade)}</div>
         <div class="job-main">
           <h2>${esc(job.title)}</h2>
-          ${job.employment_type?`<span class="jtype">${esc(T(job.employment_type))}</span>`:''}${job.duration?`<span class="jtype dur">${esc(T(job.duration))}</span>`:''}${cadenceBadge(job.pay_cadence)}${job.crew_ok?`<span class="jtype crew">${icon('truck')} ${T('Open to crews')}</span>`:''}${job.quotes_ok?`<span class="jtype quote">${T('Accepting quotes')}</span>`:''}${job.fair_chance?`<span class="jtype fair">${T('Fair-chance')}</span>`:''}${job.veteran_ok?`<span class="jtype vet">${T('Veteran-friendly')}</span>`:''}${job.transport_provided?`<span class="jtype transp">${icon('truck')} ${T('Transport provided')}</span>`:''}${job.subcontract_ok?`<span class="jtype sub">${icon('hammer')} ${T('Subcontractors welcome')}</span>`:''}
+          ${freshChip(job)}${job.employment_type?`<span class="jtype">${esc(T(job.employment_type))}</span>`:''}${job.duration?`<span class="jtype dur">${esc(T(job.duration))}</span>`:''}${cadenceBadge(job.pay_cadence)}${job.crew_ok?`<span class="jtype crew">${icon('truck')} ${T('Open to crews')}</span>`:''}${job.quotes_ok?`<span class="jtype quote">${T('Accepting quotes')}</span>`:''}${job.fair_chance?`<span class="jtype fair">${T('Fair-chance')}</span>`:''}${job.veteran_ok?`<span class="jtype vet">${T('Veteran-friendly')}</span>`:''}${job.transport_provided?`<span class="jtype transp">${icon('truck')} ${T('Transport provided')}</span>`:''}${job.subcontract_ok?`<span class="jtype sub">${icon('hammer')} ${T('Subcontractors welcome')}</span>`:''}
           <div class="job-c">${job.poster_kind==='individual'?`${icon('pin')} ${T('Posted by a homeowner / small business')} · `:''}${esc(job.company||'')} · ${jobLoc(job)} · ${esc(T(job.shift))}${distance!=null?` · <b class="dist">${distance} ${T('mi away')}</b>`:''}</div>
           <div class="pay big">${job.quotes_ok&&!job.pay_min?T('Name your price'):`$${job.pay_min}–${job.pay_max}/hr`}</div>
           ${payFitBadge(payFloor, job, 'worker')}
@@ -3278,7 +3279,7 @@ function empJobs({ jobs }) {
     <div class="page-h"><h2>${T('Job Postings')}</h2><p class="muted">${open} ${T('open')}</p><a class="btn-sm right" href="/console/jobs/new">${T('+ Post a job')}</a></div>
     ${jobs.map(j=>`<div class="jobline ${j.status==='closed'?'is-closed':''}">
       <a class="jl-left" href="/console/jobs/${j.id}"><div class="badge">${tradeEmoji(j.trade)}</div>
-        <div><h4>${esc(T(j.title))} ${j.status==='closed'?`<span class="closed-tag">${T('Closed')}</span>`:''}</h4>
+        <div><h4>${esc(T(j.title))} ${j.status==='closed'?`<span class="closed-tag">${T('Closed')}</span>`:''}${(()=>{const f=postingFreshness(j);return j.status!=='closed'&&f&&f.stale?` <span class="stale-tag" title="${T('Refresh the pay or repost to lift response')}">${T('Open')} ${f.days}${T('d')} · ${T('refresh?')}</span>`:'';})()}</h4>
           <div class="muted">${esc(j.city)} · $${j.pay_min}–${j.pay_max}/hr · ${esc(T(j.shift))}</div></div></a>
       <div class="jl-nums">
         <div><b>${j.matched}</b><span>${T('matched')}</span></div>
@@ -3310,6 +3311,25 @@ function hireBadge(job){
   if(!job || !isExternal(job)) return '';
   if(job.hire_type==='agency') return `<span class="hire-badge agency" title="${T('Posted by a staffing/temp agency — you apply through a recruiter')}">${T('Staffing agency')}</span>`;
   return `<span class="hire-badge direct" title="${T('Apply directly to the company that hires — no middle-man')}">${icon('check')} ${T('Direct employer')}</span>`;
+}
+// Posting freshness / evergreen signal — computed from when we first saw the posting (created_at)
+// and when it was last live (last_seen). Fresh roles respond faster; long-open roles get a soft
+// "evergreen" caution. Returns {days,label,cls,show,stale}. Sharpens as posting history accumulates.
+function postingFreshness(job){
+  const base = job && (job.created_at || job.last_seen);
+  if(!base) return null;
+  const s = String(base);
+  const t = Date.parse(s.includes('T') ? s : s.replace(' ','T')+'Z');
+  if(isNaN(t)) return null;
+  const days = Math.max(0, Math.floor((Date.now()-t)/864e5));
+  if(days<=1) return {days, label:T('Just posted'), cls:'fresh', show:true};
+  if(days<=7) return {days, label:T('New this week'), cls:'fresh', show:true};
+  if(days>=60) return {days, label:`${T('Open')} ${days}${T('d')}`, cls:'evergreen', show:true, stale:true};
+  return {days, label:'', cls:'', show:false};
+}
+function freshChip(job){
+  const f = postingFreshness(job); if(!f || !f.show) return '';
+  return `<span class="fresh-chip ${f.cls}"${f.stale?` title="${T('Open a while — this may be an always-on listing')}"`:''}>${f.cls==='fresh'?icon('spark'):''} ${f.label}</span>`;
 }
 function empJobForm(error='', job=null) {
   const editing = !!job;
