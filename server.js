@@ -291,8 +291,10 @@ async function _jobGeoForWorkerRaw(prof){
   const direct = new Set(trades);
   const related = new Set();
   for(const t of trades) (M.ADJACENT[t]||[]).forEach(a=>{ if(!direct.has(a)) related.add(a); });
-  const rows = await db.prepare(`SELECT j.id, j.title, j.trade, j.pay_min, j.pay_max, j.zip, z.lat, z.lon, z.city, u.company
-    FROM jobs j JOIN zip_geo z ON z.zip=j.zip JOIN users u ON u.id=j.employer_id WHERE j.status='open'`).all();
+  // Build from the already-cached job list + zip map instead of a fresh 27k-row JOIN (was the cold-load cost).
+  const zmap = await zipLLMap();
+  const rows = (await openJobs()).map(j=>{ const ll = zmap.get(j.zip);
+    return { id:j.id, title:j.title, trade:j.trade, pay_min:j.pay_min, pay_max:j.pay_max, zip:j.zip, lat: ll?ll.lat:null, lon: ll?ll.lon:null, city:j.city, company:j.company }; });
   const primary = trades[0]; // worker's main trade drives the per-metro tightness read
   const byZip = {};
   for(const r of rows){
@@ -308,7 +310,7 @@ async function _jobGeoForWorkerRaw(prof){
   const wkRows = await db.prepare(`SELECT z.city, COUNT(*) n FROM worker_profiles p JOIN zip_geo z ON z.zip=p.zip WHERE p.trade=? GROUP BY z.city`).all(primary);
   const primWk = Object.fromEntries(wkRows.map(r=>[r.city, r.n]));
   // worker's own location anchors the map — "you are here" + commute ring
-  const home = await geocodeZip(prof.zip);
+  const home = (prof.zip && zmap.get(prof.zip)) || await geocodeZip(prof.zip);
   const commute = (prof.commute_mi>0) ? prof.commute_mi : 0;
   let reachable = 0; // real sample jobs within the worker's commute radius
   const nearR = commute>0 ? commute : 40; // "near you" band — drives emphasis + reachable count
