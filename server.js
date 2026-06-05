@@ -2198,7 +2198,7 @@ async function refreshLiveJobs(){
     const stale = age >= 6*3600*1000;
     const ver = (await db.prepare("SELECT v FROM meta WHERE k='ingest_ver'").get()||{}).v;
     const forced = ver !== INGEST_VERSION; // code changed how/what we ingest → refresh once regardless of freshness
-    if(!forced && !stale && liveCount >= 800){ try { await retagTrades(); } catch(e){} try { await normalizePayPass(); } catch(e){} try { await tagHirePass(); } catch(e){} try { await dedupeLivePass(); } catch(e){} await purgeSeeds(); clearJobCache(); await prewarmJobCache(); return; } // well-stocked; still keep fakes out
+    if(!forced && !stale && liveCount >= 800){ try { await retagTrades(); } catch(e){} try { await normalizePayPass(); } catch(e){} try { await tagHirePass(); } catch(e){} await purgeSeeds(); clearJobCache(); await prewarmJobCache(); return; } // well-stocked; dedupe runs on the full path only (keeps the hot path light)
     const r = await ingestLiveJobs(db);
     let agg = { added:0, scanned:0 };
     if(aggregatorsConfigured()) agg = await ingestAggregators(db);
@@ -2222,7 +2222,9 @@ init()
   .then(loadTranslations)
   .then(()=> server.listen(PORT, ()=>console.log(`Rivet × Crewline running → http://localhost:${PORT}`)))
   .then(()=> { prewarmEs().catch(()=>{}); prewarmJobCache(); // warm the cache on boot so the first visitor never waits
-    setTimeout(()=>{ refreshLiveJobs(); }, 3000);
+    // Defer the heavy re-ingest well past cold-start so it never collides with the slow first requests
+    // (on the free tier a cold boot + full re-ingest at once can spike memory and cause a 502 window).
+    setTimeout(()=>{ refreshLiveJobs(); }, 90*1000);
     setInterval(()=>{ refreshLiveJobs(); }, 6*3600*1000);     // self-maintaining: re-ingest + freshness + prune every 6h
     setInterval(()=>{ prewarmJobCache(); }, 30*60*1000); })   // keep the cache warm (TTL is 45m) so pages stay fast
   .catch(err=>{ console.error('init failed', err); process.exit(1); });
