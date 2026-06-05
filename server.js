@@ -143,7 +143,7 @@ function clearJobCache(){ _jcache.clear(); }
 async function prewarmJobCache(){
   try {
     await Promise.all([
-      openJobs(), candidateGeo(), jobGeoAll(),
+      openJobs(), candidateGeo(), jobGeoAll(), zipLLMap(),
       sectorStats('semiconductor'), sectorStats('manufacturing'), sectorStats('healthcare'),
       jobGeoAll('semiconductor'), jobGeoAll('manufacturing'), jobGeoAll('healthcare'),
     ]);
@@ -151,6 +151,15 @@ async function prewarmJobCache(){
 }
 const _openJobsRaw = () => db.prepare(`SELECT j.*, u.company FROM jobs j JOIN users u ON u.id=j.employer_id WHERE j.status='open' ORDER BY j.created_at DESC`).all();
 const openJobs   = () => cached('openJobs', CACHE_TTL, _openJobsRaw);
+// All known zip/location → lat,lon as an in-memory Map, loaded once per TTL. Lets the worker-board
+// scoring loop resolve every job's distance locally instead of one remote DB round-trip per zip
+// (that per-zip query was the ~11s board cost over remote Turso).
+const zipLLMap = () => cached('zipllmap', CACHE_TTL, async ()=>{
+  const rows = await db.prepare('SELECT zip, lat, lon FROM zip_geo WHERE lat IS NOT NULL').all();
+  const m = new Map();
+  for(const r of rows) m.set(r.zip, { lat:r.lat, lon:r.lon });
+  return m;
+});
 
 // normalize a checkbox field (string | array | undefined) to a clean list of valid trade keys
 function normTrades(v){
@@ -180,14 +189,14 @@ async function rankJobsForWorker(uid){
   const _tr = profTrades(prof);
   if(_tr.length){ const broad = new Set(_tr); for(const t of _tr) for(const a of (M.ADJACENT[t]||[])) broad.add(a); jobs = jobs.filter(j=>broad.has(j.trade)); }
   else { jobs = jobs.slice(0, 300); }
-  const home = prof ? await geocodeZip(prof.zip) : null;
-  const zc = {};
+  const zmap = await zipLLMap();
+  const home = prof ? (prof.zip && zmap.get(prof.zip)) || await geocodeZip(prof.zip) : null;
   const out = [];
   const needZip = !home; // worker hasn't set a geocodable ZIP, so distance can't be computed
   for(const j of jobs){
     const r = bestMatch(prof, creds, j);
     let distance = null;
-    if(home && j.zip){ if(!(j.zip in zc)) zc[j.zip] = await geocodeZip(j.zip); distance = zc[j.zip] ? haversineMi(home, zc[j.zip]) : null; }
+    if(home && j.zip){ const ll = zmap.get(j.zip); distance = ll ? haversineMi(home, ll) : null; }
     const beyondCommute = (prof && prof.commute_mi>0 && distance!=null && distance>prof.commute_mi);
     out.push({job:j, score:r.score, missing:r.missing, distance, needZip, beyondCommute});
   }
