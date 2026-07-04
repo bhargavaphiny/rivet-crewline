@@ -1,0 +1,48 @@
+services:
+  - type: web
+    name: rivet-crewline
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_VERSION
+        value: "22.22.3"
+      - key: RIVET_SECRET
+        generateValue: true
+      # Fallback local-file DB path (used only when TURSO_DATABASE_URL is unset).
+      - key: RIVET_DATA_DIR
+        value: /opt/render/project/src/data
+      # Persistent data via Turso (free, open-source libSQL). Set both in the
+      # Render dashboard. Until set, the app falls back to an ephemeral local file.
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
+      # Google Sign-In. Set both in the Render dashboard (Environment tab).
+      # Until set, the "Continue with Google" button is hidden automatically.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      # SMS via Twilio (free trial works). Set all three in the Render dashboard.
+      # Until set, OTP login + job alerts run in demo mode (code shown on screen,
+      # alerts are no-ops). TWILIO_FROM is your Twilio number, e.g. +15005550006.
+      - key: TWILIO_SID
+        sync: false
+      - key: TWILIO_TOKEN
+        sync: false
+      - key: TWILIO_FROM
+        sync: false
+      # Optional free $0 AI drafting (Groq). Set GROQ_API_KEY in the dashboard to
+      # turn on AI-written drafts; unset = a built-in template writes them instead.
+      - key: GROQ_API_KEY
+        sync: false
+    # ---- Persistent data (PAID plan only) ----
+    # To keep data permanently: upgrade `plan` above to `starter`, uncomment
+    # the disk block below, and change RIVET_DATA_DIR above to /var/data.
+    # disk:
+    #   name: rivet-data
+    #   mountPath: /var/data
+    #   sizeGB: 1
