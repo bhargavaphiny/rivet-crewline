@@ -41,7 +41,10 @@ async function sendSms(to, body){
 
 function baseUrl(req){
   const proto = (req.headers['x-forwarded-proto'] || '').split(',')[0].trim() || 'http';
-  return `${proto}://${req.headers.host}`;
+  // Prefer the original public host when behind a fronting proxy (e.g. Vercel → Render),
+  // so OAuth callbacks and absolute links use the domain the visitor actually sees.
+  const host = (req.headers['x-forwarded-host'] || '').split(',')[0].trim() || req.headers.host;
+  return `${proto}://${host}`;
 }
 function getCookie(req, name){
   const c = (req.headers.cookie||'').split(';').map(s=>s.trim()).find(s=>s.startsWith(name+'='));

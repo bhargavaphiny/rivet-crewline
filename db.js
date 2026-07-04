@@ -23,6 +23,14 @@ if (process.env.TURSO_DATABASE_URL) {
 }
 const client = createClient(authToken ? { url, authToken } : { url });
 
+// Local-file mode: the libsql driver executes statements SYNCHRONOUSLY (the promise
+// resolves immediately). Long ingest/seed loops of awaited sync calls therefore never
+// leave the current macrotask, starving the HTTP server for minutes. Breaking the
+// microtask chain with setImmediate after each statement lets requests interleave.
+// Turso (network) mode is genuinely async already, so no yield is needed there.
+const IS_FILE_DB = String(url).startsWith('file:');
+const yieldLoop = IS_FILE_DB ? () => new Promise((r) => setImmediate(r)) : null;
+
 // Normalize a libSQL Row into a plain object keyed by column name (safe to spread).
 function toObj(row, columns) {
   if (!row) return undefined;
@@ -36,14 +44,17 @@ const db = {
   prepare(sql) {
     return {
       async get(...args) {
+        if (yieldLoop) await yieldLoop();
         const r = await client.execute({ sql, args });
         return toObj(r.rows[0], r.columns);
       },
       async all(...args) {
+        if (yieldLoop) await yieldLoop();
         const r = await client.execute({ sql, args });
         return r.rows.map((row) => toObj(row, r.columns));
       },
       async run(...args) {
+        if (yieldLoop) await yieldLoop();
         const r = await client.execute({ sql, args });
         return {
           lastInsertRowid: r.lastInsertRowid != null ? Number(r.lastInsertRowid) : undefined,
@@ -53,6 +64,7 @@ const db = {
     };
   },
   async exec(sql) {
+    if (yieldLoop) await yieldLoop();
     await client.executeMultiple(sql);
   },
 };
@@ -263,10 +275,7 @@ async function createSchema() {
     CREATE INDEX IF NOT EXISTS idx_jobs_employer ON jobs(employer_id);
     CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
     CREATE INDEX IF NOT EXISTS idx_jobs_trade ON jobs(trade);
-    CREATE INDEX IF NOT EXISTS idx_jobs_status_sector ON jobs(status, sector);
     CREATE INDEX IF NOT EXISTS idx_jobs_status_trade ON jobs(status, trade);
-    CREATE INDEX IF NOT EXISTS idx_jobs_apply ON jobs(apply_url);
-    CREATE INDEX IF NOT EXISTS idx_jobs_last_seen ON jobs(last_seen);
     CREATE INDEX IF NOT EXISTS idx_worker_profiles_zip ON worker_profiles(zip);
   `);
 }
@@ -1354,6 +1363,10 @@ async function migrate() {
   try { await db.exec('ALTER TABLE worker_profiles ADD COLUMN open_to_extra INTEGER DEFAULT 0'); } catch (e) { /* wants to stack multiple jobs/shifts */ }
   try { await db.exec("ALTER TABLE jobs ADD COLUMN hire_type TEXT DEFAULT 'direct'"); } catch (e) { /* direct (employer hires) | agency (staffing/temp firm) */ }
   try { await db.exec("ALTER TABLE jobs ADD COLUMN dupe_of INTEGER"); } catch (e) { /* set when this posting is a cross-source mirror of another (hidden from the board) */ }
+  // indexes on migrated columns — must run after the ALTERs above, not in createSchema()
+  try { await db.exec('CREATE INDEX IF NOT EXISTS idx_jobs_status_sector ON jobs(status, sector)'); } catch (e) { console.error('[db] idx_jobs_status_sector:', e.message); }
+  try { await db.exec('CREATE INDEX IF NOT EXISTS idx_jobs_apply ON jobs(apply_url)'); } catch (e) { console.error('[db] idx_jobs_apply:', e.message); }
+  try { await db.exec('CREATE INDEX IF NOT EXISTS idx_jobs_last_seen ON jobs(last_seen)'); } catch (e) { console.error('[db] idx_jobs_last_seen:', e.message); }
 }
 
 async function seedZips() {
