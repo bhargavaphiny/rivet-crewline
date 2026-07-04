@@ -2237,5 +2237,14 @@ init()
     // (on the free tier a cold boot + full re-ingest at once can spike memory and cause a 502 window).
     setTimeout(()=>{ refreshLiveJobs(); }, 90*1000);
     setInterval(()=>{ refreshLiveJobs(); }, 6*3600*1000);     // self-maintaining: re-ingest + freshness + prune every 6h
-    setInterval(()=>{ prewarmJobCache(); }, 30*60*1000); })   // keep the cache warm (TTL is 45m) so pages stay fast
+    setInterval(()=>{ prewarmJobCache(); }, 30*60*1000);      // keep the cache warm (TTL is 45m) so pages stay fast
+    // Keep the free instance warm: ping our own PUBLIC url so Render's edge sees inbound traffic and never
+    // spins us down (free tier sleeps after ~15min idle → ~30s cold starts otherwise). $0 — one always-on
+    // free web service fits within the 750 free instance-hours/month. Off locally (no RENDER env).
+    const SELF_URL = process.env.SELF_PING_URL || process.env.RENDER_EXTERNAL_URL || (process.env.RENDER ? 'https://rivet-crewline.onrender.com' : '');
+    if(SELF_URL){
+      const ping = ()=> fetch(`${SELF_URL.replace(/\/$/,'')}/healthz`).then(()=>{}).catch(()=>{});
+      setTimeout(ping, 30*1000);                  // first ping shortly after boot
+      setInterval(ping, 10*60*1000);              // every 10min < Render's ~15min idle window
+    } })
   .catch(err=>{ console.error('init failed', err); process.exit(1); });
