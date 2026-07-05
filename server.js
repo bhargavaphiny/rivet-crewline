@@ -77,9 +77,18 @@ function mailer(){
       host: SMTP_HOST, port: SMTP_PORT,
       secure: SMTP_PORT === 465, // 465 = implicit TLS; 587 upgrades via STARTTLS
       auth: { user: SMTP_USER, pass: SMTP_PASS },
+      // fail fast: a wrong port/password must not hang signups for minutes
+      connectionTimeout: 8000, greetingTimeout: 8000, socketTimeout: 15000,
     });
   }
   return _mailer;
+}
+// probed at boot so /healthz can say WHY email is broken (never leaks secrets)
+let smtpStatus = smtpEnabled ? 'checking…' : '';
+if(smtpEnabled){
+  setTimeout(()=>{ mailer().verify()
+    .then(()=>{ smtpStatus='ok'; console.log('[auth] smtp check: ok'); })
+    .catch(e=>{ smtpStatus='FAILED — '+String(e.message||e).slice(0,120); console.error('[auth] smtp check failed:', e.message); }); }, 3000);
 }
 async function sendEmailMsg(to, subject, text){
   if(!emailEnabled) return false;
@@ -816,7 +825,10 @@ const server = http.createServer(async (req,res)=>{
     if(p==='/healthz'){
       res.writeHead(200,{'Content-Type':'text/plain'});
       // feature flags (booleans only, never secrets) so misnamed env vars are easy to spot
-      return res.end(`ok\nemail-otp: ${emailEnabled?'on':'OFF — set SMTP_HOST+SMTP_USER+SMTP_PASS (or BREVO_API_KEY / RESEND_API_KEY)'}\nsms: ${smsEnabled?'on':'off'}\ngoogle: ${googleEnabled?'on':'off'}\ndb: ${process.env.TURSO_DATABASE_URL?'turso':'local-file'}`);
+      const emailLine = emailEnabled
+        ? 'on' + (smtpEnabled ? ` (smtp ${SMTP_HOST}:${SMTP_PORT} — ${smtpStatus})` : (RESEND_API_KEY ? ' (resend)' : ' (brevo)'))
+        : 'OFF — set SMTP_HOST+SMTP_USER+SMTP_PASS (or BREVO_API_KEY / RESEND_API_KEY)';
+      return res.end(`ok\nemail-otp: ${emailLine}\nsms: ${smsEnabled?'on':'off'}\ngoogle: ${googleEnabled?'on':'off'}\ndb: ${process.env.TURSO_DATABASE_URL?'turso':'local-file'}`);
     }
     if(p==='/robots.txt'){ res.writeHead(200,{'Content-Type':'text/plain'}); return res.end('User-agent: *\nAllow: /\nAllow: /jobs\nDisallow: /app\nDisallow: /console\nDisallow: /auth\n\nSitemap: https://rivet-crewline.onrender.com/sitemap.xml\n'); }
     if(p==='/sitemap.xml'){
@@ -998,9 +1010,10 @@ const server = http.createServer(async (req,res)=>{
       const next = safeNext(url.searchParams.get('next'), user);
       // reuse the pending code on refresh; only mint + send a new one when none is live
       const row = await db.prepare("SELECT 1 FROM email_otp WHERE email=? AND expires > datetime('now')").get(user.email);
-      if(!row) await issueEmailCode(user.email);
+      let sendErr = url.searchParams.get('senderr')==='1';
+      if(!row){ const r = await issueEmailCode(user.email); if(!r.sent && !r.throttled) sendErr = true; }
       return send(res, V.layout({title:'Verify your email', user:null,
-        body:V.verifyEmail({email:user.email, next})}));
+        body:V.verifyEmail({email:user.email, next, error: sendErr ? 'We couldn’t send the email just now. Wait a minute, then press “Resend code”.' : ''})}));
     }
     if(p==='/verify-email' && method==='POST'){
       if(!user) return redirect(res,'/login');
@@ -1062,8 +1075,8 @@ const server = http.createServer(async (req,res)=>{
         // email provider is configured; Google/phone accounts always skip this
         if(emailEnabled){
           await db.prepare('UPDATE users SET email_verified=0 WHERE id=?').run(info.lastInsertRowid);
-          await issueEmailCode(email);
-          return redirect(res, '/verify-email?next=' + encodeURIComponent(dest));
+          const r = await issueEmailCode(email);
+          return redirect(res, '/verify-email?next=' + encodeURIComponent(dest) + (r.sent||r.throttled?'':'&senderr=1'));
         }
         return redirect(res, dest);
       }catch(e){
