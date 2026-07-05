@@ -20,6 +20,10 @@
     }
   } catch(e){ console.error('[env] .env load skipped:', e.message); }
 })();
+// Some hosts (e.g. Render) have no IPv6 route, but Node ≥17 tries DNS results
+// verbatim — often IPv6 first — so SMTP/API connects die with ENETUNREACH.
+// Preferring IPv4 fixes outbound connections without touching anything else.
+try { require('dns').setDefaultResultOrder('ipv4first'); } catch(e){}
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
