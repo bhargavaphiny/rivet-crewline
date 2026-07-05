@@ -813,7 +813,11 @@ const server = http.createServer(async (req,res)=>{
       res.writeHead(404); return res.end('not found');
     }
     if(p==='/og.svg'){ res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'public, max-age=86400'}); return res.end(V.ogImage()); }
-    if(p==='/healthz'){ res.writeHead(200,{'Content-Type':'text/plain'}); return res.end('ok'); }
+    if(p==='/healthz'){
+      res.writeHead(200,{'Content-Type':'text/plain'});
+      // feature flags (booleans only, never secrets) so misnamed env vars are easy to spot
+      return res.end(`ok\nemail-otp: ${emailEnabled?'on':'OFF — set SMTP_HOST+SMTP_USER+SMTP_PASS (or BREVO_API_KEY / RESEND_API_KEY)'}\nsms: ${smsEnabled?'on':'off'}\ngoogle: ${googleEnabled?'on':'off'}\ndb: ${process.env.TURSO_DATABASE_URL?'turso':'local-file'}`);
+    }
     if(p==='/robots.txt'){ res.writeHead(200,{'Content-Type':'text/plain'}); return res.end('User-agent: *\nAllow: /\nAllow: /jobs\nDisallow: /app\nDisallow: /console\nDisallow: /auth\n\nSitemap: https://rivet-crewline.onrender.com/sitemap.xml\n'); }
     if(p==='/sitemap.xml'){
       const ids = await db.prepare("SELECT id FROM jobs WHERE status='open' ORDER BY id DESC LIMIT 1000").all();
@@ -2430,7 +2434,11 @@ async function refreshLiveJobs(){
 
 init()
   .then(loadTranslations)
-  .then(()=> server.listen(PORT, ()=>console.log(`Rivet × Crewline running → http://localhost:${PORT}`)))
+  .then(()=> server.listen(PORT, ()=>{
+    console.log(`Rivet × Crewline running → http://localhost:${PORT}`);
+    console.log(`[auth] email OTP: ${emailEnabled?'ON ('+(smtpEnabled?'smtp':RESEND_API_KEY?'resend':'brevo')+')':'OFF — set SMTP_HOST+SMTP_USER+SMTP_PASS (or BREVO_API_KEY / RESEND_API_KEY) to enforce signup verification'}`);
+    console.log(`[auth] phone OTP (Twilio): ${smsEnabled?'ON':'off'} · Google sign-in: ${googleEnabled?'ON':'off'}`);
+  }))
   .then(()=> { prewarmEs().catch(()=>{}); prewarmJobCache(); // warm the cache on boot so the first visitor never waits
     // Defer the heavy re-ingest well past cold-start so it never collides with the slow first requests
     // (on the free tier a cold boot + full re-ingest at once can spike memory and cause a 502 window).
