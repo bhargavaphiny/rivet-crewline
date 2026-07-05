@@ -101,9 +101,16 @@ async function sendEmailMsg(to, subject, text){
   if(!emailEnabled) return false;
   try {
     if(smtpEnabled){
-      const m = await smtpTransport();
-      await m.sendMail({ from: EMAIL_FROM, to, subject, text });
-      return true;
+      try {
+        const m = await smtpTransport();
+        await m.sendMail({ from: EMAIL_FROM, to, subject, text });
+        return true;
+      } catch(e){
+        console.error('email send (smtp)', e.message);
+        // some hosts (Render free tier) firewall all SMTP ports — fall through to
+        // an HTTPS API provider when one is configured instead of failing outright
+        if(!RESEND_API_KEY && !BREVO_API_KEY) return false;
+      }
     }
     if(RESEND_API_KEY){
       const r = await fetch('https://api.resend.com/emails', {
@@ -833,9 +840,15 @@ const server = http.createServer(async (req,res)=>{
     if(p==='/healthz'){
       res.writeHead(200,{'Content-Type':'text/plain'});
       // feature flags (booleans only, never secrets) so misnamed env vars are easy to spot
-      const emailLine = emailEnabled
-        ? 'on' + (smtpEnabled ? ` (smtp ${SMTP_HOST}:${SMTP_PORT} — ${smtpStatus})` : (RESEND_API_KEY ? ' (resend)' : ' (brevo)'))
-        : 'OFF — set SMTP_HOST+SMTP_USER+SMTP_PASS (or BREVO_API_KEY / RESEND_API_KEY)';
+      let emailLine = 'OFF — set SMTP_HOST+SMTP_USER+SMTP_PASS (or BREVO_API_KEY / RESEND_API_KEY)';
+      if(emailEnabled){
+        const api = RESEND_API_KEY ? 'resend api' : BREVO_API_KEY ? 'brevo api' : '';
+        emailLine = 'on';
+        if(smtpEnabled){
+          emailLine += ` (smtp ${SMTP_HOST}:${SMTP_PORT} — ${smtpStatus}${api?`; fallback: ${api}`:''})`;
+          if(/timeout/i.test(smtpStatus) && !api) emailLine += ' — host likely blocks SMTP ports; use BREVO_API_KEY or RESEND_API_KEY instead';
+        } else emailLine += ` (${api})`;
+      }
       return res.end(`ok\nbuild: ${(process.env.RENDER_GIT_COMMIT||'local').slice(0,7)}\nemail-otp: ${emailLine}\nsms: ${smsEnabled?'on':'off'}\ngoogle: ${googleEnabled?'on':'off'}\ndb: ${process.env.TURSO_DATABASE_URL?'turso':'local-file'}`);
     }
     if(p==='/robots.txt'){ res.writeHead(200,{'Content-Type':'text/plain'}); return res.end('User-agent: *\nAllow: /\nAllow: /jobs\nDisallow: /app\nDisallow: /console\nDisallow: /auth\n\nSitemap: https://rivet-crewline.onrender.com/sitemap.xml\n'); }
