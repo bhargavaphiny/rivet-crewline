@@ -1069,6 +1069,19 @@ const server = http.createServer(async (req,res)=>{
     if(p==='/login' && method==='POST'){
       const b = await readBody(req);
       const emailLc = (b.email||'').toLowerCase().trim();
+      // "Email or mobile number": a phone-shaped identifier goes through SMS OTP instead
+      if(!emailLc.includes('@') && validPhone(normPhone(emailLc))){
+        if(!smsEnabled)
+          return send(res, V.layout({title:'Log in',user:null,body:V.authForm('login',{google:googleEnabled,sms:smsEnabled,error:'Phone sign-in isn’t available yet on this server — log in with your email.'})}));
+        const ph = normPhone(emailLc);
+        if(rateLimited('smsph:'+ph, 3, 60*60*1000) || rateLimited('smsip:'+clientIp(req), 8, 60*60*1000))
+          return send(res, V.layout({title:'Log in',user:null,body:V.authForm('login',{google:googleEnabled,sms:smsEnabled,error:'Too many codes requested. Try again in an hour.'})}));
+        const code = String(crypto.randomInt(100000, 1000000));
+        await db.prepare("INSERT INTO otp(phone,code,expires,role,name,tries) VALUES(?,?,datetime('now','+10 minutes'),'worker','',0) ON CONFLICT(phone) DO UPDATE SET code=excluded.code, expires=excluded.expires, tries=0, created_at=datetime('now')").run(ph, code);
+        const sent = await sendSms(ph, `${code} is your Rivet × Crewline verification code.`);
+        if(!sent) return send(res, V.layout({title:'Log in',user:null,body:V.authForm('login',{google:googleEnabled,sms:smsEnabled,error:'We couldn’t send the text. Double-check the number and try again.'})}));
+        return send(res, V.layout({title:'Enter code',user:null,body:V.phoneVerify({phone:ph})}));
+      }
       const rlKey = 'login:'+clientIp(req)+':'+emailLc;
       if(rlCount(rlKey, 15*60*1000) >= 10)
         return send(res, V.layout({title:'Log in',user:null,body:V.authForm('login',{google:googleEnabled,sms:smsEnabled,error:'Too many failed attempts. Try again in 15 minutes.'})}));

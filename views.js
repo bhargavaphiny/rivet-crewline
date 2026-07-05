@@ -615,12 +615,12 @@ function authForm(kind, { role = 'worker', error = '', google = false, sms = fal
           <label>${t('auth_fullname')} <input name="name" required autocomplete="name"></label>
           <label class="emp-only">${t('auth_company')} <input name="company" autocomplete="organization"></label>
         `:''}
-        <label>${t('auth_email')} <input type="email" name="email" required autocomplete="email"></label>
-        <label>${t('auth_password')}
+        <label>${isSignup?t('auth_email'):T('Email or mobile number')} <input type="${isSignup?'email':'text'}" name="email" required autocomplete="${isSignup?'email':'username'}" id="authid" ${isSignup?'':`placeholder="${T('you@example.com or +1 555 123 4567')}"`}></label>
+        <label id="pwlabel">${t('auth_password')}
           <span class="pw-wrap"><input type="password" name="pass" required minlength="6" id="authpw" autocomplete="${isSignup?'new-password':'current-password'}">
           <button type="button" class="pw-eye" id="pweye" aria-label="${T('Show password')}">👁</button></span>
         </label>
-        <button class="btn full" type="submit">${isSignup?t('auth_create_btn'):t('auth_login_btn')}</button>
+        <button class="btn full" type="submit" id="authsubmit">${isSignup?t('auth_create_btn'):t('auth_login_btn')}</button>
       </form>
       <p class="auth-foot">${isSignup?`${t('auth_have')} <a href="/login">${t('auth_login_btn')}</a>`:`${t('auth_new')} <a href="/signup">${t('nav_get_started')}</a>`}</p>
       <div class="auth-trust"><span>🔒 ${T('Encrypted')}</span><span>✅ ${T('Verified employers')}</span><span>🚫 ${T('No spam, ever')}</span></div>
@@ -636,6 +636,14 @@ function authForm(kind, { role = 'worker', error = '', google = false, sms = fal
       radios.forEach(function(r){r.addEventListener('change',tog)}); if(radios.length)tog();
       var pw=document.getElementById('authpw'), eye=document.getElementById('pweye');
       if(eye&&pw)eye.addEventListener('click',function(){var s=pw.type==='password';pw.type=s?'text':'password';eye.textContent=s?'🙈':'👁';});
+      // login only: typing a mobile number hides the password — we text a code instead
+      var idf=document.getElementById('authid'), pwl=document.getElementById('pwlabel'), sub=document.getElementById('authsubmit');
+      if(${isSignup?'false':'true'}&&idf&&pwl&&sub&&pw){
+        var defTxt=sub.textContent, smsTxt=${JSON.stringify(t('phone_textme'))};
+        var isPhone=function(v){v=String(v).trim();return v&&v.indexOf('@')<0&&v.replace(/\\D/g,'').length>=10;};
+        var upd=function(){var p=isPhone(idf.value);pwl.style.display=p?'none':'block';pw.required=!p;sub.textContent=p?smsTxt:defTxt;};
+        idf.addEventListener('input',upd); upd();
+      }
     })();
   </script>`;
 }
