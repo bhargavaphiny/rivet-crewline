@@ -487,7 +487,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=114">
+  <link rel="stylesheet" href="/styles.css?v=115">
   <link rel="manifest" href="/manifest.webmanifest">
   <script>if('serviceWorker' in navigator) addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));</script>
   </head><body class="${user?'app-mode':'mkt-mode'}">
@@ -527,6 +527,25 @@ function layout({ title, user, body, active = '', flash = '' }) {
     </div>
     <div class="wrap foot-base">© 2026 Rivet × Crewline · Phoenix, AZ · <a href="/lang/${LANG==='es'?'en':'es'}" style="color:#9fb0bb">${LANG==='es'?'English':'Español'}</a></div>
   </footer>`}
+  <div id="pgbar" aria-hidden="true"></div>
+  <script>
+  (function(){
+    // slim top progress bar on every navigation (links + form posts)
+    var bar=document.getElementById('pgbar');
+    addEventListener('beforeunload',function(){ if(bar) bar.classList.add('on'); });
+    // submit buttons get a spinner + double-submit guard
+    document.addEventListener('submit',function(e){
+      var f=e.target; if(!(f instanceof HTMLFormElement)) return;
+      var b=f.querySelector('button[type=submit],button:not([type])');
+      if(b && !b.classList.contains('is-loading')){ b.classList.add('is-loading'); setTimeout(function(){b.classList.remove('is-loading');},8000); }
+    }, true);
+    // gentle reveal for cards as they scroll into view
+    if('IntersectionObserver' in window && !matchMedia('(prefers-reduced-motion: reduce)').matches){
+      var io=new IntersectionObserver(function(es){ es.forEach(function(en){ if(en.isIntersecting){ en.target.classList.add('inview'); io.unobserve(en.target); } }); },{rootMargin:'0px 0px -8% 0px'});
+      document.querySelectorAll('.card').forEach(function(c,i){ if(c.getBoundingClientRect().top > innerHeight){ c.classList.add('reveal'); io.observe(c); } });
+    }
+  })();
+  </script>
   </body></html>`;
 }
 
