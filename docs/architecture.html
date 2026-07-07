@@ -81,18 +81,14 @@
     <text x="1056" y="103" class="s">Push receive</text>
     <text x="1056" y="116" class="s">Notif click → page</text>
 
-    <!-- ===================== ZONE: EDGE ===================== -->
+    <!-- ===================== ZONE: HOSTING ===================== -->
     <rect x="20" y="170" width="1155" height="74" class="zone" rx="14"/>
-    <text x="36" y="192" class="zl">EDGE</text>
-    <rect x="120" y="184" width="300" height="48" class="box" rx="10"/>
-    <text x="132" y="204" class="t">▲ Vercel Front Door</text>
-    <text x="132" y="220" class="s">rewrites * → Render · x-forwarded-host preserved</text>
-    <rect x="520" y="184" width="420" height="48" class="boxhl" rx="10"/>
-    <text x="532" y="204" class="t">Render Web Service — rivet-crewline.onrender.com</text>
-    <text x="532" y="220" class="s">HTTPS · HSTS · keep-warm (GitHub cron + self-ping) · build hash on /healthz</text>
-    <path class="ln" d="M420 208 H518"/>
-    <path class="ln" d="M590 148 V182"/>
-    <path class="ln" d="M270 132 V182"/>
+    <text x="36" y="192" class="zl">HOSTING — RENDER (frontend + backend, one service)</text>
+    <rect x="250" y="184" width="700" height="48" class="boxhl" rx="10"/>
+    <text x="264" y="204" class="t">Render Web Service — rivet-crewline.onrender.com — serves the UI AND the API</text>
+    <text x="264" y="220" class="s">server-rendered frontend + backend + background jobs in ONE Node process · HTTPS · HSTS · keep-warm · build hash on /healthz</text>
+    <path class="ln" d="M450 148 V182"/>
+    <path class="ln" d="M770 148 V182"/>
 
     <!-- ===================== ZONE: APPLICATION ===================== -->
     <rect x="20" y="266" width="1155" height="420" class="zone" rx="14"/>
