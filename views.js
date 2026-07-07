@@ -498,7 +498,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
     <aside class="sidenav" aria-label="Primary">
       <div class="snav-top">${brand}<label for="navcb" class="snav-close" aria-label="Close menu">✕</label></div>
       <nav class="snav-list">${sideList}</nav>
-      <div class="snav-foot">${sideFoot}</div>
+      <div class="snav-foot"><button id="pushbell" class="nav-link" type="button" style="display:none;background:none;border:0;cursor:pointer;width:100%;text-align:left;font:inherit;color:inherit">🔔 ${T('Enable notifications')}</button>${sideFoot}</div>
     </aside>
     <label for="navcb" class="nav-scrim" aria-hidden="true"></label>
     <div class="app-body">
@@ -543,6 +543,22 @@ function layout({ title, user, body, active = '', flash = '' }) {
     if('IntersectionObserver' in window && !matchMedia('(prefers-reduced-motion: reduce)').matches){
       var io=new IntersectionObserver(function(es){ es.forEach(function(en){ if(en.isIntersecting){ en.target.classList.add('inview'); io.unobserve(en.target); } }); },{rootMargin:'0px 0px -8% 0px'});
       document.querySelectorAll('.card').forEach(function(c,i){ if(c.getBoundingClientRect().top > innerHeight){ c.classList.add('reveal'); io.observe(c); } });
+    }
+    // web-push opt-in bell (logged-in pages only; hidden if unsupported/denied/subscribed)
+    var bell=document.getElementById('pushbell');
+    if(bell && 'serviceWorker' in navigator && 'PushManager' in window && Notification.permission!=='denied'){
+      navigator.serviceWorker.ready.then(function(reg){ return reg.pushManager.getSubscription(); })
+        .then(function(sub){ if(!sub) bell.style.display='block'; }).catch(function(){});
+      bell.addEventListener('click', function(){
+        bell.disabled=true; bell.textContent='🔔 …';
+        function b64(s){var p='='.repeat((4-s.length%4)%4);var r=atob((s+p).replace(/-/g,'+').replace(/_/g,'/'));var a=new Uint8Array(r.length);for(var i=0;i<r.length;i++)a[i]=r.charCodeAt(i);return a;}
+        Promise.all([navigator.serviceWorker.ready, fetch('/push/key').then(function(r){return r.json()})])
+          .then(function(x){ if(!x[1].key) throw 0; return x[0].pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64(x[1].key)}); })
+          .then(function(sub){ var j=sub.toJSON(); var f=new URLSearchParams({endpoint:j.endpoint, p256dh:j.keys.p256dh, auth:j.keys.auth});
+            return fetch('/push/subscribe',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:f.toString()}); })
+          .then(function(){ bell.textContent='🔔 ${T('Notifications on')}'; setTimeout(function(){bell.style.display='none';},1500); })
+          .catch(function(){ bell.textContent='🔔 ${T('Not available')}'; bell.disabled=false; });
+      });
     }
   })();
   </script>

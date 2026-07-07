@@ -263,10 +263,63 @@ async function getConversations(meId){
   convos.sort((a,b)=> String(b.last&&b.last.created_at||'').localeCompare(String(a.last&&a.last.created_at||'')));
   return convos;
 }
+// ---------- web push (zero-config: VAPID keys self-generate on first boot, stored in meta) ----------
+let _webpush = null, _vapidPublic = '';
+async function initPush(){
+  try {
+    _webpush = require('web-push');
+    let pub = (await db.prepare("SELECT v FROM meta WHERE k='vapid_pub'").get()||{}).v;
+    let priv = (await db.prepare("SELECT v FROM meta WHERE k='vapid_priv'").get()||{}).v;
+    if(!pub || !priv){
+      const k = _webpush.generateVAPIDKeys();
+      pub = k.publicKey; priv = k.privateKey;
+      await db.prepare("INSERT INTO meta(k,v) VALUES('vapid_pub',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").run(pub);
+      await db.prepare("INSERT INTO meta(k,v) VALUES('vapid_priv',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").run(priv);
+      console.log('[push] generated VAPID keypair (stored in db)');
+    }
+    const contact = (EMAIL_FROM.match(/<(.+)>/)||[])[1] || (EMAIL_FROM.includes('@') ? EMAIL_FROM : 'admin@rivet-crewline.onrender.com');
+    _webpush.setVapidDetails('mailto:'+contact, pub, priv);
+    _vapidPublic = pub;
+  } catch(e){ console.error('[push] init skipped:', e.message); }
+}
+async function sendPush(userId, payload){
+  if(!_webpush || !_vapidPublic) return;
+  try {
+    const subs = await db.prepare('SELECT * FROM push_subs WHERE user_id=?').all(userId);
+    const body = JSON.stringify(payload);
+    for(const s of subs){
+      try {
+        await _webpush.sendNotification({ endpoint:s.endpoint, keys:{ p256dh:s.p256dh, auth:s.auth } }, body, { TTL: 3600 });
+      } catch(e){
+        if(e.statusCode===404 || e.statusCode===410) await db.prepare('DELETE FROM push_subs WHERE id=?').run(s.id); // expired
+      }
+    }
+  } catch(e){ /* push is best-effort, never break the request */ }
+}
+// notify a user outside the app (email, throttled to 1/hr per recipient so threads don't spam)
+async function notifyEmail(userId, subject, text){
+  if(!emailEnabled) return;
+  try {
+    const u = await db.prepare('SELECT email FROM users WHERE id=?').get(userId);
+    if(!u || !u.email || u.email.endsWith('.rivet.local') || u.email.endsWith('@rivet.test')) return;
+    if(rateLimited('nmail:'+userId, 1, 60*60*1000)) return;
+    await sendEmailMsg(u.email, subject, text);
+  } catch(e){ /* best-effort */ }
+}
 async function sendMessage(fromId, toId, body){
   const text = String(body||'').trim().slice(0,2000);
   if(!text) return false;
   await db.prepare('INSERT INTO messages(from_id,to_id,body) VALUES(?,?,?)').run(fromId, toId, text);
+  // best-effort out-of-app notifications: push (instant) + email (throttled)
+  try {
+    const to = await db.prepare('SELECT role,name FROM users WHERE id=?').get(toId);
+    const from = await db.prepare('SELECT name,company FROM users WHERE id=?').get(fromId);
+    const who = (from && (from.company || from.name)) || 'Someone';
+    const url = to && to.role==='employer' ? '/console/messages' : '/app/messages';
+    sendPush(toId, { title:`${who} on Rivet × Crewline`, body: text.slice(0,120), url });
+    notifyEmail(toId, `New message from ${who} on Rivet × Crewline`,
+      `${who} sent you a message:\n\n"${text.slice(0,400)}"\n\nReply: https://rivet-crewline.onrender.com${url}\n\n— Rivet × Crewline`);
+  } catch(e){}
   return true;
 }
 
@@ -831,6 +884,18 @@ function interviewVerdict(history){
 const server = http.createServer(async (req,res)=>{
   const url = new URL(req.url, `http://${req.headers.host}`);
   const p = url.pathname, method = req.method;
+  // HSTS on secure traffic; CSRF guard: cross-origin POSTs are rejected outright
+  if(isHttps(req)) res.setHeader('Strict-Transport-Security','max-age=15552000; includeSubDomains');
+  if(method==='POST'){
+    const origin = req.headers.origin;
+    if(origin){
+      try {
+        const oh = new URL(origin).host;
+        const rh = String(req.headers['x-forwarded-host']||req.headers.host||'').split(',')[0].trim();
+        if(oh && rh && oh !== rh){ res.writeHead(403,{'Content-Type':'text/plain'}); return res.end('Cross-origin request rejected'); }
+      } catch(e){}
+    }
+  }
   const user = await getUser(req);
   if(user) user.mode = p.startsWith('/console') ? 'employer' : (p.startsWith('/app') ? 'worker' : user.role);
   const isEs = getCookie(req,'lang')==='es';
@@ -876,8 +941,16 @@ const server = http.createServer(async (req,res)=>{
     }
     if(p==='/sw.js'){
       res.writeHead(200,{'Content-Type':'application/javascript','Cache-Control':'no-cache'});
-      // minimal pass-through worker: enough for installability; no offline caching yet
-      return res.end("self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>self.clients.claim());self.addEventListener('fetch',()=>{});");
+      // installability + web-push notifications (no offline caching yet)
+      return res.end(
+        "self.addEventListener('install',e=>self.skipWaiting());"+
+        "self.addEventListener('activate',e=>self.clients.claim());"+
+        "self.addEventListener('fetch',()=>{});"+
+        "self.addEventListener('push',e=>{let d={};try{d=e.data.json()}catch(_){d={title:'Rivet × Crewline',body:e.data&&e.data.text()||''}}"+
+        "e.waitUntil(self.registration.showNotification(d.title||'Rivet × Crewline',{body:d.body||'',icon:'/icon.svg',badge:'/icon.svg',data:{url:d.url||'/'}}))});"+
+        "self.addEventListener('notificationclick',e=>{e.notification.close();"+
+        "e.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(ws=>{const u=e.notification.data&&e.notification.data.url||'/';"+
+        "for(const w of ws){if('focus' in w){w.navigate(u);return w.focus();}}return clients.openWindow(u);}))});");
     }
     if(p==='/healthz'){
       res.writeHead(200,{'Content-Type':'text/plain'});
@@ -1097,6 +1170,13 @@ const server = http.createServer(async (req,res)=>{
       }
       await db.prepare('UPDATE users SET email_verified=1 WHERE id=?').run(user.id);
       await db.prepare('DELETE FROM email_otp WHERE email=?').run(user.email);
+      // welcome them properly now that the address is proven real
+      sendEmailMsg(user.email, 'Welcome to Rivet × Crewline 🛠️',
+        `Hi ${user.name||'there'},\n\nYour email is verified — welcome aboard.\n\n`+
+        (user.role==='employer'
+          ? `Next steps:\n1. Set up your company page\n2. Post your first job — it matches against our worker pool instantly\n3. Review candidates on your pipeline board\n\nStart here: https://rivet-crewline.onrender.com/console`
+          : `Next steps:\n1. Finish your Work Card (trade, ZIP, pay floor)\n2. Add your credentials — verified credentials boost your match scores\n3. Apply to real jobs near you with one tap\n\nStart here: https://rivet-crewline.onrender.com/app`)+
+        `\n\n— The Rivet × Crewline team`).catch(()=>{});
       return redirect(res, next);
     }
     if(p==='/verify-email/resend' && method==='POST'){
@@ -1308,6 +1388,31 @@ const server = http.createServer(async (req,res)=>{
       } catch(e){ console.error('account delete', e.message); }
       clearSession(req, res);
       return redirect(res,'/');
+    }
+
+    // ---- web push subscription (any logged-in user) ----
+    if(p==='/push/key' && method==='GET'){
+      res.writeHead(200,{'Content-Type':'application/json'});
+      return res.end(JSON.stringify({ key:_vapidPublic }));
+    }
+    if(p==='/push/subscribe' && method==='POST'){
+      if(!user) return redirect(res,'/login');
+      const b = await readBody(req);
+      const endpoint = String(b.endpoint||'').slice(0,600);
+      if(/^https:\/\//.test(endpoint) && b.p256dh && b.auth){
+        try { await db.prepare(`INSERT INTO push_subs(user_id,endpoint,p256dh,auth) VALUES(?,?,?,?)
+          ON CONFLICT(endpoint) DO UPDATE SET user_id=excluded.user_id, p256dh=excluded.p256dh, auth=excluded.auth`)
+          .run(user.id, endpoint, String(b.p256dh).slice(0,300), String(b.auth).slice(0,120)); } catch(e){}
+      }
+      res.writeHead(200,{'Content-Type':'application/json'});
+      return res.end('{"ok":true}');
+    }
+    if(p==='/push/unsubscribe' && method==='POST'){
+      if(!user) return redirect(res,'/login');
+      const b = await readBody(req);
+      await db.prepare('DELETE FROM push_subs WHERE user_id=? AND endpoint=?').run(user.id, String(b.endpoint||''));
+      res.writeHead(200,{'Content-Type':'application/json'});
+      return res.end('{"ok":true}');
     }
 
     // ---- calendar invite for a confirmed interview (worker or employer) ----
@@ -1995,11 +2100,15 @@ const server = http.createServer(async (req,res)=>{
         try {
           const trades = [b.trade, ...((M.ADJACENT && M.ADJACENT[b.trade]) || [])];
           const ph = trades.map(()=>'?').join(',');
-          const targets = await db.prepare(`SELECT u.phone FROM users u JOIN worker_profiles p ON p.user_id=u.id
-            WHERE p.alerts=1 AND p.available=1 AND u.phone IS NOT NULL AND p.trade IN (${ph})`).all(...trades);
+          const targets = await db.prepare(`SELECT u.id uid, u.phone FROM users u JOIN worker_profiles p ON p.user_id=u.id
+            WHERE p.alerts=1 AND p.available=1 AND p.trade IN (${ph})`).all(...trades);
           const label = (M.TRADES && M.TRADES[b.trade]) || b.trade || 'trades';
+          const alertTxt = `New ${label} job on Rivet: ${b.title} · $${Number(b.pay_min)||0}-${Number(b.pay_max)||0}/hr · ${b.city||''}.`;
           for(const t of targets){
-            await sendSms(t.phone, `New ${label} job on Rivet: ${b.title} · $${Number(b.pay_min)||0}-${Number(b.pay_max)||0}/hr · ${b.city||''}. Open the app to apply.`);
+            if(t.phone) await sendSms(t.phone, alertTxt+' Open the app to apply.');
+            sendPush(t.uid, { title:'New job matches your trade', body:`${b.title} · $${Number(b.pay_min)||0}-${Number(b.pay_max)||0}/hr · ${b.city||''}`, url:`/app/jobs/${jobId}` });
+            if(!rateLimited('jmail:'+t.uid, 1, 6*60*60*1000)) // max one job-alert email per worker per 6h
+              notifyEmail(t.uid, `New ${label} job near you — Rivet × Crewline`, `${alertTxt}\n\nView & apply: https://rivet-crewline.onrender.com/app/jobs/${jobId}\n\nManage alerts in your profile.\n— Rivet × Crewline`);
             alerted++;
           }
         } catch(e){ console.error('job alerts', e); }
@@ -2612,6 +2721,7 @@ async function refreshLiveJobs(){
 
 init()
   .then(loadTranslations)
+  .then(initPush)
   .then(()=> server.listen(PORT, ()=>{
     console.log(`Rivet × Crewline running → http://localhost:${PORT}`);
     console.log(`[auth] email OTP: ${emailEnabled?'ON ('+(smtpEnabled?'smtp':RESEND_API_KEY?'resend':'brevo')+')':'OFF — set SMTP_HOST+SMTP_USER+SMTP_PASS (or BREVO_API_KEY / RESEND_API_KEY) to enforce signup verification'}`);
