@@ -76,6 +76,7 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const BREVO_API_KEY = process.env.BREVO_API_KEY || '';
 const EMAIL_FROM = process.env.EMAIL_FROM || (smtpEnabled ? SMTP_USER : 'Rivet x Crewline <onboarding@resend.dev>');
 const emailEnabled = smtpEnabled || !!(RESEND_API_KEY || BREVO_API_KEY);
+let lastEmailErr = ''; // last delivery failure, surfaced on /healthz (no secrets)
 // Build the transport against an explicitly-resolved IPv4 address: some hosts
 // (Render) have no IPv6 route, and nodemailer does its own DNS lookups, so the
 // global ipv4first preference is not enough. TLS still verifies the real
@@ -137,7 +138,8 @@ async function sendEmailMsg(to, subject, text){
         method:'POST', headers:{ Authorization:`Bearer ${RESEND_API_KEY}`, 'Content-Type':'application/json' },
         body: JSON.stringify({ from: EMAIL_FROM, to: [to], subject, text }),
       });
-      if(!r.ok) console.error('email send (resend)', r.status, await r.text().catch(()=>''));
+      if(!r.ok){ lastEmailErr = `resend ${r.status}: ${(await r.text().catch(()=>'')).slice(0,140)}`; console.error('email send', lastEmailErr); }
+      else lastEmailErr = '';
       return r.ok;
     }
     // Brevo: EMAIL_FROM must be a verified sender in the Brevo dashboard
@@ -147,9 +149,10 @@ async function sendEmailMsg(to, subject, text){
       method:'POST', headers:{ 'api-key': BREVO_API_KEY, 'Content-Type':'application/json' },
       body: JSON.stringify({ sender, to: [{ email: to }], subject, textContent: text }),
     });
-    if(!r.ok) console.error('email send (brevo)', r.status, await r.text().catch(()=>''));
+    if(!r.ok){ lastEmailErr = `brevo ${r.status}: ${(await r.text().catch(()=>'')).slice(0,140)}`; console.error('email send', lastEmailErr); }
+    else lastEmailErr = '';
     return r.ok;
-  } catch(e){ console.error('email send', e); return false; }
+  } catch(e){ lastEmailErr = String(e.message||e).slice(0,140); console.error('email send', e); return false; }
 }
 // mint + store a 6-digit code for this email (10-min expiry) and try to deliver it.
 // Throttled: an unexpired code younger than 30s is reused silently (no re-send),
@@ -887,8 +890,10 @@ const server = http.createServer(async (req,res)=>{
           emailLine += ` (smtp ${SMTP_HOST}:${SMTP_PORT} — ${smtpStatus}${api?`; fallback: ${api}`:''})`;
           if(/timeout/i.test(smtpStatus) && !api) emailLine += ' — host likely blocks SMTP ports; use BREVO_API_KEY or RESEND_API_KEY instead';
         } else emailLine += ` (${api})`;
+        emailLine += ` · from: ${EMAIL_FROM}`;
+        if(lastEmailErr) emailLine += ` · LAST SEND FAILED — ${lastEmailErr}`;
       }
-      return res.end(`ok\nbuild: ${(process.env.RENDER_GIT_COMMIT||'local').slice(0,7)}\nemail-otp: ${emailLine}\nsms: ${smsEnabled?'on':'off'}\ngoogle: ${googleEnabled?'on':'off'}\ndb: ${process.env.TURSO_DATABASE_URL?'turso':'local-file'}`);
+      return res.end(`ok\nbuild: ${(process.env.RENDER_GIT_COMMIT||'local').slice(0,7)}\nemail-otp: ${emailLine}\nsms: ${smsEnabled?'on':'off'}\ngoogle: ${googleEnabled?'on':'off'}\ndb: ${process.env.TURSO_DATABASE_URL?'turso':'local-file'}\nadmin: ${ADMIN_EMAILS.length?ADMIN_EMAILS.length+' account(s) configured':'NOT SET — add ADMIN_EMAILS env var'}`);
     }
     if(p==='/robots.txt'){ res.writeHead(200,{'Content-Type':'text/plain'}); return res.end('User-agent: *\nAllow: /\nAllow: /jobs\nDisallow: /app\nDisallow: /console\nDisallow: /auth\n\nSitemap: https://rivet-crewline.onrender.com/sitemap.xml\n'); }
     if(p==='/sitemap.xml'){
