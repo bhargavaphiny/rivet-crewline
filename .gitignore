@@ -22,3 +22,6 @@ Thumbs.db
 # Test/coverage output
 coverage/
 *.lcov
+
+# Business documents (not app code)
+*.xlsx
