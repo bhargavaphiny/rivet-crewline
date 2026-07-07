@@ -926,6 +926,13 @@ const server = http.createServer(async (req,res)=>{
     }
     if(p==='/og.svg'){ res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'public, max-age=86400'}); return res.end(V.ogImage()); }
     // ---- legal & PWA (public) ----
+    if(p==='/docs/architecture' && method==='GET'){
+      try {
+        const html = fs.readFileSync(path.join(__dirname,'docs','architecture.html'));
+        res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'public, max-age=3600'});
+        return res.end(html);
+      } catch(e){ return redirect(res,'/'); }
+    }
     if(p==='/terms' && method==='GET') return send(res, V.layout({title:'Terms of Service', user, body:V.legalPage('terms', user)}));
     if(p==='/privacy' && method==='GET') return send(res, V.layout({title:'Privacy Policy', user, body:V.legalPage('privacy', user)}));
     if(p==='/eeo' && method==='GET') return send(res, V.layout({title:'Equal Opportunity', user, body:V.legalPage('eeo', user)}));

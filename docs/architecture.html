@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rivet × Crewline — System Architecture</title>
+<style>
+  body{margin:0;background:#0F1923;font-family:Georgia,'Times New Roman',serif;color:#E8EEF4;padding:28px 16px}
+  .wrap{max-width:1560px;margin:0 auto}
+  h1{font-size:26px;margin:0 0 4px;color:#fff}
+  p.sub{margin:0 0 18px;color:#8FA3B5;font-size:14px}
+  .scroll{overflow-x:auto;border-radius:14px;background:#13212B;box-shadow:0 18px 60px rgba(0,0,0,.5)}
+  svg{display:block;min-width:1500px}
+  text{font-family:Georgia,serif}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Rivet × Crewline — End-to-End System Architecture</h1>
+  <p class="sub">One Node process, one database, everything real. Numbered arrows = the seven core data flows (legend bottom-left). July 2026.</p>
+  <div class="scroll">
+  <svg viewBox="0 0 1500 1060" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0L10 5L0 10z" fill="#8FA3B5"/></marker>
+      <marker id="arB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0L10 5L0 10z" fill="#4D9FDC"/></marker>
+      <marker id="arA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0L10 5L0 10z" fill="#E0883A"/></marker>
+      <marker id="arG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0L10 5L0 10z" fill="#3FBF8A"/></marker>
+    </defs>
+    <style>
+      .zone{fill:#182835;stroke:#2A3E4E;stroke-width:1.5}
+      .box{fill:#1F3242;stroke:#3B566C;stroke-width:1.2}
+      .boxhl{fill:#20425E;stroke:#4D9FDC;stroke-width:1.6}
+      .boxamb{fill:#3A2E1C;stroke:#E0883A;stroke-width:1.4}
+      .boxgrn{fill:#173428;stroke:#3FBF8A;stroke-width:1.4}
+      .t{fill:#E8EEF4;font-size:13px;font-weight:bold}
+      .s{fill:#9FB4C6;font-size:10.5px}
+      .zl{fill:#6E8BA3;font-size:11px;font-weight:bold;letter-spacing:2px}
+      .fl{fill:#8FA3B5;font-size:10px;font-style:italic}
+      .ln{stroke:#8FA3B5;stroke-width:1.4;fill:none;marker-end:url(#ar)}
+      .lnB{stroke:#4D9FDC;stroke-width:1.8;fill:none;marker-end:url(#arB)}
+      .lnA{stroke:#E0883A;stroke-width:1.8;fill:none;marker-end:url(#arA)}
+      .lnG{stroke:#3FBF8A;stroke-width:1.8;fill:none;marker-end:url(#arG)}
+      .num{fill:#0F1923;font-size:10px;font-weight:bold}
+    </style>
+
+    <!-- ===================== ZONE: CLIENTS ===================== -->
+    <rect x="20" y="18" width="1155" height="130" class="zone" rx="14"/>
+    <text x="36" y="40" class="zl">CLIENTS — server-rendered pages, installable PWA</text>
+    <rect x="36" y="52" width="200" height="80" class="box" rx="10"/>
+    <text x="46" y="74" class="t">🌐 Public Site</text>
+    <text x="46" y="90" class="s">Landing · live demand map</text>
+    <text x="46" y="103" class="s">Jobs · Pulse · Sectors · Careers</text>
+    <text x="46" y="116" class="s">Terms · Privacy · EEO</text>
+    <rect x="252" y="52" width="205" height="80" class="box" rx="10"/>
+    <text x="262" y="74" class="t">🛠️ Worker App (Rivet)</text>
+    <text x="262" y="90" class="s">Onboarding · Work Card · Matches</text>
+    <text x="262" y="103" class="s">Apply · Shifts · Messages · Crews</text>
+    <text x="262" y="116" class="s">Credential wallet · Portfolio</text>
+    <rect x="473" y="52" width="205" height="80" class="box" rx="10"/>
+    <text x="483" y="74" class="t">🏗️ Employer Console (Crewline)</text>
+    <text x="483" y="90" class="s">Post job · Pipeline kanban</text>
+    <text x="483" y="103" class="s">Talent search · Analytics</text>
+    <text x="483" y="116" class="s">Interviews · Shortlist · Company</text>
+    <rect x="694" y="52" width="190" height="80" class="boxamb" rx="10"/>
+    <text x="704" y="74" class="t">🛡️ Admin Panel  /admin</text>
+    <text x="704" y="90" class="s">Credential review queue</text>
+    <text x="704" y="103" class="s">User search · Job moderation</text>
+    <text x="704" y="116" class="s">Gated by ADMIN_EMAILS</text>
+    <rect x="900" y="52" width="130" height="80" class="box" rx="10"/>
+    <text x="910" y="74" class="t">🔐 Auth Screens</text>
+    <text x="910" y="90" class="s">Login (email/phone)</text>
+    <text x="910" y="103" class="s">Signup · 6-box OTP</text>
+    <text x="910" y="116" class="s">Google button</text>
+    <rect x="1046" y="52" width="115" height="80" class="box" rx="10"/>
+    <text x="1056" y="74" class="t">📲 Service Worker</text>
+    <text x="1056" y="90" class="s">PWA install</text>
+    <text x="1056" y="103" class="s">Push receive</text>
+    <text x="1056" y="116" class="s">Notif click → page</text>
+
+    <!-- ===================== ZONE: EDGE ===================== -->
+    <rect x="20" y="170" width="1155" height="74" class="zone" rx="14"/>
+    <text x="36" y="192" class="zl">EDGE</text>
+    <rect x="120" y="184" width="300" height="48" class="box" rx="10"/>
+    <text x="132" y="204" class="t">▲ Vercel Front Door</text>
+    <text x="132" y="220" class="s">rewrites * → Render · x-forwarded-host preserved</text>
+    <rect x="520" y="184" width="420" height="48" class="boxhl" rx="10"/>
+    <text x="532" y="204" class="t">Render Web Service — rivet-crewline.onrender.com</text>
+    <text x="532" y="220" class="s">HTTPS · HSTS · keep-warm (GitHub cron + self-ping) · build hash on /healthz</text>
+    <path class="ln" d="M420 208 H518"/>
+    <path class="ln" d="M590 148 V182"/>
+    <path class="ln" d="M270 132 V182"/>
+
+    <!-- ===================== ZONE: APPLICATION ===================== -->
+    <rect x="20" y="266" width="1155" height="420" class="zone" rx="14"/>
+    <text x="36" y="288" class="zl">APPLICATION — single Node.js process (server.js · views.js · matching.js · db.js)</text>
+
+    <rect x="36" y="300" width="270" height="108" class="boxhl" rx="10"/>
+    <text x="48" y="320" class="t">🔒 Security Layer (every request)</text>
+    <text x="48" y="337" class="s">Signed HttpOnly session cookies (HMAC)</text>
+    <text x="48" y="351" class="s">CSRF origin guard on POST · HSTS · CSP</text>
+    <text x="48" y="365" class="s">Rate limits: login 10/15m · signup 20/h</text>
+    <text x="48" y="379" class="s">OTP: 5 tries kills code · resend throttle</text>
+    <text x="48" y="393" class="s">SMS caps 3/h/number · scrypt hashes</text>
+
+    <rect x="36" y="424" width="270" height="118" class="box" rx="10"/>
+    <text x="48" y="444" class="t">🎫 Auth Service</text>
+    <text x="48" y="461" class="s">① Email+password → email OTP (enforced)</text>
+    <text x="48" y="475" class="s">② Google OAuth (state-signed, auto-verified)</text>
+    <text x="48" y="489" class="s">③ Phone → SMS OTP (login field accepts both)</text>
+    <text x="48" y="503" class="s">email_verified guard on /app + /console</text>
+    <text x="48" y="517" class="s">Account deletion cascade (GDPR-style)</text>
+
+    <rect x="36" y="558" width="270" height="112" class="boxgrn" rx="10"/>
+    <text x="48" y="578" class="t">🔔 Notification Hub (sendMessage)</text>
+    <text x="48" y="595" class="s">Every in-app message fans out:</text>
+    <text x="48" y="609" class="s">→ Web Push (VAPID self-generated)</text>
+    <text x="48" y="623" class="s">→ Email via Brevo (throttled 1/h)</text>
+    <text x="48" y="637" class="s">→ SMS via Twilio (high-intent only)</text>
+    <text x="48" y="651" class="s">Job alerts · welcome · status updates</text>
+
+    <rect x="330" y="300" width="280" height="150" class="boxhl" rx="10"/>
+    <text x="342" y="320" class="t">⚙️ Matching Engine (matching.js)</text>
+    <text x="342" y="337" class="s">score = trade fit (+adjacency)</text>
+    <text x="342" y="351" class="s">      + pay vs worker floor</text>
+    <text x="342" y="365" class="s">      + distance tiers (zip haversine)</text>
+    <text x="342" y="379" class="s">      + verified-credential coverage</text>
+    <text x="342" y="393" class="s">Readiness score per worker</text>
+    <text x="342" y="407" class="s">Ranked matches both directions</text>
+    <text x="342" y="421" class="s">8 unit tests · weights in one file</text>
+    <text x="342" y="440" class="fl">verified creds literally move scores ⑤</text>
+
+    <rect x="330" y="466" width="280" height="100" class="box" rx="10"/>
+    <text x="342" y="486" class="t">🖥️ Router + SSR Views (views.js)</text>
+    <text x="342" y="503" class="s">~80 routes · server-rendered HTML</text>
+    <text x="342" y="517" class="s">EN/ES i18n (LLM-cached) · OG images</text>
+    <text x="342" y="531" class="s">Leaflet maps · animated auth v2</text>
+    <text x="342" y="545" class="s">page transitions · loading states</text>
+
+    <rect x="330" y="582" width="280" height="88" class="boxamb" rx="10"/>
+    <text x="342" y="602" class="t">🛡️ Admin Module</text>
+    <text x="342" y="619" class="s">⑤ proof (photo/link) → pending →</text>
+    <text x="342" y="633" class="s">human approve/reject → Verified badge</text>
+    <text x="342" y="647" class="s">→ recomputeReadiness → new scores</text>
+    <text x="342" y="661" class="s">User lookup · close jobs · stats</text>
+
+    <rect x="634" y="300" width="260" height="150" class="boxgrn" rx="10"/>
+    <text x="646" y="320" class="t">📥 Live Jobs Ingestion (jobs_live.js)</text>
+    <text x="646" y="337" class="s">③ every 6h: ~40 employer ATS feeds</text>
+    <text x="646" y="351" class="s">Workday · Lever · Ashby · SmartRecruiters</text>
+    <text x="646" y="365" class="s">+ Adzuna · Jooble · USAJOBS APIs</text>
+    <text x="646" y="379" class="s">dedupe · freshness prune · pay normalize</text>
+    <text x="646" y="393" class="s">trade retagging · sector tagging</text>
+    <text x="646" y="407" class="s">→ 23,000+ REAL open jobs</text>
+    <text x="646" y="427" class="fl">event-loop yield per statement —</text>
+    <text x="646" y="441" class="fl">requests stay fast during ingest</text>
+
+    <rect x="634" y="466" width="260" height="100" class="box" rx="10"/>
+    <text x="646" y="486" class="t">🗺️ Cache + Geo Layer</text>
+    <text x="646" y="503" class="s">45-min in-memory aggregates</text>
+    <text x="646" y="517" class="s">openJobs · maps · sector stats</text>
+    <text x="646" y="531" class="s">prewarmed at boot + every 30m</text>
+    <text x="646" y="545" class="s">zip→lat/lon cached in DB</text>
+
+    <rect x="634" y="582" width="260" height="88" class="box" rx="10"/>
+    <text x="646" y="602" class="t">🤖 AI Agents (llm.js · Groq, $0)</text>
+    <text x="646" y="619" class="s">About-me drafting · career coach</text>
+    <text x="646" y="633" class="s">applicant screening questions</text>
+    <text x="646" y="647" class="s">ES translation batch · graceful</text>
+    <text x="646" y="661" class="s">template fallback with no key</text>
+
+    <rect x="918" y="300" width="240" height="370" class="boxhl" rx="10"/>
+    <text x="930" y="320" class="t">🗄️ Turso libSQL (persistent)</text>
+    <text x="930" y="340" class="s">users · worker_profiles</text>
+    <text x="930" y="355" class="s">credentials (verify_status, proof)</text>
+    <text x="930" y="370" class="s">jobs (23k live + posted)</text>
+    <text x="930" y="385" class="s">applications (stage, outcomes)</text>
+    <text x="930" y="400" class="s">messages · notes · reviews</text>
+    <text x="930" y="415" class="s">shifts · shift_claims</text>
+    <text x="930" y="430" class="s">interviews · quotes · crews</text>
+    <text x="930" y="445" class="s">saved_jobs · saved_candidates</text>
+    <text x="930" y="460" class="s">email_otp · otp (SMS) · push_subs</text>
+    <text x="930" y="475" class="s">work_history · media · posts</text>
+    <text x="930" y="490" class="s">zip_geo · translations · meta</text>
+    <text x="930" y="505" class="s">(VAPID keys live in meta)</text>
+    <line x1="930" y1="518" x2="1140" y2="518" stroke="#3B566C"/>
+    <text x="930" y="538" class="s">Schema auto-creates + migrates</text>
+    <text x="930" y="553" class="s">idempotently at boot</text>
+    <text x="930" y="568" class="s">Local dev: file SQLite fallback</text>
+    <text x="930" y="583" class="s">(zero-config, auto-seeded demo)</text>
+    <text x="930" y="606" class="fl">Data survives every deploy —</text>
+    <text x="930" y="621" class="fl">verified on production</text>
+
+    <!-- app-internal arrows -->
+    <path class="ln" d="M306 354 H328"/>
+    <path class="ln" d="M306 480 H328"/>
+    <path class="lnG" d="M306 614 H328"/>
+    <path class="ln" d="M610 375 H632"/>
+    <path class="ln" d="M610 516 H632"/>
+    <path class="lnA" d="M610 626 H632"/>
+    <path class="ln" d="M894 375 H916"/>
+    <path class="ln" d="M894 516 H916"/>
+    <path class="ln" d="M894 626 H916"/>
+    <path class="lnB" d="M730 246 V264"/>
+
+    <!-- ===================== ZONE: EXTERNAL ===================== -->
+    <rect x="1195" y="18" width="285" height="668" class="zone" rx="14"/>
+    <text x="1211" y="40" class="zl">EXTERNAL SERVICES</text>
+    <rect x="1211" y="52" width="253" height="66" class="box" rx="10"/>
+    <text x="1222" y="72" class="t">Google OAuth</text>
+    <text x="1222" y="88" class="s">② Sign in with Google</text>
+    <text x="1222" y="102" class="s">redirect: /auth/google/callback</text>
+    <rect x="1211" y="130" width="253" height="66" class="boxgrn" rx="10"/>
+    <text x="1222" y="150" class="t">Brevo (HTTPS email API)</text>
+    <text x="1222" y="166" class="s">① OTP codes · welcome · alerts</text>
+    <text x="1222" y="180" class="s">SMTP self-heals → API fallback</text>
+    <rect x="1211" y="208" width="253" height="66" class="box" rx="10"/>
+    <text x="1222" y="228" class="t">Twilio (SMS)</text>
+    <text x="1222" y="244" class="s">③ phone OTP · job alert texts</text>
+    <text x="1222" y="258" class="s">rate-capped (costs real money)</text>
+    <rect x="1211" y="286" width="253" height="66" class="boxgrn" rx="10"/>
+    <text x="1222" y="306" class="t">Push Services (FCM / Mozilla)</text>
+    <text x="1222" y="322" class="s">⑥ VAPID-signed web push</text>
+    <text x="1222" y="336" class="s">expired subs auto-pruned</text>
+    <rect x="1211" y="364" width="253" height="80" class="box" rx="10"/>
+    <text x="1222" y="384" class="t">Employer ATS Feeds (public)</text>
+    <text x="1222" y="400" class="s">Intel · Micron · TSMC-adjacent fabs</text>
+    <text x="1222" y="414" class="s">hospitals · manufacturers via</text>
+    <text x="1222" y="428" class="s">Workday/Lever/Ashby/SmartRecruiters</text>
+    <rect x="1211" y="456" width="253" height="56" class="box" rx="10"/>
+    <text x="1222" y="476" class="t">Job APIs</text>
+    <text x="1222" y="492" class="s">Adzuna · Jooble · USAJOBS</text>
+    <rect x="1211" y="524" width="253" height="56" class="box" rx="10"/>
+    <text x="1222" y="544" class="t">Groq LLM API (free tier)</text>
+    <text x="1222" y="560" class="s">drafting · screening · translation</text>
+    <rect x="1211" y="592" width="253" height="56" class="box" rx="10"/>
+    <text x="1222" y="612" class="t">Zippopotam Geocoding</text>
+    <text x="1222" y="628" class="s">zip→lat/lon (cached forever in DB)</text>
+
+    <path class="ln" d="M1160 92 H1209"/>
+    <path class="lnG" d="M1160 160 C1190 160 1190 163 1209 163"/>
+    <path class="ln" d="M1160 238 H1209"/>
+    <path class="lnG" d="M1160 318 H1209"/>
+    <path class="lnG" d="M896 340 C1160 340 1160 400 1209 400"/>
+
+    <!-- ===================== ZONE: AUTOMATION ===================== -->
+    <rect x="20" y="708" width="1460" height="96" class="zone" rx="14"/>
+    <text x="36" y="730" class="zl">AUTOMATION & DEPLOY</text>
+    <rect x="36" y="742" width="250" height="50" class="box" rx="10"/>
+    <text x="47" y="762" class="t">GitHub · bhargavaphiny repo</text>
+    <text x="47" y="778" class="s">⑦ push to main → auto-deploy</text>
+    <rect x="306" y="742" width="215" height="50" class="box" rx="10"/>
+    <text x="317" y="762" class="t">GitHub Actions cron</text>
+    <text x="317" y="778" class="s">/healthz ping ~10min (keep-warm)</text>
+    <rect x="541" y="742" width="230" height="50" class="box" rx="10"/>
+    <text x="552" y="762" class="t">Boot sequence</text>
+    <text x="552" y="778" class="s">schema → migrate → seed → prewarm</text>
+    <rect x="791" y="742" width="215" height="50" class="box" rx="10"/>
+    <text x="802" y="762" class="t">Timers</text>
+    <text x="802" y="778" class="s">ingest 6h · cache 30m · self-ping</text>
+    <rect x="1026" y="742" width="230" height="50" class="box" rx="10"/>
+    <text x="1037" y="762" class="t">/healthz self-diagnostics</text>
+    <text x="1037" y="778" class="s">build · email · sms · google · db · admin</text>
+    <path class="ln" d="M286 767 H304"/>
+    <path class="ln" d="M521 767 H539"/>
+    <path class="ln" d="M771 767 H789"/>
+    <path class="ln" d="M1006 767 H1024"/>
+
+    <!-- ===================== LEGEND: THE 7 FLOWS ===================== -->
+    <rect x="20" y="826" width="1460" height="216" class="zone" rx="14"/>
+    <text x="36" y="848" class="zl">THE SEVEN CORE DATA FLOWS</text>
+    <text x="36" y="874" class="s">① SIGNUP — form → rate-limit check → user row (email_verified=0) → 6-digit code → Brevo → inbox → 6-box OTP screen → verified → onboarding. No unverified account passes the /app · /console guards.</text>
+    <text x="36" y="896" class="s">② GOOGLE LOGIN — button → Google consent → signed-state callback → account created pre-verified (Google proved the email) → session cookie (HMAC-signed, HttpOnly).</text>
+    <text x="36" y="918" class="s">③ PHONE LOGIN — "Email or mobile" field detects a number → Twilio SMS code → verify → session. Same 6-box UI as email.</text>
+    <text x="36" y="940" class="s">④ MATCH & APPLY — worker Work Card + credentials vs 23k live jobs → scored & ranked → one-tap apply → employer pipeline (kanban) → stage moves notify worker (in-app + push + email + SMS).</text>
+    <text x="36" y="962" class="s">⑤ CREDENTIAL VERIFICATION (the moat) — worker uploads proof photo → status: pending → admin reviews in /admin → approve = Verified badge → readiness recomputed → match scores actually move.</text>
+    <text x="36" y="984" class="s">⑥ NOTIFICATION FAN-OUT — one sendMessage() call → in-app thread + web push (even with the site closed) + throttled email + optional SMS. Job posts alert matching available workers on all channels.</text>
+    <text x="36" y="1006" class="s">⑦ INGESTION & DEPLOY — every 6h: fetch ~40 ATS feeds + 3 job APIs → dedupe/prune/retag → cache prewarm. Git push → Render builds → /healthz shows the new build hash.</text>
+    <text x="36" y="1030" class="fl">Colors: blue = request path · green = data/notification pipelines · amber = admin/trust actions · gray = internal calls</text>
+  </svg>
+  </div>
+</div>
+</body>
+</html>
