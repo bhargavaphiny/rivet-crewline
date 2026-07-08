@@ -498,7 +498,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=117">
+  <link rel="stylesheet" href="/styles.css?v=118">
   <link rel="manifest" href="/manifest.webmanifest">
   <script>if('serviceWorker' in navigator) addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));</script>
   </head><body class="${user?'app-mode':'mkt-mode'}">
@@ -1548,12 +1548,15 @@ function onboardChat({ question = '', placeholder = '', transcript = [], done = 
   });
 }
 
+// The Rivet company mark — used as the agent avatar (our brand, not a generic AI icon)
+function rivetMark(cls=''){ return `<span class="rivet-mark ${cls}">R</span>`; }
+
 // ---------- Claude-style chat primitives (reused by every agent) ----------
 function chatMsg(who, html, fresh=false){
   const isUser = who==='user';
   const av = isUser
     ? `<div class="cav cav-u">${T('You')}</div>`
-    : `<div class="cav cav-a">${icon('spark')}</div>`;
+    : `<div class="cav cav-a">${rivetMark()}</div>`;
   return `<div class="crow ${isUser?'crow-u':'crow-a'}${fresh?' crow-fresh':''}">
     ${isUser?'':av}
     <div class="cbub ${isUser?'cbub-u':'cbub-a'}">${html}</div>
@@ -1562,11 +1565,12 @@ function chatMsg(who, html, fresh=false){
 }
 function chatShell({ title, subtitle, body, composer, progress=null, progressLabel='', backHref='/app', backLabel=null }){
   return `<section class="chat-page">
-    <a class="back" href="${backHref}">← ${backLabel||T('Home')}</a>
     <div class="chat-window">
       <header class="chat-head">
-        <div class="chat-head-ic">${icon('spark')}</div>
+        <a class="chat-back" href="${backHref}" aria-label="${backLabel||T('Home')}">←</a>
+        <div class="chat-head-ic">${rivetMark()}</div>
         <div class="chat-head-tx"><b>${esc(title)}</b><span>${esc(subtitle)}</span></div>
+        <span class="chat-badge">${T('Rivet Agent')}</span>
       </header>
       ${progress!=null?`<div class="chat-prog"><div class="chat-prog-bar" style="width:${progress}%"></div><span class="chat-prog-lbl">${esc(progressLabel)}</span></div>`:''}
       <div class="chat-scroll" id="chatscroll">${body}</div>
@@ -1590,10 +1594,10 @@ function agentsHub({ mode }){
   ];
   const items = mode==='employer' ? recruiter : worker;
   return `<section class="wrap">
-    <div class="page-h"><h2>${icon('spark','xic')} ${T('Agents')}</h2><p class="muted">${T('AI that works for you — grounded in real data, explainable, free.')}</p></div>
+    <div class="page-h"><h2>${rivetMark('mk-h')} ${T('Rivet Agents')}</h2><p class="muted">${T('AI that works for you — grounded in real data, explainable, free.')}</p></div>
     <div class="agent-grid">
       ${items.map(a=>`<div class="agent-tile">
-        <div class="agent-tile-ic">${icon('spark')}</div>
+        <div class="agent-tile-ic">${rivetMark()}</div>
         <div class="agent-tile-h">${esc(a.title)}</div>
         <p class="agent-tile-d">${esc(a.desc)}</p>
         <div class="agent-act">${a.action}</div>
@@ -2132,31 +2136,34 @@ function workerProfile({ user, profile, creds, error, portfolio = [], work = [],
   const kinds = Object.entries(CRED_KINDS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
   const trades = tradesOf(profile);
   return `<section class="wrap">
-    <div class="card profile-head wide-head">
-      <div class="big-av">${initials(user.name)}</div>
-      <h2>${esc(user.name)}</h2>
-      ${profile.headline?`<p class="headline">${esc(profile.headline)}</p>`:''}
-      <div class="chips">${tradeChips(profile)}</div>
-      ${(rating.count||showUp.pct!=null)?`<div class="rating-row">${rating.count?ratingHead(rating):''} ${showUpBadge(showUp)}</div>`:''}
-      <p class="muted">${esc(profile.city)} · ${profile.years_exp} yrs · floor $${profile.pay_floor}/hr · ${esc(profile.shift)} shift</p>
-      ${xfactorBadges(profile)}
-      ${skillVerifiedRow(profile)}
-      <div class="share-row">
-        <button class="btn-sm" type="button" onclick="var u=location.origin+'/p/${user.id}';if(navigator.share){navigator.share({title:'My Rivet Work Card',url:u})}else if(navigator.clipboard){navigator.clipboard.writeText(u);this.textContent='${T('Link copied ✓')}'}">${icon('send')} ${T('Share my Work Card')}</button>
-        <a class="btn-sm ghost" href="/app/resume">${icon('star')} ${T('Download résumé')}</a>
-        <a class="btn-sm ghost" href="/p/${user.id}" target="_blank" rel="noopener">${T('Preview ↗')}</a>
+    <div class="card pfhero">
+      <div class="pfhero-top">
+        <div class="big-av">${initials(user.name)}</div>
+        <div class="pfhero-id">
+          <h2>${esc(user.name)}</h2>
+          ${profile.headline?`<p class="headline">${esc(profile.headline)}</p>`:''}
+          <div class="chips">${tradeChips(profile)}</div>
+          <p class="pfhero-meta">${esc(profile.city)} · ${profile.years_exp} ${T('yrs')} · ${T('floor')} $${profile.pay_floor}/hr · ${esc(profile.shift)} ${T('shift')}</p>
+          ${(rating.count||showUp.pct!=null)?`<div class="rating-row">${rating.count?ratingHead(rating):''} ${showUpBadge(showUp)}</div>`:''}
+        </div>
+        <div class="pfhero-actions">
+          <form method="post" action="/app/available" class="avail-form">
+            <button class="pf-avail ${profile.available?'on':'off'}">${icon('dot','xic')}<span>${profile.available?T('Available'):T('Paused')}</span></button>
+          </form>
+          <button class="btn-sm" type="button" onclick="var u=location.origin+'/p/${user.id}';if(navigator.share){navigator.share({title:'My Rivet Work Card',url:u})}else if(navigator.clipboard){navigator.clipboard.writeText(u);this.querySelector('span').textContent='${T('Link copied ✓')}'}">${icon('send')} <span>${T('Share')}</span></button>
+          <a class="btn-sm ghost" href="/app/resume">${icon('star')} ${T('Résumé')}</a>
+          <a class="btn-sm ghost" href="/p/${user.id}" target="_blank" rel="noopener">${T('Preview ↗')}</a>
+        </div>
       </div>
-      <p class="muted sm share-hint">${T('Share the live link, or download a clean résumé PDF — use it for any application, on Rivet or off.')}</p>
       <div class="ministats">
         <div><b>${profile.readiness}</b><span>${T('READINESS')}</span></div>
         <div><b>${creds.filter(c=>c.verified).length}</b><span>${T('VERIFIED')}</span></div>
         <div><b>${work.length}</b><span>${T('PAST JOBS')}</span></div>
         <div><b>${portfolio.length}</b><span>${T('PHOTOS')}</span></div>
       </div>
+      ${xfactorBadges(profile)}
+      ${skillVerifiedRow(profile)}
       ${workCardStrength(profile, creds, work, portfolio)}
-      <form method="post" action="/app/available" class="avail-form">
-        <button class="btn-sm tgl ${profile.available?'':'ghost'}">${icon('dot','xic')}<span>${profile.available?T('Available for work — tap to pause'):T('Paused — tap to go available')}</span></button>
-      </form>
     </div>
     <div class="card">
       <div class="sec-h" style="margin-top:0">${T('What makes you stand out')}</div>
