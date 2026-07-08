@@ -1428,3 +1428,14 @@ img{transition:opacity .3s ease}
   #pgbar{display:none}
   .btn,.btn-sm,.card,.snav-list a{transition:none}
 }
+
+/* ===== realistic line-icons replacing former emoji (sized per container) ===== */
+.role-opt .ro-emoji .ic{width:26px;height:26px;color:var(--brand);vertical-align:middle}
+.role-opt:has(input:checked) .ro-emoji .ic{color:var(--brand-d)}
+.sector-emoji .ic{width:30px;height:30px;color:var(--sc,var(--brand))}
+.sector-hero-emoji .ic{width:40px;height:40px;color:#fff}
+.why-emo .ic{width:20px;height:20px;color:var(--brand)}
+.auth-mailart .ic{width:30px;height:30px;color:var(--brand)}
+.auth-trust .ic{width:13px;height:13px;vertical-align:-0.15em;color:var(--muted)}
+.pw-eye .ic{width:18px;height:18px}
+.snav-foot .nav-ic{width:17px;height:17px;vertical-align:-0.2em;margin-right:8px}

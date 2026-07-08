@@ -1184,7 +1184,7 @@ const server = http.createServer(async (req,res)=>{
       await db.prepare('UPDATE users SET email_verified=1 WHERE id=?').run(user.id);
       await db.prepare('DELETE FROM email_otp WHERE email=?').run(user.email);
       // welcome them properly now that the address is proven real
-      sendEmailMsg(user.email, 'Welcome to Rivet × Crewline 🛠️',
+      sendEmailMsg(user.email, 'Welcome to Rivet × Crewline',
         `Hi ${user.name||'there'},\n\nYour email is verified — welcome aboard.\n\n`+
         (user.role==='employer'
           ? `Next steps:\n1. Set up your company page\n2. Post your first job — it matches against our worker pool instantly\n3. Review candidates on your pipeline board\n\nStart here: https://rivet-crewline.onrender.com/console`
@@ -2168,10 +2168,10 @@ const server = http.createServer(async (req,res)=>{
           await db.prepare('UPDATE applications SET stage=? WHERE id=?').run(b.stage, appId);
           // close the feedback loop: tell the worker when their status changes
           if(before && before.stage!==b.stage && before.job_id){
-            const label = { Screened:'was screened in', Interview:'was moved to Interview', Offer:'received an Offer', Hired:'was Hired 🎉', Sourced:'was added to the pipeline' }[b.stage] || `is now ${b.stage}`;
+            const label = { Screened:'was screened in', Interview:'was moved to Interview', Offer:'received an Offer', Hired:'was Hired', Sourced:'was added to the pipeline' }[b.stage] || `is now ${b.stage}`;
             try { await sendMessage(user.id, before.worker_id, `Update on "${before.title}": your application ${label}. Open Applications to see next steps.`); } catch(e){}
             if(before.alerts && before.phone && (b.stage==='Interview'||b.stage==='Offer'||b.stage==='Hired')){
-              try { await sendSms(before.phone, `Rivet: update on "${before.title}" — your application ${label.replace(' 🎉','')}. Open the app for next steps.`); } catch(e){}
+              try { await sendSms(before.phone, `Rivet: update on "${before.title}" — your application ${label}. Open the app for next steps.`); } catch(e){}
             }
           }
         }
@@ -2464,7 +2464,7 @@ const server = http.createServer(async (req,res)=>{
           for(const w of ranked){
             try {
               await db.prepare('INSERT INTO applications(job_id,worker_id,stage,score) VALUES(?,?,?,?)').run(jobId, w.user_id, 'Sourced', w.score);
-              await db.prepare('INSERT INTO notes(author_id,worker_id,body) VALUES(?,?,?)').run(user.id, w.user_id, `🤖 Sourcing Agent: ${M.TRADES[w.trade]||w.trade} fit ${w.score}/100${w.available?' · available now':''}.`);
+              await db.prepare('INSERT INTO notes(author_id,worker_id,body) VALUES(?,?,?)').run(user.id, w.user_id, `Sourcing Agent: ${M.TRADES[w.trade]||w.trade} fit ${w.score}/100${w.available?' · available now':''}.`);
               sourced++;
             } catch(e){}
           }
@@ -2490,7 +2490,7 @@ const server = http.createServer(async (req,res)=>{
               if(w.work_today) reasons.push('can work today');
               if(w.readiness>=85) reasons.push(`readiness ${w.readiness}`);
               const line = await LLM.sourceLine({ tradeLabel:M.TRADES[w.trade]||w.trade, jobTitle:job.title, score:w.score, reasons });
-              await db.prepare('INSERT INTO notes(author_id,worker_id,body) VALUES(?,?,?)').run(user.id, w.user_id, `🤖 Sourcing Agent: ${line}`);
+              await db.prepare('INSERT INTO notes(author_id,worker_id,body) VALUES(?,?,?)').run(user.id, w.user_id, `Sourcing Agent: ${line}`);
               sourced++;
             } catch(e){}
           }

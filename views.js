@@ -46,6 +46,17 @@ const ICONS = {
   users:   { f:0, p:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5a3 3 0 0 1 0 6M21 20a6 6 0 0 0-5-5.9"/>' },
   calendar:{ f:0, p:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/>' },
   chart:   { f:0, p:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>' },
+  award:   { f:0, p:'<circle cx="12" cy="9" r="6"/><path d="M8.5 13.5 7 22l5-3 5 3-1.5-8.5"/>' },
+  help:    { f:0, p:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.5 2.5 0 1 1 3.6 2.4c-.9.5-1.1 1-1.1 1.9M12 17h.01"/>' },
+  lock:    { f:0, p:'<rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>' },
+  ban:     { f:0, p:'<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6 18.4 18.4"/>' },
+  eye:     { f:0, p:'<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>' },
+  eyeoff:  { f:0, p:'<path d="M4 4 20 20"/><path d="M9.9 5.2A9.3 9.3 0 0 1 12 5c6.4 0 10 7 10 7a15.7 15.7 0 0 1-3 3.6M6.1 7C3.5 8.6 2 12 2 12s3.6 7 10 7c1 0 2-.15 2.9-.4"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>' },
+  mail:    { f:0, p:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M4 7l8 6 8-6"/>' },
+  camera:  { f:0, p:'<rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="12" cy="13.5" r="3.5"/><path d="M8.5 7 10 4h4l1.5 3"/>' },
+  chip:    { f:0, p:'<rect x="7" y="7" width="10" height="10" rx="1"/><path d="M10 3v2M14 3v2M10 19v2M14 19v2M3 10h2M3 14h2M19 10h2M19 14h2"/>' },
+  factory: { f:0, p:'<path d="M3 21V10l6 4V10l6 4V7l6 3v11z"/><path d="M7 21v-3M12 21v-3M17 21v-3"/>' },
+  hospital:{ f:0, p:'<path d="M5 21V5a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v16"/><path d="M3 21h18M12 8v6M9 11h6"/>' },
 };
 function icon(name, cls=''){
   const ic = ICONS[name] || ICONS.wrench;
@@ -359,7 +370,7 @@ const BUILTIN_ES = {
   'Posting as':'Publicando como','A company / contractor':'Una empresa / contratista','A homeowner or small business (one-off job)':'Un dueño de casa o pequeño negocio (trabajo puntual)',
   'e.g. Fix a leaking faucet':'ej. Arreglar una llave que gotea','Let workers send me a price quote (instead of a fixed pay rate)':'Permitir que los trabajadores me envíen una cotización (en vez de un pago fijo)',
   'Accepting quotes':'Acepta cotizaciones','Posted by a homeowner / small business':'Publicado por un dueño de casa / pequeño negocio','Name your price':'Pon tu precio','Homeowner':'Dueño de casa',
-  'Quote sent':'Cotización enviada','per job':'por trabajo','per hour':'por hora','per day':'por día','accepted! 🎉':'¡aceptada! 🎉','not selected':'no seleccionada','waiting on the poster':'esperando al solicitante',
+  'Quote sent':'Cotización enviada','per job':'por trabajo','per hour':'por hora','per day':'por día','accepted!':'¡aceptada!','not selected':'no seleccionada','waiting on the poster':'esperando al solicitante',
   'Your price':'Tu precio','for the job':'por el trabajo','Add a note (when you can start, what’s included)':'Agrega una nota (cuándo puedes empezar, qué incluye)','Send my price quote':'Enviar mi cotización',
   'Price quotes':'Cotizaciones','quote':'cotización','quotes':'cotizaciones','No quotes yet — they’ll appear here as workers bid.':'Aún no hay cotizaciones — aparecerán aquí cuando los trabajadores oferten.',
   'Accept quote':'Aceptar cotización','Accepted':'Aceptada','Not selected':'No seleccionada','Photos of the work':'Fotos del trabajo','candidates see these on the job':'los candidatos las ven en el empleo','your quote':'tu cotización',
@@ -487,7 +498,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=115">
+  <link rel="stylesheet" href="/styles.css?v=116">
   <link rel="manifest" href="/manifest.webmanifest">
   <script>if('serviceWorker' in navigator) addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));</script>
   </head><body class="${user?'app-mode':'mkt-mode'}">
@@ -498,7 +509,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
     <aside class="sidenav" aria-label="Primary">
       <div class="snav-top">${brand}<label for="navcb" class="snav-close" aria-label="Close menu">✕</label></div>
       <nav class="snav-list">${sideList}</nav>
-      <div class="snav-foot"><a class="nav-link" href="/support">🛟 ${T('Help & report')}</a><button id="pushbell" class="nav-link" type="button" style="display:none;background:none;border:0;cursor:pointer;width:100%;text-align:left;font:inherit;color:inherit">🔔 ${T('Enable notifications')}</button>${sideFoot}</div>
+      <div class="snav-foot"><a class="nav-link" href="/support">${icon('help','nav-ic')} <span>${T('Help & report')}</span></a><button id="pushbell" class="nav-link" type="button" style="display:none;background:none;border:0;cursor:pointer;width:100%;text-align:left;font:inherit;color:inherit">${icon('bell','nav-ic')} <span class="bell-tx">${T('Enable notifications')}</span></button>${sideFoot}</div>
     </aside>
     <label for="navcb" class="nav-scrim" aria-hidden="true"></label>
     <div class="app-body">
@@ -549,15 +560,16 @@ function layout({ title, user, body, active = '', flash = '' }) {
     if(bell && 'serviceWorker' in navigator && 'PushManager' in window && Notification.permission!=='denied'){
       navigator.serviceWorker.ready.then(function(reg){ return reg.pushManager.getSubscription(); })
         .then(function(sub){ if(!sub) bell.style.display='block'; }).catch(function(){});
+      var bellTx=bell.querySelector('.bell-tx');
       bell.addEventListener('click', function(){
-        bell.disabled=true; bell.textContent='🔔 …';
+        bell.disabled=true; if(bellTx)bellTx.textContent='…';
         function b64(s){var p='='.repeat((4-s.length%4)%4);var r=atob((s+p).replace(/-/g,'+').replace(/_/g,'/'));var a=new Uint8Array(r.length);for(var i=0;i<r.length;i++)a[i]=r.charCodeAt(i);return a;}
         Promise.all([navigator.serviceWorker.ready, fetch('/push/key').then(function(r){return r.json()})])
           .then(function(x){ if(!x[1].key) throw 0; return x[0].pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64(x[1].key)}); })
           .then(function(sub){ var j=sub.toJSON(); var f=new URLSearchParams({endpoint:j.endpoint, p256dh:j.keys.p256dh, auth:j.keys.auth});
             return fetch('/push/subscribe',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:f.toString()}); })
-          .then(function(){ bell.textContent='🔔 ${T('Notifications on')}'; setTimeout(function(){bell.style.display='none';},1500); })
-          .catch(function(){ bell.textContent='🔔 ${T('Not available')}'; bell.disabled=false; });
+          .then(function(){ if(bellTx)bellTx.textContent='${T('Notifications on')}'; setTimeout(function(){bell.style.display='none';},1500); })
+          .catch(function(){ if(bellTx)bellTx.textContent='${T('Not available')}'; bell.disabled=false; });
       });
     }
   })();
@@ -645,9 +657,9 @@ function authForm(kind, { role = 'worker', error = '', google = false, sms = fal
         ${isSignup?`
           <div class="role-seg" role="radiogroup" aria-label="${t('auth_iam')}">
             <label class="role-opt"><input type="radio" name="role" value="worker" ${role!=='employer'?'checked':''}>
-              <span class="ro-emoji">🛠️</span><span class="ro-t">${t('auth_worker_opt')}</span><span class="ro-s">${T('Find jobs & shifts')}</span></label>
+              <span class="ro-emoji">${icon('toolbox')}</span><span class="ro-t">${t('auth_worker_opt')}</span><span class="ro-s">${T('Find jobs & shifts')}</span></label>
             <label class="role-opt"><input type="radio" name="role" value="employer" ${role==='employer'?'checked':''}>
-              <span class="ro-emoji">🏗️</span><span class="ro-t">${t('auth_employer_opt')}</span><span class="ro-s">${T('Hire verified crews')}</span></label>
+              <span class="ro-emoji">${icon('building')}</span><span class="ro-t">${t('auth_employer_opt')}</span><span class="ro-s">${T('Hire verified crews')}</span></label>
           </div>
           <label>${t('auth_fullname')} <input name="name" required autocomplete="name"></label>
           <label class="emp-only">${t('auth_company')} <input name="company" autocomplete="organization"></label>
@@ -655,12 +667,12 @@ function authForm(kind, { role = 'worker', error = '', google = false, sms = fal
         <label>${isSignup?t('auth_email'):T('Email or mobile number')} <input type="${isSignup?'email':'text'}" name="email" required autocomplete="${isSignup?'email':'username'}" id="authid" ${isSignup?'':`placeholder="${T('you@example.com or +1 555 123 4567')}"`}></label>
         <label id="pwlabel">${t('auth_password')}
           <span class="pw-wrap"><input type="password" name="pass" required minlength="6" id="authpw" autocomplete="${isSignup?'new-password':'current-password'}">
-          <button type="button" class="pw-eye" id="pweye" aria-label="${T('Show password')}">👁</button></span>
+          <button type="button" class="pw-eye" id="pweye" aria-label="${T('Show password')}">${icon('eye')}</button></span>
         </label>
         <button class="btn full" type="submit" id="authsubmit">${isSignup?t('auth_create_btn'):t('auth_login_btn')}</button>
       </form>
       <p class="auth-foot">${isSignup?`${t('auth_have')} <a href="/login">${t('auth_login_btn')}</a>`:`${t('auth_new')} <a href="/signup">${t('nav_get_started')}</a>`}</p>
-      <div class="auth-trust"><span>🔒 ${T('Encrypted')}</span><span>✅ ${T('Verified employers')}</span><span>🚫 ${T('No spam, ever')}</span></div>
+      <div class="auth-trust"><span>${icon('lock')} ${T('Encrypted')}</span><span>${icon('check')} ${T('Verified employers')}</span><span>${icon('ban')} ${T('No spam, ever')}</span></div>
     </div>
   </section>
   <script>
@@ -672,7 +684,7 @@ function authForm(kind, { role = 'worker', error = '', google = false, sms = fal
         if(gb)gb.href='/auth/google?role='+v; if(pb)pb.href='/phone?role='+v;}
       radios.forEach(function(r){r.addEventListener('change',tog)}); if(radios.length)tog();
       var pw=document.getElementById('authpw'), eye=document.getElementById('pweye');
-      if(eye&&pw)eye.addEventListener('click',function(){var s=pw.type==='password';pw.type=s?'text':'password';eye.textContent=s?'🙈':'👁';});
+      if(eye&&pw){var eyeOn=${JSON.stringify(icon('eye'))},eyeOff=${JSON.stringify(icon('eyeoff'))};eye.addEventListener('click',function(){var s=pw.type==='password';pw.type=s?'text':'password';eye.innerHTML=s?eyeOff:eyeOn;});}
       // login only: typing a mobile number hides the password — we text a code instead
       var idf=document.getElementById('authid'), pwl=document.getElementById('pwlabel'), sub=document.getElementById('authsubmit');
       if(${isSignup?'false':'true'}&&idf&&pwl&&sub&&pw){
@@ -753,7 +765,7 @@ function phoneStart({ role='worker', name='', phone='', error='' }){
 function verifyEmail({ email, error='', next='' }){
   return `${authSceneOpen()}
     <div class="card auth auth-v2 auth-center">
-      <div class="auth-mailart">📬</div>
+      <div class="auth-mailart">${icon('mail')}</div>
       <h2>${T('Verify your email')}</h2>
       <p class="auth-sub">${T('We sent a 6-digit code to')} <b>${esc(email)}</b>.<br>${T('Check your inbox — and your spam folder.')}</p>
       ${error?`<div class="err">${esc(error)}</div>`:''}
@@ -773,7 +785,7 @@ function verifyEmail({ email, error='', next='' }){
 function phoneVerify({ phone, error='' }){
   return `${authSceneOpen()}
     <div class="card auth auth-v2 auth-center">
-      <div class="auth-mailart">💬</div>
+      <div class="auth-mailart">${icon('chat')}</div>
       <h2>${T('Enter your code')}</h2>
       <p class="auth-sub">${T('We sent a 6-digit code to')} <b>${esc(phone)}</b>.</p>
       ${error?`<div class="err">${esc(error)}</div>`:''}
@@ -848,7 +860,7 @@ function workerHome({ user, profile, creds, matches, workCount = 0, portCount = 
   const zipBanner = (!isNew && needZip) ? `<a class="zip-banner" href="/app/profile">${icon('pin','xic')} ${T('Add your ZIP to your Work Card to see how far each job is.')}</a>` : '';
   const expiring = creds.filter(c=>c.expires && c.expires < '2026-08').length;
   const welcome = isNew ? `<div class="card welcome">
-      <div class="welcome-h">${T('Welcome to Rivet')}, ${esc((user.name||'').split(' ')[0])} 👋</div>
+      <div class="welcome-h">${T('Welcome to Rivet')}, ${esc((user.name||'').split(' ')[0])}</div>
       <p>${T("Here's what's hiring across the country right now. Add your trade to get matched to the best-fit jobs near you — it takes a minute.")}</p>
       <div class="agent-act"><a class="btn" href="/app/onboard/chat">${icon('spark','xic')} ${T('Build my card by chat')}</a><a class="btn ghost" href="/app/profile">${T('Set up my Work Card')}</a></div>
     </div>` : '';
@@ -1468,7 +1480,7 @@ function invitePage({ user, link, joined = 0, sent = false }){
     <div class="card agent-card">
       <div class="agent-h">${icon('spark','xic')} ${T('Invite your crew')}</div>
       <p class="agent-line">${T('The fastest way to better work is to bring the people you already work with. Invite your crew — when they join, employers can hire you as a team.')}</p>
-      ${joined?`<p class="muted sm">${joined} ${joined===1?T('teammate has joined'):T('teammates have joined')} ${T('from your invites')} 🎉</p>`:''}
+      ${joined?`<p class="muted sm">${joined} ${joined===1?T('teammate has joined'):T('teammates have joined')} ${T('from your invites')}</p>`:''}
     </div>
     ${sent?`<div class="ok-card">${T('Invite sent ✓')}</div>`:''}
     <div class="card">
@@ -1655,7 +1667,7 @@ function credRow(c, editable = false){
   const reqForm = (editable && st!=='verified' && st!=='pending') ? `<form method="post" action="/app/credentials/${c.id}/verify" class="cred-verify">
       <input type="hidden" name="proof_data">
       <input name="proof_url" placeholder="${T('Link to proof (license #, URL)')}" maxlength="500">
-      <label class="btn-xs" style="cursor:pointer">${T('📷 Photo')}<input type="file" accept="image/*" hidden onchange="(function(i){var f=i.files[0];if(!f)return;if(f.size>600000){alert('${T('Max 600 KB — take a smaller photo')}');i.value='';return;}var r=new FileReader();r.onload=function(){i.form.proof_data.value=r.result;i.form.submit();};r.readAsDataURL(f);})(this)"></label>
+      <label class="btn-xs" style="cursor:pointer">${icon('camera')} ${T('Photo')}<input type="file" accept="image/*" hidden onchange="(function(i){var f=i.files[0];if(!f)return;if(f.size>600000){alert('${T('Max 600 KB — take a smaller photo')}');i.value='';return;}var r=new FileReader();r.onload=function(){i.form.proof_data.value=r.result;i.form.submit();};r.readAsDataURL(f);})(this)"></label>
       <button class="btn-xs">${T('Submit for review')}</button>
     </form>` : '';
   const note = (editable && (st==='pending'||st==='review')) ? `<div class="cred-ex">${T('Our team reviews proofs within 48h.')}</div>` : '';
@@ -1807,7 +1819,7 @@ function jobDetail({ job, match, applied, saved = false, jobMedia = [], distance
            <p class="muted sm" style="text-align:center;margin-top:8px">${T('You’ll finish on their site — and we’ll track it in')} <a href="/app/applications">${T('your applications')}</a> ${T('so you never lose it.')}</p>`
         : (job.quotes_ok
           ? (myQuote
-            ? `<div class="ok-card">${T('Quote sent')}: <b>$${myQuote.amount} ${T('per '+(myQuote.unit||'job'))}</b>${myQuote.status==='accepted'?` — <b>${T('accepted! 🎉')}</b>`:myQuote.status==='declined'?` — ${T('not selected')}`:` · ${T('waiting on the poster')}`}</div>`
+            ? `<div class="ok-card">${T('Quote sent')}: <b>$${myQuote.amount} ${T('per '+(myQuote.unit||'job'))}</b>${myQuote.status==='accepted'?` — <b>${T('accepted!')}</b>`:myQuote.status==='declined'?` — ${T('not selected')}`:` · ${T('waiting on the poster')}`}</div>`
             : `<form method="post" action="/app/jobs/${job.id}/quote" class="quote-form">
                 <div class="qf-row"><span class="qf-cur">$</span><input type="number" name="amount" min="1" step="1" placeholder="${T('Your price')}" required>
                   <select name="unit"><option value="job">${T('for the job')}</option><option value="hour">${T('per hour')}</option><option value="day">${T('per day')}</option></select></div>
@@ -1963,7 +1975,7 @@ function workerOffers({ requests = [], interested = [], pending = 0, count = 0 }
     ${confirmed.length ? `<div class="sec-h big" style="margin-top:22px">${T('Confirmed interviews')}</div>
       ${confirmed.map(iv=>`<div class="card offer-card ok"><div class="oc-top"><div class="badge">${tradeEmoji(iv.trade)}</div>
         <div class="oc-main"><h4>${esc(iv.title||'')}</h4><div class="muted">${esc(iv.company||'')}</div></div></div>${interviewWorker(iv)}
-        <div class="oc-act"><a class="btn-xs ghost" href="/ics/interview/${iv.id}">${T('📅 Add to calendar')}</a></div></div>`).join('')}` : ''}
+        <div class="oc-act"><a class="btn-xs ghost" href="/ics/interview/${iv.id}">${icon('calendar')} ${T('Add to calendar')}</a></div></div>`).join('')}` : ''}
     ${interested.length ? `<div class="sec-h big" style="margin-top:22px">${T('Employers interested in you')} <span class="hot-ct soft">${interested.length}</span></div>
       <p class="muted sm" style="margin-top:-6px">${T('These employers saved your Work Card. Message them to get on their radar before the interview request.')}</p>
       ${interested.map(e=>`<div class="card offer-card"><div class="oc-top"><div class="badge">${icon('company','xic')}</div>
@@ -2772,7 +2784,7 @@ function careerGuide({ trade, employers = [], metros = [], openCount = 0 }){
     <a class="back" href="/careers">← ${T('All career guides')}</a>
     <div class="card guide-hero" style="--sc:${sm?sm.color:'#E8923A'}">
       <div class="guide-top"><span class="trend-ic">${tradeEmoji(trade)}</span>
-        <div><h1>${esc(label)}</h1>${sm?`<a class="guide-sector" href="/sectors/${r.sector}">${sm.emoji} ${T(sm.label)}</a>`:''}</div></div>
+        <div><h1>${esc(label)}</h1>${sm?`<a class="guide-sector" href="/sectors/${r.sector}">${icon(sm.ic,'xic')} ${T(sm.label)}</a>`:''}</div></div>
       ${r?`<p class="guide-what">${T(r.what)}</p>
       <div class="guide-kpis">
         <div class="skpi"><b>$${r.med.toLocaleString()}</b><span>${T('median/yr')} · ~$${hr}/hr</span></div>
@@ -2820,7 +2832,7 @@ function careerHub(items = []){
   return `<section class="wrap">
     <div class="sec-h big">${T('Career guides')} <span class="muted">${T('Everything about the jobs we place')}</span></div>
     <p class="muted" style="margin:-6px 0 16px;max-width:640px">${T('Real U.S. Bureau of Labor Statistics pay & outlook, the credentials that matter, who’s hiring, where, and a mock interview — for every role on Rivet.')}</p>
-    ${Object.entries(bySec).map(([sec,list])=>{ if(!list.length) return ''; const sm=SECTOR_META[sec]; return `<div class="sec-h">${sm.emoji} ${T(sm.label)}</div>
+    ${Object.entries(bySec).map(([sec,list])=>{ if(!list.length) return ''; const sm=SECTOR_META[sec]; return `<div class="sec-h">${icon(sm.ic,'xic')} ${T(sm.label)}</div>
       <div class="track-grid">${list.map(it=>{ const r=ROLE_BLS[it.trade]; return `<a class="card track-card" href="/careers/${it.trade}">
         <div class="track-h"><span class="trend-ic">${tradeEmoji(it.trade)}</span><div><b>${esc(TRADES[it.trade]||it.trade)}</b><div class="muted sm">$${r.med.toLocaleString()}/yr · ${esc(r.growth)}${it.openCount?` · ${it.openCount} ${T('open')}`:''}</div></div></div>
         <p class="track-why">${T(r.what)}</p><span class="sector-go">${T('Full guide')} →</span></a>`; }).join('')}</div>`; }).join('')}
@@ -3246,7 +3258,7 @@ function usMap(points = [], opts = {}){
 function empOverview({ user, kpis, funnel, recent, hot, alerts, fillRate, geo = [], isNew = false, talentTotal = 0 }) {
   const maxF = Math.max(1, ...STAGES.map(s=>funnel[s]||0));
   const welcome = isNew ? `<div class="card welcome">
-      <div class="welcome-h">${T('Welcome to Crewline')}, ${esc((user.name||'').split(' ')[0])} 👋</div>
+      <div class="welcome-h">${T('Welcome to Crewline')}, ${esc((user.name||'').split(' ')[0])}</div>
       <p>${T('There are')} <b>${talentTotal.toLocaleString()}</b> ${T('verified blue-collar workers ready across the U.S. Post your first job and we’ll match you instantly — see who’s available on the map below.')}</p>
       <a class="btn" href="/console/jobs/new">${T('Post your first job')}</a>
     </div>` : '';
@@ -3380,7 +3392,7 @@ const COMPANY_SIZES = ['1–10','11–50','51–200','201–500','500+'];
 function empCompany({ user, saved = false, welcome = false, rating = {avg:0,count:0}, reviews = [], payRep = {}, rehire = 0, safety = {} }) {
   const sizeOpts = `<option value="">Company size</option>`+COMPANY_SIZES.map(s=>`<option ${user.company_size===s?'selected':''}>${s}</option>`).join('');
   return `<section class="wrap narrow">
-    ${welcome?`<div class="card welcome"><div class="welcome-h">${T('Welcome to Crewline')} 👋</div><p>${T('First, add your company so candidates trust your jobs. Then post your first role — takes a minute.')}</p></div>`:''}
+    ${welcome?`<div class="card welcome"><div class="welcome-h">${T('Welcome to Crewline')}</div><p>${T('First, add your company so candidates trust your jobs. Then post your first role — takes a minute.')}</p></div>`:''}
     <div class="card profile-head">
       <div class="big-av c">${initials(user.company||user.name)}</div>
       <h2>${esc(user.company||'Your company')}</h2>
@@ -3776,13 +3788,13 @@ function ogImage() {
 
 // ---------- GTM sector pages (Manufacturing / Healthcare / Semiconductor) ----------
 const SECTOR_META = {
-  semiconductor: { label:'Semiconductor', emoji:'🔬', color:'#3F7CAC',
+  semiconductor: { label:'Semiconductor', ic:'chip', color:'#3F7CAC',
     tag:'Build the chips that power America',
     blurb:'The CHIPS Act is funding the biggest semiconductor build-out in U.S. history — fabs nationwide need equipment, process and facilities technicians. Paid training, no four-year degree required. Browse the real openings below.' },
-  manufacturing: { label:'Manufacturing', emoji:'🏭', color:'#E8923A',
+  manufacturing: { label:'Manufacturing', ic:'factory', color:'#E8923A',
     tag:'Make the things that move the world',
     blurb:'From EVs to jet engines, American manufacturers need welders, machinists, assemblers and maintenance techs. Real wages, real benefits, real ladders. Every role below is a live opening with a direct apply link.' },
-  healthcare: { label:'Healthcare', emoji:'🏥', color:'#E0556E',
+  healthcare: { label:'Healthcare', ic:'hospital', color:'#E0556E',
     tag:'Frontline healthcare careers',
     blurb:'Hospitals and clinics are short-staffed nationwide. Start as a CNA, patient-care, sterile-processing or surgical tech — with a clear path up to nursing. Browse the real openings below.' },
 };
@@ -3792,7 +3804,7 @@ function sectorHub(cards = []){
     <p class="muted" style="margin:-6px 0 18px;max-width:640px">${T('We package Rivet for the sectors hiring hardest right now — with real employers, sector-specific credentials, and a talent pool built for each industry.')}</p>
     <div class="grid3">
       ${cards.map(c=>{const m=SECTOR_META[c.key];return `<a class="card sector-card" href="/sectors/${c.key}" style="--sc:${m.color}">
-        <div class="sector-emoji">${m.emoji}</div>
+        <div class="sector-emoji">${icon(m.ic,'xic')}</div>
         <div class="sector-nm">${T(m.label)}</div>
         <p class="muted sm">${T(m.tag)}</p>
         <div class="sector-stats"><span><b>${(c.count||0).toLocaleString()}</b> ${T('live openings')}</span><span><b>${c.employers}</b> ${T('top employers')}</span>${c.payHi?`<span><b>$${c.payLo}–${c.payHi}</b>/hr</span>`:''}</div>
@@ -3807,7 +3819,7 @@ function sectorPage({ key, count, metros, payLo, payHi, employers = [], roles = 
   return `<section class="wrap">
     <a class="back" href="/sectors">← ${T('All industries')}</a>
     <div class="card sector-hero" style="--sc:${m.color}">
-      <div class="sector-hero-emoji">${m.emoji}</div>
+      <div class="sector-hero-emoji">${icon(m.ic,'xic')}</div>
       <h1>${T(m.label)} ${T('jobs on Rivet')}</h1>
       <p class="sector-tag">${T(m.tag)}</p>
       <p class="sector-blurb">${T(m.blurb)}</p>
@@ -3852,9 +3864,9 @@ function whyPage(){
     ['pin', T('Free, bilingual, mobile-first'), T('Always free for workers. Full English/Spanish. Built for a phone in a work glove — not a desktop HR portal.')],
   ];
   const sectors = [
-    ['🔬', T('Semiconductor'), T('Equipment, process, fab & probe technicians at every major US fab — Intel, Micron, GlobalFoundries, Samsung, NXP, TI, onsemi, Applied Materials, KLA and more.')],
-    ['🏭', T('Manufacturing'), T('Welders, machinists, CNC & production operators, industrial maintenance — Caterpillar, Magna, Cummins, Tyson, Trane, Johnson Controls and dozens more.')],
-    ['⚕️', T('Healthcare support'), T('CNAs, home-health & personal-care aides, LPNs, pharmacy & sterile-processing techs — BAYADA, Providence, CVS, Brookdale, Sanford and major hospital systems.')],
+    ['chip', T('Semiconductor'), T('Equipment, process, fab & probe technicians at every major US fab — Intel, Micron, GlobalFoundries, Samsung, NXP, TI, onsemi, Applied Materials, KLA and more.')],
+    ['factory', T('Manufacturing'), T('Welders, machinists, CNC & production operators, industrial maintenance — Caterpillar, Magna, Cummins, Tyson, Trane, Johnson Controls and dozens more.')],
+    ['cross', T('Healthcare support'), T('CNAs, home-health & personal-care aides, LPNs, pharmacy & sterile-processing techs — BAYADA, Providence, CVS, Brookdale, Sanford and major hospital systems.')],
   ];
   const emp = [
     [T('Verified, job-ready crews'), T('Every candidate carries a checked Work Card, Show-Up Score and skill badges — you see readiness before you ever message.')],
@@ -3874,7 +3886,7 @@ function whyPage(){
     <div class="sec-h">${T('What makes it different')}</div>
     <div class="why-grid wide">${wins.map(([ic,h,b])=>`<div class="why-item card"><span class="why-ic">${icon(ic)}</span><div><b>${h}</b><p class="muted sm">${b}</p></div></div>`).join('')}</div>
     <div class="sec-h">${T('Deep in the sectors that are hiring')}</div>
-    <div class="why-grid wide">${sectors.map(([e,h,b])=>`<div class="why-item card"><span class="why-emo">${e}</span><div><b>${h}</b><p class="muted sm">${b}</p></div></div>`).join('')}</div>
+    <div class="why-grid wide">${sectors.map(([e,h,b])=>`<div class="why-item card"><span class="why-emo">${icon(e,'xic')}</span><div><b>${h}</b><p class="muted sm">${b}</p></div></div>`).join('')}</div>
     <div class="sec-h">${T('For employers — this is Crewline')}</div>
     <div class="why-grid">${emp.map(([h,b])=>`<div class="why-item card"><span class="why-ic">${icon('check')}</span><div><b>${h}</b><p class="muted sm">${b}</p></div></div>`).join('')}</div>
     <div class="card why-foot">
