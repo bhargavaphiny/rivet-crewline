@@ -498,7 +498,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
     <aside class="sidenav" aria-label="Primary">
       <div class="snav-top">${brand}<label for="navcb" class="snav-close" aria-label="Close menu">✕</label></div>
       <nav class="snav-list">${sideList}</nav>
-      <div class="snav-foot"><button id="pushbell" class="nav-link" type="button" style="display:none;background:none;border:0;cursor:pointer;width:100%;text-align:left;font:inherit;color:inherit">🔔 ${T('Enable notifications')}</button>${sideFoot}</div>
+      <div class="snav-foot"><a class="nav-link" href="/support">🛟 ${T('Help & report')}</a><button id="pushbell" class="nav-link" type="button" style="display:none;background:none;border:0;cursor:pointer;width:100%;text-align:left;font:inherit;color:inherit">🔔 ${T('Enable notifications')}</button>${sideFoot}</div>
     </aside>
     <label for="navcb" class="nav-scrim" aria-hidden="true"></label>
     <div class="app-body">
@@ -2520,7 +2520,7 @@ function shiftCard(s){
     </div>
   </div>`;
 }
-function shiftsBoard({ shifts = [], showUp = null, claims = [], conflict = false, openToExtra = false }){
+function shiftsBoard({ shifts = [], showUp = null, claims = [], conflict = false, lowrep = false, today = '', openToExtra = false }){
   let weekPanel = '';
   if(claims.length){
     const byDate = {}; let total=0, hoursTotal=0;
@@ -2530,13 +2530,14 @@ function shiftsBoard({ shifts = [], showUp = null, claims = [], conflict = false
       <div class="week-h"><div><div class="agent-h">${icon('check','xic')} ${T('My week')}</div>
         <p class="muted sm" style="margin:2px 0 0">${claims.length} ${claims.length===1?T('gig'):T('gigs')} · ${hoursTotal} ${T('hrs')} · ${days.length} ${days.length===1?T('employer'):T('employers')}</p></div>
         <div class="week-earn"><b>~$${total.toLocaleString()}</b><span>${T('projected')}</span></div></div>
-      ${days.map(d=>`<div class="week-day"><span class="week-date">${fmtShiftDate(d)}</span><div class="week-gigs">${byDate[d].map(g=>`<span class="week-gig">${tradeEmoji(g.trade)} ${esc(g.company)} · ${t12(g.start_time)}–${t12(g.end_time)} · <b>$${g.earn}</b></span>`).join('')}</div></div>`).join('')}
+      ${days.map(d=>`<div class="week-day"><span class="week-date">${fmtShiftDate(d)}</span><div class="week-gigs">${byDate[d].map(g=>`<span class="week-gig">${tradeEmoji(g.trade)} ${esc(g.company)} · ${t12(g.start_time)}–${t12(g.end_time)} · <b>$${g.earn}</b>${g.checkin_at?` <span class="v ok" style="font-size:10px">${T('Arrived ✓')}</span>`:(today&&g.date===today?` <form method="post" action="/app/shifts/${g.shift_id}/checkin" style="display:inline"><button class="btn-xs">${T('I’ve arrived')}</button></form>`:'')}</span>`).join('')}</div></div>`).join('')}
       <p class="muted sm" style="margin-top:8px">${T('Stack as many as you can work — Rivet keeps your schedule clear of double-bookings.')}</p>
     </div>`;
   }
   return `<section class="wrap">
     <div class="sec-h big">${icon('bolt','xic')} ${T('Open shifts & contracts')} <span class="muted">${T('Get paid this week — no agency, no résumé')}</span></div>
     ${conflict?`<div class="warn-card">${T('That shift overlaps one you already claimed — pick a different time so you’re not double-booked.')}</div>`:''}
+    ${lowrep?`<div class="warn-card">${T('Urgent shifts need a Show-Up Score of 80%+. Build your score back up: claim a regular shift and tap “I’ve arrived” when you get there.')}</div>`:''}
     <div class="card shift-banner"><div class="sb-txt">${T('Verified workers claim open shifts straight from the employer — per-diem, contract and travel. Stack multiple jobs, keep your full rate; we cut out the staffing agency.')}</div>
       ${showUp!=null?`<span class="shift-su">${icon('check')} ${T('Your Show-Up Score')}: <b>${showUp}%</b></span>`:`<span class="shift-su muted sm">${T('Verify your Work Card to claim faster')}</span>`}</div>
     ${weekPanel}
@@ -3736,10 +3737,16 @@ function empCandidate({ worker, profile, creds, matches, apps, messages, meId, n
 }
 
 // ---------- employer: shortlist ----------
-function empShortlist({ rows }) {
+function empShortlist({ rows, bench = [] }) {
   return `<section class="wrap">
     <div class="page-h"><h2>${T('Shortlist')}</h2><p class="muted">${rows.length} ${rows.length===1?T('saved candidate'):T('saved candidates')}</p>
       <a class="btn-sm right" href="/console/search">${T('Talent Search')}</a></div>
+    ${bench.length?`<div class="sec-h big">${T('Your Crew Bench')} <span class="muted sm">${T('people you already hired — rebooking beats re-sourcing')}</span></div>
+    <div class="card" style="padding:0"><table class="tbl wide"><tr><th>${T('Worker')}</th><th>${T('Trade')}</th><th>${T('Times hired')}</th><th>${T('Last job')}</th><th></th></tr>
+      ${bench.map(w=>`<tr><td><a class="cand-link" href="/console/candidates/${w.id}"><span class="av-t">${initials(w.name)}</span> ${esc(w.name)}</a></td>
+        <td>${TRADES[w.trade]||w.trade||''}</td><td><b>${w.hires}×</b></td><td class="muted">${esc(w.last_job||'')}</td>
+        <td><a class="btn-xs" href="/console/messages/${w.id}">${T('Rebook →')}</a></td></tr>`).join('')}
+    </table></div>`:''}
     ${rows.length ? `<div class="card" style="padding:0"><table class="tbl wide"><tr><th>Candidate</th><th>Trade</th><th>Exp</th><th>Readiness</th><th>Pay floor</th></tr>
       ${rows.map(w=>`<tr><td><a class="cand-link" href="/console/candidates/${w.id}"><span class="av-t">${initials(w.name)}</span> ${esc(w.name)}</a>${w.available?`<span class="avail-dot" title="Available for work">${icon('dot')}</span>`:''}${w.work_today?`<span class="today-chip" title="Can work today">${icon('bolt')}</span>`:''}${w.relocate?`<span class="today-chip" title="Open to relocate">${icon('send')}</span>`:''}</td>
         <td>${TRADES[w.trade]||w.trade}</td><td>${w.years_exp} yr</td>
@@ -3890,7 +3897,7 @@ function whyRivetBlock(){
 }
 
 // ---------- admin: credential review + moderation ----------
-function adminPanel({ pending, users, jobs, stats, q }){
+function adminPanel({ pending, users, jobs, stats, q, reports = [] }){
   return `<section class="wrap">
     <h2 style="margin:14px 0 4px">Admin</h2>
     <p class="muted sm">Credential review, user lookup, job moderation. Access limited to ADMIN_EMAILS.</p>
@@ -3906,6 +3913,12 @@ function adminPanel({ pending, users, jobs, stats, q }){
         <form method="post" action="/admin/creds/${c.id}/approve"><button class="btn-xs">✓ Approve</button></form>
         <form method="post" action="/admin/creds/${c.id}/reject"><button class="btn-xs ghost" style="color:#B3372C">✕ Reject</button></form>
       </div>`).join('') : `<div class="card muted">Queue is empty — nothing awaiting review.</div>`}
+    <div class="sec-h big">Problem reports ${reports.length?`<span class="hot-ct">${reports.length}</span>`:''}</div>
+    ${reports.length ? reports.map(r=>`<div class="card" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+        <div style="flex:1;min-width:240px"><b>${esc(r.uname||'(deleted user)')}</b> <span class="muted sm">${esc(r.uemail||'')} · ${esc(String(r.created_at||'').slice(0,16))}${r.page?` · ${esc(r.page)}`:''}</span>
+          <div style="margin-top:4px">${esc(r.body)}</div></div>
+        <form method="post" action="/admin/reports/${r.id}/close"><button class="btn-xs">✓ Resolve</button></form>
+      </div>`).join('') : `<div class="card muted">No open reports.</div>`}
     <div class="sec-h big">Users</div>
     <form method="get" action="/admin" class="inline-form" style="margin-bottom:10px">
       <input name="q" value="${esc(q||'')}" placeholder="Search email or name"><button class="btn-sm">Search</button>
@@ -3919,6 +3932,23 @@ function adminPanel({ pending, users, jobs, stats, q }){
       <div style="flex:1;min-width:200px"><b>${esc(j.title||'')}</b><div class="muted sm">${esc(j.company||'')} · ${esc(j.city||'')} · ${esc(j.status)}</div></div>
       ${j.status==='open'?`<form method="post" action="/admin/jobs/${j.id}/close"><button class="btn-xs ghost" style="color:#B3372C">Close job</button></form>`:''}
     </div>`).join('')}
+  </section>`;
+}
+
+// ---------- support: report a problem (feeds the /admin queue) ----------
+function supportPage({ok=false}={}){
+  return `<section class="wrap narrow" style="padding:26px 16px">
+    <h2>${T('Help & support')}</h2>
+    <p class="muted sm">${T('Something broken, wrong, or unfair? Tell us — reports go straight to the team and are reviewed daily.')}</p>
+    ${ok?`<div class="ok-card">${T('Got it — thank you. We read every report.')}</div>`:''}
+    <div class="card">
+      <form method="post" action="/support">
+        <label>${T('What happened?')} <textarea name="body" rows="5" maxlength="1000" required placeholder="${T('e.g. I applied to a job 2 weeks ago and never heard back / this posting looks fake / the app showed an error')}"></textarea></label>
+        <label>${T('Where? (optional)')} <input name="page" maxlength="120" placeholder="${T('page or job title')}"></label>
+        <button class="btn full" type="submit">${T('Send report')}</button>
+      </form>
+    </div>
+    <p class="muted sm" style="margin-top:10px">${T('Urgent safety issue on a job site? Contact local authorities first.')}</p>
   </section>`;
 }
 
@@ -3959,5 +3989,5 @@ function legalPage(kind, user){
   return `<section class="wrap narrow" style="padding:26px 16px">${body}</section>`;
 }
 
-module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, verifyEmail, adminPanel, legalPage, workerOnboard, workerHome, workerJobs,
+module.exports = { setLang, setEs, drainEsMisses, layout, landing, authForm, phoneStart, phoneVerify, verifyEmail, adminPanel, legalPage, supportPage, workerOnboard, workerHome, workerJobs,
   jobDetail, workerProfile, resumeDoc, workerApplications, workerOffers, publicPortfolio, empOverview, empAnalytics, empJobs, empJobForm, empPipeline, empSearch, empCandidate, empShortlist, inbox, ogImage, STAGES, JOB_TYPES, DURATIONS, empCompany, workerTraining, pulsePage, publicJob, workerCoach, agentApplyResult, onboardChat, agentsHub, workHub, SPONSORSHIP, SECTOR_META, sectorHub, sectorPage, mockInterview, LEARN_TRACKS, ROLE_BLS, careerHub, careerGuide, landJob, trustVerdict, trustCard, earnLearn, credPrep, credPrepIndex, credPath, gradeQuiz, skillCheckIndex, skillCheck, gradeSkill, skillKeyFor, parseSkillchecks, skillVerifiedRow, growHub, invitePage, shiftsBoard, sourcingAgent, empShifts, empShiftForm, voiceAgent, whyPage, SHIFT_KINDS, REGISTRY };

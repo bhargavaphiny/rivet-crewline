@@ -174,6 +174,14 @@ async function createSchema() {
       expires TEXT NOT NULL,
       created_at TEXT DEFAULT (datetime('now'))
     );
+    CREATE TABLE IF NOT EXISTS reports (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER REFERENCES users(id),
+      body TEXT NOT NULL,
+      page TEXT,
+      status TEXT DEFAULT 'open',
+      created_at TEXT DEFAULT (datetime('now'))
+    );
     CREATE TABLE IF NOT EXISTS push_subs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER REFERENCES users(id),
@@ -1383,6 +1391,7 @@ async function migrate() {
   try { await db.exec('ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 1'); } catch (e) { /* column exists */ }
   // brute-force guard: wrong-code attempts per live OTP (code dies after 5 misses)
   try { await db.exec('ALTER TABLE email_otp ADD COLUMN tries INTEGER DEFAULT 0'); } catch (e) { /* column exists */ }
+  try { await db.exec('ALTER TABLE shift_claims ADD COLUMN checkin_at TEXT'); } catch (e) { /* arrival check-in feeds Show-Up Score */ }
   try { await db.exec('ALTER TABLE otp ADD COLUMN tries INTEGER DEFAULT 0'); } catch (e) { /* column exists */ }
   // indexes on migrated columns — must run after the ALTERs above, not in createSchema()
   try { await db.exec('CREATE INDEX IF NOT EXISTS idx_jobs_status_sector ON jobs(status, sector)'); } catch (e) { console.error('[db] idx_jobs_status_sector:', e.message); }

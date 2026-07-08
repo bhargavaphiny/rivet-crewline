@@ -608,7 +608,13 @@ async function reviewsFor(subjectId, kind, limit=8){
 // Show-Up Score: % of completed starts where the worker showed up.
 async function showUp(workerId){
   const r = await db.prepare("SELECT COUNT(*) total, SUM(CASE WHEN outcome='showed' THEN 1 ELSE 0 END) showed FROM applications WHERE worker_id=? AND outcome IS NOT NULL AND outcome!='cancelled'").get(workerId);
-  const total = r && r.total || 0; const showed = r && r.showed || 0;
+  let total = r && r.total || 0, showed = r && r.showed || 0;
+  // shift arrival check-ins add positive signal (unchecked past shifts are NOT counted
+  // against the worker — the check-in feature is opt-in evidence, not surveillance)
+  try {
+    const s2 = await db.prepare('SELECT COUNT(*) c FROM shift_claims WHERE worker_id=? AND checkin_at IS NOT NULL').get(workerId);
+    total += (s2 && s2.c) || 0; showed += (s2 && s2.c) || 0;
+  } catch(e){}
   return { starts: total, pct: total ? Math.round((showed/total)*100) : null };
 }
 // Paid-Like-Promised: % of an employer's completed jobs paid on time.
@@ -1339,7 +1345,8 @@ const server = http.createServer(async (req,res)=>{
           verified: (await db.prepare("SELECT COUNT(*) c FROM credentials WHERE verify_status='verified'").get()).c,
           pending: pending.length,
         };
-        return send(res, V.layout({title:'Admin',user,body:V.adminPanel({pending,users,jobs,stats,q})}));
+        const reports = await db.prepare(`SELECT r.*, u.name uname, u.email uemail FROM reports r LEFT JOIN users u ON u.id=r.user_id WHERE r.status='open' ORDER BY r.id DESC LIMIT 30`).all();
+        return send(res, V.layout({title:'Admin',user,body:V.adminPanel({pending,users,jobs,stats,q,reports})}));
       }
       const credAct = p.match(/^\/admin\/creds\/(\d+)\/(approve|reject)$/);
       if(credAct && method==='POST'){
@@ -1359,6 +1366,11 @@ const server = http.createServer(async (req,res)=>{
         const m = pr.match(/^data:(image\/(?:png|jpe?g|webp));base64,(.+)$/s);
         if(m){ res.writeHead(200,{'Content-Type':m[1]}); return res.end(Buffer.from(m[2],'base64')); }
         if(/^https?:\/\//i.test(pr)) return redirect(res, pr);
+        return redirect(res,'/admin');
+      }
+      const repClose = p.match(/^\/admin\/reports\/(\d+)\/close$/);
+      if(repClose && method==='POST'){
+        await db.prepare("UPDATE reports SET status='closed' WHERE id=?").run(Number(repClose[1]));
         return redirect(res,'/admin');
       }
       const jobClose = p.match(/^\/admin\/jobs\/(\d+)\/close$/);
@@ -1395,6 +1407,20 @@ const server = http.createServer(async (req,res)=>{
       } catch(e){ console.error('account delete', e.message); }
       clearSession(req, res);
       return redirect(res,'/');
+    }
+
+    // ---- support: report a problem -> admin queue ----
+    if(p==='/support' && method==='GET'){
+      if(!user) return redirect(res,'/login');
+      return send(res, V.layout({title:'Help & support', user, body:V.supportPage({ok:url.searchParams.get('ok')==='1'})}));
+    }
+    if(p==='/support' && method==='POST'){
+      if(!user) return redirect(res,'/login');
+      const b = await readBody(req);
+      const body = String(b.body||'').trim().slice(0,1000);
+      if(body && !rateLimited('report:'+user.id, 5, 60*60*1000))
+        await db.prepare('INSERT INTO reports(user_id,body,page) VALUES(?,?,?)').run(user.id, body, String(b.page||'').slice(0,120));
+      return redirect(res,'/support?ok=1');
     }
 
     // ---- web push subscription (any logged-in user) ----
@@ -1929,12 +1955,20 @@ const server = http.createServer(async (req,res)=>{
         const shifts = rows.map(s=>{ const dist = (home && s.lat!=null) ? Math.round(haversineMi(home,{lat:s.lat,lon:s.lon})) : null; return {...s, claimed:claimed.has(s.id), distance:dist, mine:trades.has(s.trade)}; })
           .sort((a,b)=> (b.mine?1:0)-(a.mine?1:0) || ((a.distance==null?1e9:a.distance)-(b.distance==null?1e9:b.distance)) || (a.date<b.date?-1:1));
         const su = await showUp(user.id);
-        const claims = await db.prepare(`SELECT sh.title, sh.trade, sh.date, sh.start_time, sh.end_time, sh.pay_rate, u.company FROM shift_claims c JOIN shifts sh ON sh.id=c.shift_id JOIN users u ON u.id=sh.employer_id WHERE c.worker_id=? AND sh.date>=? ORDER BY sh.date ASC`).all(user.id, today);
-        return send(res, V.layout({title:'Open shifts',user,active:'shifts',body:V.shiftsBoard({shifts, showUp:su.pct, claims, conflict:!!url.searchParams.get('conflict'), openToExtra:!!(prof&&prof.open_to_extra)})}));
+        const claims = await db.prepare(`SELECT c.shift_id, c.checkin_at, sh.title, sh.trade, sh.date, sh.start_time, sh.end_time, sh.pay_rate, u.company FROM shift_claims c JOIN shifts sh ON sh.id=c.shift_id JOIN users u ON u.id=sh.employer_id WHERE c.worker_id=? AND sh.date>=? ORDER BY sh.date ASC`).all(user.id, today);
+        return send(res, V.layout({title:'Open shifts',user,active:'shifts',body:V.shiftsBoard({shifts, showUp:su.pct, claims, conflict:!!url.searchParams.get('conflict'), lowrep:!!url.searchParams.get('lowrep'), today, openToExtra:!!(prof&&prof.open_to_extra)})}));
+      }
+      if(jid && p===`/app/shifts/${jid}/checkin` && method==='POST'){
+        await db.prepare("UPDATE shift_claims SET checkin_at=datetime('now'), status='showed' WHERE shift_id=? AND worker_id=? AND checkin_at IS NULL").run(jid, user.id);
+        return redirect(res,'/app/shifts');
       }
       if(jid && p===`/app/shifts/${jid}/claim` && method==='POST'){
         const s = await db.prepare("SELECT * FROM shifts WHERE id=? AND status='open'").get(jid);
         if(s){
+          // Reliability gating (the Instawork lesson): a proven no-show record locks
+          // urgent shifts until the score recovers — the score now has teeth.
+          const su = await showUp(user.id);
+          if(s.urgent && su.pct !== null && su.pct < 80) return redirect(res,'/app/shifts?lowrep=1');
           // conflict guard: don't let a multi-job worker double-book an overlapping time the same day
           const toMin = t => { const [h,m]=String(t).split(':').map(Number); return h*60+(m||0); };
           let aS=toMin(s.start_time), aE=toMin(s.end_time); if(aE<=aS) aE+=1440;
@@ -2350,7 +2384,12 @@ const server = http.createServer(async (req,res)=>{
         const rows = await db.prepare(`SELECT u.id,u.name,p.* FROM saved_candidates s
           JOIN users u ON u.id=s.worker_id JOIN worker_profiles p ON p.user_id=s.worker_id
           WHERE s.employer_id=? ORDER BY s.created_at DESC`).all(user.id);
-        return send(res, V.layout({title:'Shortlist',user,active:'search',body:V.empShortlist({rows})}));
+        // Crew Bench: everyone this employer has HIRED before — the winner playbook is rebooking
+        const bench = await db.prepare(`SELECT u.id, u.name, p.trade, p.readiness, MAX(j.title) last_job, COUNT(*) hires
+          FROM applications a JOIN jobs j ON j.id=a.job_id JOIN users u ON u.id=a.worker_id
+          LEFT JOIN worker_profiles p ON p.user_id=a.worker_id
+          WHERE j.employer_id=? AND a.stage='Hired' GROUP BY a.worker_id ORDER BY hires DESC, u.name`).all(user.id);
+        return send(res, V.layout({title:'Shortlist',user,active:'search',body:V.empShortlist({rows,bench})}));
       }
 
       // ---- Employer: shifts & contracts (real, employer-posted supply) ----
