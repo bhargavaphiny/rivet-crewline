@@ -1620,7 +1620,7 @@ const server = http.createServer(async (req,res)=>{
       }
       if(p==='/app/onboard/chat' && method==='GET'){
         const s = ONBOARD_STEPS[0];
-        return send(res, V.layout({title:'Onboarding Agent',user,active:'',body:V.onboardChat({question:s.q, placeholder:s.ph, transcript:[], done:false, step:0})}));
+        return send(res, V.layout({title:'Onboarding Agent',user,active:'',body:V.onboardChat({question:s.q, placeholder:s.ph, transcript:[], done:false, step:0, total:ONBOARD_STEPS.length})}));
       }
       if(p==='/app/onboard/chat' && method==='POST'){
         const b = await readBody(req);
@@ -1630,10 +1630,10 @@ const server = http.createServer(async (req,res)=>{
         const fresh = await getProfile(user.id);
         if(step >= ONBOARD_STEPS.length){
           await recomputeReadiness(user.id);
-          return send(res, V.layout({title:'Onboarding Agent',user,active:'',body:V.onboardChat({transcript:onboardTranscript(fresh, step), done:true})}));
+          return send(res, V.layout({title:'Onboarding Agent',user,active:'',body:V.onboardChat({transcript:onboardTranscript(fresh, step), done:true, step, total:ONBOARD_STEPS.length})}));
         }
         const s = ONBOARD_STEPS[step];
-        return send(res, V.layout({title:'Onboarding Agent',user,active:'',body:V.onboardChat({question:s.q, placeholder:s.ph, transcript:onboardTranscript(fresh, step), done:false, step})}));
+        return send(res, V.layout({title:'Onboarding Agent',user,active:'',body:V.onboardChat({question:s.q, placeholder:s.ph, transcript:onboardTranscript(fresh, step), done:false, step, total:ONBOARD_STEPS.length})}));
       }
       if(p==='/app/jobs' && method==='GET'){
         const f = {

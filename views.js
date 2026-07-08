@@ -498,7 +498,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=116">
+  <link rel="stylesheet" href="/styles.css?v=117">
   <link rel="manifest" href="/manifest.webmanifest">
   <script>if('serviceWorker' in navigator) addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));</script>
   </head><body class="${user?'app-mode':'mkt-mode'}">
@@ -1525,24 +1525,54 @@ function agentApplyResult({ applied = [], matches = [], already = 0, total = 0 }
   </section>`;
 }
 
-function onboardChat({ question = '', placeholder = '', transcript = [], done = false, step = 0 }){
-  return `<section class="wrap narrow">
-    <a class="back" href="/app">← ${T('Home')}</a>
-    <div class="card agent-card">
-      <div class="agent-h">${icon('spark','xic')} ${T('Onboarding Agent')}</div>
-      <p class="muted sm">${T('I’ll build your Work Card by chat — answer in your own words, in English or Spanish.')}</p>
-    </div>
-    <div class="card">
-      <div class="chat">
-        ${transcript.map(m=>`<div class="bubble ${m.role==='you'?'mine':'theirs'}"><div class="bub-body">${esc(m.text)}</div></div>`).join('')}
-        ${!done?`<div class="bubble theirs"><div class="bub-body">${esc(T(question))}</div></div>`:`<div class="bubble theirs"><div class="bub-body">${T('All set — your Work Card is ready.')} <a href="/app/profile">${T('Review it →')}</a></div></div>`}
-      </div>
-      ${!done?`<form method="post" action="/app/onboard/chat" class="msg-form" style="margin-top:12px">
+function onboardChat({ question = '', placeholder = '', transcript = [], done = false, step = 0, total = 6 }){
+  const msgs = transcript.map(m=> m.role==='you' ? chatMsg('user', m.text) : chatMsg('agent', m.text));
+  const tail = done
+    ? chatMsg('agent', `${T('All set — your Work Card is ready.')} <a href="/app/profile">${T('Review it →')}</a>`, true)
+    : chatMsg('agent', esc(T(question)), true);
+  const pct = Math.min(100, Math.round((step/total)*100));
+  const composer = done
+    ? `<div class="chat-done"><a class="btn full" href="/app">${T('Go to my Home')}</a></div>`
+    : `<form method="post" action="/app/onboard/chat" class="composer" autocomplete="off">
         <input type="hidden" name="step" value="${step}">
-        <input name="answer" placeholder="${esc(T(placeholder)||T('Type your answer…'))}" autocomplete="off" required maxlength="200" autofocus>
-        <button class="btn-sm">${T('Send')}</button>
-      </form>`:`<a class="btn" href="/app">${T('Go to my Home')}</a>`}
+        <input name="answer" class="composer-in" placeholder="${esc(T(placeholder)||T('Type your answer…'))}" autocomplete="off" required maxlength="200" autofocus>
+        <button class="composer-send" aria-label="${T('Send')}">${icon('send')}</button>
+      </form>`;
+  return chatShell({
+    title:T('Onboarding Agent'),
+    subtitle:T('I’ll build your Work Card by chat — answer in your own words, in English or Spanish.'),
+    progress: done ? 100 : pct,
+    progressLabel: done ? T('Complete') : `${T('Step')} ${Math.min(step+1,total)} / ${total}`,
+    body: msgs.join('') + tail,
+    composer
+  });
+}
+
+// ---------- Claude-style chat primitives (reused by every agent) ----------
+function chatMsg(who, html, fresh=false){
+  const isUser = who==='user';
+  const av = isUser
+    ? `<div class="cav cav-u">${T('You')}</div>`
+    : `<div class="cav cav-a">${icon('spark')}</div>`;
+  return `<div class="crow ${isUser?'crow-u':'crow-a'}${fresh?' crow-fresh':''}">
+    ${isUser?'':av}
+    <div class="cbub ${isUser?'cbub-u':'cbub-a'}">${html}</div>
+    ${isUser?av:''}
+  </div>`;
+}
+function chatShell({ title, subtitle, body, composer, progress=null, progressLabel='', backHref='/app', backLabel=null }){
+  return `<section class="chat-page">
+    <a class="back" href="${backHref}">← ${backLabel||T('Home')}</a>
+    <div class="chat-window">
+      <header class="chat-head">
+        <div class="chat-head-ic">${icon('spark')}</div>
+        <div class="chat-head-tx"><b>${esc(title)}</b><span>${esc(subtitle)}</span></div>
+      </header>
+      ${progress!=null?`<div class="chat-prog"><div class="chat-prog-bar" style="width:${progress}%"></div><span class="chat-prog-lbl">${esc(progressLabel)}</span></div>`:''}
+      <div class="chat-scroll" id="chatscroll">${body}</div>
+      <div class="chat-foot">${composer}</div>
     </div>
+    <script>(function(){var s=document.getElementById('chatscroll');if(s)s.scrollTop=s.scrollHeight;var i=document.querySelector('.composer-in');if(i)i.focus();})();</script>
   </section>`;
 }
 
@@ -1561,10 +1591,11 @@ function agentsHub({ mode }){
   const items = mode==='employer' ? recruiter : worker;
   return `<section class="wrap">
     <div class="page-h"><h2>${icon('spark','xic')} ${T('Agents')}</h2><p class="muted">${T('AI that works for you — grounded in real data, explainable, free.')}</p></div>
-    <div class="grid2">
-      ${items.map(a=>`<div class="card agent-card">
-        <div class="agent-h">${icon('spark','xic')} ${esc(a.title)}</div>
-        <p class="agent-line">${esc(a.desc)}</p>
+    <div class="agent-grid">
+      ${items.map(a=>`<div class="agent-tile">
+        <div class="agent-tile-ic">${icon('spark')}</div>
+        <div class="agent-tile-h">${esc(a.title)}</div>
+        <p class="agent-tile-d">${esc(a.desc)}</p>
         <div class="agent-act">${a.action}</div>
       </div>`).join('')}
     </div>
