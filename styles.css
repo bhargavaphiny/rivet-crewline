@@ -1531,3 +1531,19 @@ img{transition:opacity .3s ease}
 .pfhero .xf-badges,.pfhero .sv-row{padding:0 26px}
 .pfhero .wc-strength{margin:14px 26px 22px}
 @media(max-width:640px){.pfhero-top{flex-direction:column;align-items:center;text-align:center}.pfhero-id{min-width:0}.pfhero-id .chips{justify-content:center}.pfhero-actions{width:100%}.pfhero .ministats{grid-template-columns:repeat(2,1fr)}}
+
+/* ===== uniform alignment fixes (buttons + x-factor tiles) ===== */
+/* hero action buttons: identical centered layout whether <a> or <button> */
+.pfhero-actions .btn-sm,.pfhero-actions .pf-avail{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;
+  padding:11px 14px;border-radius:11px;font-size:13px;line-height:1;text-align:center}
+.pfhero-actions .btn-sm .ic{width:14px;height:14px;flex:none}
+.pfhero-actions .btn-sm span{display:inline}
+/* x-factor tiles: every tile identical — icon fixed left, label left, same height */
+.xf-grid .xbtn{display:flex;align-items:center;justify-content:flex-start;gap:10px;text-align:left;
+  min-height:54px;padding:12px 14px;line-height:1.25}
+.xf-grid .xbtn .xic{flex:none;width:17px;height:17px}
+.xf-grid .xbtn span{flex:1;text-align:left}
+/* equal-height x-factor tiles across each row */
+.xf-grid{align-items:stretch}
+.xf-grid .xf{display:flex}
+.xf-grid .xbtn{height:100%}

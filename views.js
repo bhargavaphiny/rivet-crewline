@@ -498,7 +498,7 @@ function layout({ title, user, body, active = '', flash = '' }) {
   <link rel="stylesheet" href="/vendor/markercluster/MarkerCluster.css">
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/markercluster/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="/styles.css?v=118">
+  <link rel="stylesheet" href="/styles.css?v=120">
   <link rel="manifest" href="/manifest.webmanifest">
   <script>if('serviceWorker' in navigator) addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));</script>
   </head><body class="${user?'app-mode':'mkt-mode'}">
