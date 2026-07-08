@@ -1493,13 +1493,14 @@ const server = http.createServer(async (req,res)=>{
       if(p==='/app/messages' && method==='GET'){
         await db.prepare("UPDATE messages SET read_at=datetime('now') WHERE to_id=? AND read_at IS NULL").run(user.id);
         const convos = await getConversations(user.id);
-        return send(res, V.layout({title:'Messages',user:{...user,unread:0},active:'msgs',body:V.inbox({convos, base:'/app', meId:user.id})}));
+        const sel = Number(url.searchParams.get('c')) || (convos[0] && convos[0].other.id) || 0;
+        return send(res, V.layout({title:'Messages',user:{...user,unread:0},active:'msgs',body:V.inbox({convos, base:'/app', meId:user.id, sel})}));
       }
       const wMsg = p.match(/^\/app\/messages\/(\d+)$/);
       if(wMsg && method==='POST'){
         const b = await readBody(req);
         await sendMessage(user.id, Number(wMsg[1]), b.body);
-        return redirect(res, '/app/messages');
+        return redirect(res, '/app/messages?c='+Number(wMsg[1]));
       }
 
       // First login: never show an empty app. Auto-create a blank Work Card so every
@@ -2316,13 +2317,14 @@ const server = http.createServer(async (req,res)=>{
       if(p==='/console/messages' && method==='GET'){
         await db.prepare("UPDATE messages SET read_at=datetime('now') WHERE to_id=? AND read_at IS NULL").run(user.id);
         const convos = await getConversations(user.id);
-        return send(res, V.layout({title:'Messages',user:{...user,unread:0},active:'msgs',body:V.inbox({convos, base:'/console', meId:user.id})}));
+        const sel = Number(url.searchParams.get('c')) || (convos[0] && convos[0].other.id) || 0;
+        return send(res, V.layout({title:'Messages',user:{...user,unread:0},active:'msgs',body:V.inbox({convos, base:'/console', meId:user.id, sel})}));
       }
       const eMsg = p.match(/^\/console\/messages\/(\d+)$/);
       if(eMsg && method==='POST'){
         const b = await readBody(req);
         await sendMessage(user.id, Number(eMsg[1]), b.body);
-        return redirect(res, '/console/messages');
+        return redirect(res, '/console/messages?c='+Number(eMsg[1]));
       }
       const cMsg = p.match(/^\/console\/candidates\/(\d+)\/message$/);
       if(cMsg && method==='POST'){

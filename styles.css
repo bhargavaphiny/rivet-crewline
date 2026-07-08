@@ -1547,3 +1547,58 @@ img{transition:opacity .3s ease}
 .xf-grid{align-items:stretch}
 .xf-grid .xf{display:flex}
 .xf-grid .xbtn{height:100%}
+
+/* ===== inline Rivet mark inside agent headers ===== */
+.rivet-mark.mk-a{display:inline-grid;width:18px;height:18px;border-radius:5px;font-size:11px;vertical-align:-4px;margin-right:3px}
+.agent-h .rivet-mark.mk-a{width:19px;height:19px}
+
+/* ===== WhatsApp-style Messages ===== */
+.wa-shell{display:grid;grid-template-columns:320px 1fr;height:calc(100vh - 84px);margin:8px 0 0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--card);box-shadow:0 12px 40px rgba(20,42,70,.10)}
+.wa-list{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;background:var(--card)}
+.wa-list-h{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#fff,var(--card-2))}
+.wa-list-h h2{font-size:19px;margin:0}
+.wa-count{font-size:11px;font-weight:800;color:var(--brand-d);background:rgba(30,111,181,.1);padding:3px 9px;border-radius:999px}
+.wa-list-scroll{flex:1;overflow-y:auto;min-height:0}
+.wa-conv{display:flex;gap:12px;align-items:center;padding:13px 16px;border-bottom:1px solid var(--line);text-decoration:none;color:var(--ink);transition:background .14s}
+.wa-conv:hover{background:var(--wash)}
+.wa-conv.on{background:rgba(30,111,181,.08);box-shadow:inset 3px 0 0 var(--brand)}
+.wa-av{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:15px;color:#fff;background:linear-gradient(135deg,var(--brand),var(--brand-d))}
+.wa-conv-tx{flex:1;min-width:0}
+.wa-conv-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.wa-conv-top b{font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wa-conv-t{flex:none;font-size:11px;color:var(--muted)}
+.wa-conv-prev{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.wa-thread{display:flex;flex-direction:column;min-height:0;background:linear-gradient(180deg,#f7fafd,#eef3f8)}
+.wa-thread-h{display:flex;align-items:center;gap:12px;padding:13px 18px;border-bottom:1px solid var(--line);background:var(--card)}
+.wa-back{display:none;font-size:20px;color:var(--muted);text-decoration:none;font-weight:700}
+.wa-thread-id{display:flex;flex-direction:column;line-height:1.3}
+.wa-thread-id b{font-size:15px}
+.wa-thread-id span{font-size:12px;color:var(--muted)}
+.wa-scroll{flex:1;overflow-y:auto;min-height:0;padding:20px 22px;display:flex;flex-direction:column;gap:8px;scroll-behavior:smooth}
+.wa-msg{display:flex;max-width:72%}
+.wa-in{align-self:flex-start}
+.wa-out{align-self:flex-end;flex-direction:row-reverse}
+.wa-bub{position:relative;padding:9px 13px 7px;border-radius:12px;font-size:14px;line-height:1.45;box-shadow:0 1px 2px rgba(20,42,70,.08)}
+.wa-in .wa-bub{background:#fff;border:1px solid var(--line);border-top-left-radius:4px}
+.wa-out .wa-bub{background:linear-gradient(135deg,#d7f0e2,#c8ead6);border-top-right-radius:4px;color:#0d3a28}
+.wa-time{display:block;font-size:10px;color:var(--muted);text-align:right;margin-top:3px}
+.wa-out .wa-time{color:#3f7a5f}
+.wa-composer{display:flex;gap:10px;align-items:center;padding:14px 18px;border-top:1px solid var(--line);background:var(--card)}
+.wa-composer .wa-in{flex:1;margin:0;border:1.5px solid var(--line);border-radius:22px;padding:12px 18px;font-size:14.5px;background:var(--paper-2);align-self:auto}
+.wa-composer .wa-in:focus{border-color:var(--brand);box-shadow:0 0 0 4px rgba(30,111,181,.12);outline:none}
+.wa-send{flex:none;width:46px;height:46px;border-radius:50%;border:0;cursor:pointer;display:grid;place-items:center;background:linear-gradient(135deg,var(--brand),var(--brand-d));transition:transform .15s,box-shadow .15s}
+.wa-send:hover{transform:scale(1.06);box-shadow:0 6px 16px rgba(30,111,181,.35)}
+.wa-send .ic{width:19px;height:19px;color:#fff}
+.wa-empty-thread{margin:auto;text-align:center;color:var(--muted)}
+.wa-empty-thread .wa-empty-ic{width:56px;height:56px;margin:0 auto 12px;border-radius:16px;overflow:hidden}
+.wa-shell-empty{grid-template-columns:1fr;place-items:center}
+.wa-empty{text-align:center;max-width:420px;padding:40px 20px}
+.wa-empty-ic{width:64px;height:64px;border-radius:18px;overflow:hidden;margin:0 auto 16px;box-shadow:0 8px 22px rgba(30,111,181,.3)}
+.wa-empty-ic .rivet-mark{font-size:30px}
+.wa-empty h2{font-size:22px;margin:0 0 8px}
+.wa-empty .btn{margin-top:16px}
+@media(max-width:720px){
+  .wa-shell{grid-template-columns:1fr;height:calc(100vh - 64px)}
+  .wa-back{display:block}
+  .wa-msg{max-width:85%}
+}
